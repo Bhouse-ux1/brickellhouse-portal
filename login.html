@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="0; url=management/login.html">
+  <title>Redirecting | BrickellHouse</title>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const next = params.get("next") || "/management/dashboard.html";
+    location.replace(`/management/login.html?next=${encodeURIComponent(next)}`);
+  </script>
+</head>
+<body>
+  <p>Redirecting to <a href="management/login.html">Management Login</a>.</p>
+</body>
+</html>

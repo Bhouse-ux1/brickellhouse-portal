@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="BrickellHouse private management dashboard.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:;">
+  <title>Management Dashboard | BrickellHouse</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css?v=20260615-roadmap2">
+</head>
+<body class="management-page">
+  <div class="admin-shell open" id="adminShell">
+    <aside class="admin-sidebar">
+      <div class="footer-brand"><img class="official-logo logo-on-dark" src="../bh-logo-transparent.png" alt="Brickell House"></div>
+      <p>Management Portal</p>
+      <nav><button class="active" data-admin-view="overview">Overview</button><button data-admin-view="products">Products</button><button data-admin-view="orders">Orders</button><button data-admin-view="feedback">Feedback</button><button data-admin-view="settings">Settings</button></nav>
+      <a class="admin-exit" href="../#home">← Resident portal</a>
+    </aside>
+    <section class="admin-main">
+      <header><div><p class="eyebrow">Management</p><h2 id="adminTitle">Overview</h2></div><div class="admin-user"><span id="adminUserEmail">Checking access...</span><b>PM</b><button class="table-action" id="adminLogout">Sign out</button></div></header>
+      <div class="admin-view" id="adminOverview"></div>
+      <div class="admin-view hidden" id="adminProducts">
+        <div class="admin-toolbar"><p>Manage resident services, pricing, and inventory.</p><button class="primary-button" id="addProduct">+ Add product</button></div>
+        <div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Inventory</th><th>Status</th><th></th></tr></thead><tbody id="productTable"></tbody></table></div>
+      </div>
+      <div class="admin-view hidden" id="adminOrders">
+        <div class="admin-toolbar"><p>Resident order history and accounting records.</p><button class="outline-button" id="exportOrders">↓ Export for Excel</button></div>
+        <div class="order-search">
+          <label><span>Look up by</span><select id="orderSearchField"><option value="unit">Unit number</option><option value="number">Order number</option><option value="name">Resident name</option><option value="email">Email</option><option value="phone">Phone</option><option value="product">Product</option><option value="glCode">GL code</option><option value="all">All information</option></select></label>
+          <label class="order-search-input"><span>Search</span><input id="orderSearchInput" type="search" placeholder="Enter unit number"></label>
+          <button class="outline-button" id="clearOrderSearch">Clear</button>
+          <small id="orderSearchCount"></small>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Order</th><th>Resident / Unit</th><th>Product</th><th>Qty</th><th>Total</th><th>Payment</th><th>GL Code</th><th>Date</th><th>Status</th><th>Legal Acceptance</th><th>Notes</th></tr></thead><tbody id="orderTable"></tbody></table></div>
+      </div>
+      <div class="admin-view hidden" id="adminFeedback">
+        <div class="admin-toolbar"><p>Private resident feedback and management responses.</p><button class="outline-button" id="exportFeedback">↓ Export feedback</button></div>
+        <div class="feedback-filters">
+          <label><span>Search</span><input id="feedbackSearch" type="search" placeholder="Name, unit, email, or message"></label>
+          <label><span>Status</span><select id="feedbackStatusFilter"><option value="All">All statuses</option><option>New</option><option>In Review</option><option>Answered</option><option>Closed</option></select></label>
+          <label><span>Category</span><select id="feedbackCategoryFilter"><option value="All">All categories</option><option>Suggestions</option><option>Questions</option><option>Compliments</option><option>Product Requests</option><option>General Feedback</option></select></label>
+          <label><span>Date</span><input id="feedbackDateFilter" type="date"></label>
+        </div>
+        <div class="feedback-admin-list" id="feedbackAdminList"></div>
+      </div>
+      <div class="admin-view hidden" id="adminSettings">
+        <div class="settings-card">
+          <p class="eyebrow">Checkout settings</p>
+          <h3>Processing fee</h3>
+          <p>Choose how the resident processing fee is calculated and shown in the checkout breakdown.</p>
+          <form id="feeSettingsForm">
+            <div class="field-grid">
+              <label><span>Fee type</span><select name="type"><option value="percent">Percentage</option><option value="fixed">Fixed amount</option></select></label>
+              <label><span>Fee amount</span><input name="amount" type="number" min="0" step="0.01" required></label>
+              <label><span>Fee label</span><input name="label" required></label>
+              <label><span>Internal GL code</span><input name="glCode" required></label>
+            </div>
+            <label class="check-label"><input name="enabled" type="checkbox"> Charge processing fee at checkout</label>
+            <button class="primary-button" type="submit">Save fee settings</button>
+          </form>
+        </div>
+      </div>
+    </section>
+  </div>
+  <div class="modal" id="productModal" role="dialog" aria-modal="true">
+    <div class="modal-card product-form-card">
+      <button class="icon-button modal-close" data-close="product">×</button>
+      <p class="eyebrow">Catalog management</p><h2 id="productFormTitle">Add product</h2>
+      <form id="productForm">
+        <input type="hidden" name="id">
+        <label><span>Product name</span><input name="name" required></label>
+        <label><span>Internal / Square name</span><input name="internalName" required></label>
+        <label><span>Description</span><textarea name="description" required></textarea></label>
+        <div class="field-grid">
+          <label><span>Category</span><select name="category" required></select></label>
+          <label><span>Price</span><input name="price" type="number" min="0" step=".01" required></label>
+          <label><span>Inventory</span><input name="inventory" type="number" min="0" required></label>
+          <label><span>Internal GL code</span><input name="glCode" required></label>
+        </div>
+        <label><span>Image URL (optional)</span><input name="image" type="url"></label>
+        <label class="check-label"><input name="active" type="checkbox" checked> Active in resident store</label>
+        <button class="primary-button full" type="submit">Save product</button>
+      </form>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script src="../legal.js?v=20260615-legal1"></script>
+  <script src="../app.js?v=20260616-management-hidden1"></script>
+  <script src="../roadmap.js?v=20260616-management-split1"></script>
+</body>
+</html>

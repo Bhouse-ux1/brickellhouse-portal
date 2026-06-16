@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="BrickellHouse management login.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:;">
+  <title>Management Login | BrickellHouse</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css?v=20260615-roadmap2">
+</head>
+<body class="auth-page">
+  <main class="auth-layout">
+    <section class="auth-brand-panel">
+      <a href="../#home"><img src="../bh-logo-transparent.png" alt="Brickell House"></a>
+      <div><p class="eyebrow light">Authorized personnel only</p><h1>Management Portal</h1><p>Secure access for approved BrickellHouse management users.</p></div>
+    </section>
+    <section class="auth-form-panel">
+      <div class="auth-card">
+        <p class="eyebrow">Management sign in</p>
+        <h2>Welcome back</h2>
+        <form id="managementLoginForm">
+          <label><span>Email</span><input name="email" type="email" required autocomplete="username"></label>
+          <label><span>Password</span><input name="password" type="password" required autocomplete="current-password"></label>
+          <button class="primary-button full" type="submit">Sign in securely</button>
+          <p class="auth-message hidden" id="loginMessage" aria-live="polite"></p>
+          <a class="primary-button full hidden" id="goManagementLink" href="/management/dashboard.html">Go to Management</a>
+        </form>
+        <form id="passwordResetForm" class="password-reset-form">
+          <p>Need a new password? Enter your approved management email.</p>
+          <label><span>Management email</span><input name="email" type="email" required autocomplete="username"></label>
+          <button class="outline-button full" type="submit">Send password reset email</button>
+          <p class="auth-message hidden" id="resetMessage" aria-live="polite"></p>
+        </form>
+        <form id="passwordRecoveryForm" class="password-reset-form hidden">
+          <p>Create a new management password.</p>
+          <label><span>New password</span><input name="password" type="password" minlength="12" required autocomplete="new-password"></label>
+          <label><span>Confirm new password</span><input name="confirmation" type="password" minlength="12" required autocomplete="new-password"></label>
+          <button class="primary-button full" type="submit">Update password</button>
+          <p class="auth-message hidden" id="recoveryMessage" aria-live="polite"></p>
+        </form>
+        <a class="auth-back-link" href="../#home">← Return to resident portal</a>
+      </div>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../auth.js?v=20260616-management-split1"></script>
+</body>
+</html>

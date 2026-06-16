@@ -1,0 +1,715 @@
+const CATALOG_VERSION = "resident-services-2026-06-12-v2";
+const LEGAL_NOTICE_VERSION = window.BH_LEGAL_NOTICE.version;
+const CATEGORIES = ["Keys & Access", "Maintenance Services", "HVAC Services", "Subscriptions & Plans"];
+window.managementAccessGranted = false;
+let managementAuthClient = null;
+let managementProfile = null;
+let managementAccessPending = false;
+
+const seedProducts = [
+  {id:"svc1",name:"Mailbox Key Copy",category:"Keys & Access",description:"Replacement key for your assigned mailbox.",price:1,inventory:99,glCode:"4051-MAILBOX",image:"offer-mailbox-key.webp",active:true},
+  {id:"svc2",name:"Unit Key Copy",category:"Keys & Access",description:"Replacement of your unit door key.",price:30,inventory:99,glCode:"4051-UNIT",image:"offer-unit-key.webp",active:true},
+  {id:"svc3",name:"Smoke Detector Battery Replacement",category:"Maintenance Services",description:"Includes battery and labor.",price:25,inventory:99,glCode:"4083-SMOKE-BATT",image:"offer-smoke-battery.webp",active:true},
+  {id:"svc4",name:"AC Filter Replacement",category:"HVAC Services",description:"Includes filter and labor.",price:55,inventory:99,glCode:"4081-FILTER",image:"offer-filter-replacement.webp",active:true},
+  {id:"svc5",name:"Trash Compactor Replacement",category:"Maintenance Services",description:"Includes parts and labor.",price:200,inventory:99,glCode:"4084-COMPACTOR",image:"offer-trash-compactor.webp",active:true},
+  {id:"svc6",name:"Toilet or Sink Unclogged Service",category:"Maintenance Services",description:"Includes unclogging and labor for each individual sink or toilet.",price:30,inventory:99,glCode:"4085-UNCLOG",image:"offer-unclog-service.webp",active:true},
+  {id:"svc7",name:"Lockout Assistance",category:"Keys & Access",description:"Includes access and labor.",price:50,inventory:99,glCode:"4086-LOCKOUT",image:"offer-lockout.webp",active:true},
+  {id:"svc8",name:"Faucet Repair",category:"Maintenance Services",description:"Includes parts and labor.",price:125,inventory:99,glCode:"4087-FAUCET",image:"offer-faucet-repair.webp",active:true},
+  {id:"svc9",name:"Thermostat Reset or System Check",category:"HVAC Services",description:"Includes minor adjustments and labor.",price:40,inventory:99,glCode:"4088-THERMO-SVC",image:"offer-thermostat-check.webp",active:true},
+  {id:"svc10",name:"Portable AC Unit Rental",category:"HVAC Services",description:"$25.00 per day; requires a $300 refundable security deposit payable in advance.",price:300,inventory:10,glCode:"4091-AC-RENTAL",image:"offer-portable-ac.webp",active:true},
+  {id:"svc11",name:"Thermostat Replacement",category:"HVAC Services",description:"Thermostat replacement provided at no charge.",price:0,inventory:99,glCode:"4088-THERMO-REPL",image:"offer-thermostat-replacement.webp",active:true},
+  {id:"svc12",name:"Annual AC Filter Subscription",category:"Subscriptions & Plans",description:"Includes 12 scheduled AC filter replacements per year, one per month.",price:360,inventory:99,glCode:"4092-FILTER-SUB",image:"offer-annual-filter.webp",active:true},
+  {id:"svc13",name:"Valet Service Subscription",category:"Subscriptions & Plans",description:"Includes unlimited valet parking for one month for each registered vehicle per unit.",price:250,inventory:99,glCode:"4062-VALET-SUB",image:"offer-valet-subscription.webp",active:true},
+  {id:"svc14",name:"AC Drain Line Cleaning",category:"HVAC Services",description:"Includes cleaning and flushing the AC drain line to prevent overflow.",price:45,inventory:99,glCode:"4081-DRAIN",image:"offer-drain-cleaning.webp",active:true},
+  {id:"svc15",name:"Premium Resident Care Plan",category:"Subscriptions & Plans",description:"Billed annually. Covers basic in-unit maintenance labor, including light bulbs, AC maintenance, filters, thermostat checks, unclogging, minor touch-ups, and general inspections.",price:960,inventory:99,glCode:"4093-CARE-PLAN",image:"offer-resident-care.webp",active:true}
+];
+
+const sampleOrders = [];
+
+const catalogIsCurrent = localStorage.getItem("bh_catalog_version") === CATALOG_VERSION;
+let products = catalogIsCurrent ? JSON.parse(localStorage.getItem("bh_products") || "null") || seedProducts : seedProducts;
+let orders = sampleOrders;
+let cart = catalogIsCurrent ? JSON.parse(localStorage.getItem("bh_cart") || "[]") : [];
+let feeSettings = JSON.parse(localStorage.getItem("bh_fee_settings") || "null") || {
+  enabled:true,type:"percent",amount:3,label:"Processing fee",glCode:"4090-PROCESSING"
+};
+let activeCategory = "All";
+let orderSearchField = "unit";
+let orderSearchQuery = "";
+
+products.forEach(product => {
+  product.internalName ||= `${product.name} - GL ${product.glCode}`;
+});
+orders.forEach(order => {
+  order.status ||= "Received";
+  order.paymentStatus ||= "Historical";
+  order.internalNote ||= "";
+  order.publicNote ||= "";
+  order.squareTransactionId ||= "";
+});
+
+const $ = selector => document.querySelector(selector);
+const $$ = selector => [...document.querySelectorAll(selector)];
+const isManagementPage = document.body.classList.contains("management-page");
+const money = value => new Intl.NumberFormat("en-US", {style:"currency",currency:"USD"}).format(value);
+const todayISO = () => {
+  const date = new Date();
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+};
+const formatDate = value => {
+  if (!value) return "";
+  const [year, month, day] = value.slice(0, 10).split("-");
+  return `${month}/${day}/${year}`;
+};
+const fileDate = () => {
+  const [year, month, day] = todayISO().split("-");
+  return `${month}-${day}-${year}`;
+};
+const acceptanceDateTime = () => new Intl.DateTimeFormat("en-US", {
+  month:"2-digit",day:"2-digit",year:"numeric",hour:"numeric",minute:"2-digit"
+}).format(new Date());
+
+function migrateOrderNumber(order) {
+  const match = /^BH-(\d{2})(\d{2})(\d{2})-(.+)$/.exec(order.number || "");
+  if (match) order.number = `BH-${match[2]}${match[3]}20${match[1]}-${match[4]}`;
+}
+
+orders.forEach(migrateOrderNumber);
+
+function persist() {
+  localStorage.setItem("bh_products", JSON.stringify(products));
+  localStorage.removeItem("bh_orders");
+  localStorage.setItem("bh_cart", JSON.stringify(cart));
+  localStorage.setItem("bh_fee_settings", JSON.stringify(feeSettings));
+  localStorage.setItem("bh_catalog_version", CATALOG_VERSION);
+}
+
+function cartSubtotal() {
+  return cart.reduce((sum, item) => {
+    const product = products.find(candidate => candidate.id === item.id);
+    return sum + (product ? product.price * item.quantity : 0);
+  }, 0);
+}
+
+function processingFee(subtotal) {
+  if (!feeSettings.enabled) return 0;
+  const amount = feeSettings.type === "fixed" ? feeSettings.amount : subtotal * feeSettings.amount / 100;
+  return +amount.toFixed(2);
+}
+
+function revenueFor(list) {
+  return list.reduce((sum, order) => sum + order.price * order.quantity + (+order.processingFee || 0), 0);
+}
+
+function generateOrderNumber() {
+  const date = new Date();
+  const prefix = `BH-${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}${date.getFullYear()}-`;
+  const existing = new Set(orders.map(order => order.number));
+  let number;
+  do {
+    const random = crypto.getRandomValues(new Uint32Array(2));
+    const suffix = [...random].map(value => value.toString(36).padStart(7, "0")).join("").slice(0, 10).toUpperCase();
+    number = prefix + suffix;
+  } while (existing.has(number));
+  return number;
+}
+
+function iconFor(category) {
+  const paths = {
+    "Access Devices":'<rect x="21" y="18" width="48" height="74" rx="9"/><circle cx="45" cy="39" r="9"/><path d="M45 48v25M35 66h20"/>',
+    "Keys":'<circle cx="32" cy="39" r="17"/><path d="M44 51l30 30M61 68l9-9M69 76l9-9"/>',
+    "Parking Services":'<rect x="18" y="17" width="64" height="76" rx="5"/><path d="M35 74V35h15c20 0 20 27 0 27H35"/>',
+    "Building Services":'<path d="M20 88h60M27 88V37l23-19 23 19v51M39 88V60h22v28M38 43h6M56 43h6"/>',
+    "Maintenance Items":'<path d="M58 20a21 21 0 0 0-19 30L19 70l12 12 20-20a21 21 0 0 0 29-25L65 52 49 36 64 21z"/>'
+  };
+  return `<div class="product-icon"><svg viewBox="0 0 100 110">${paths[category]}</svg></div>`;
+}
+
+function renderTabs() {
+  if (!$("#categoryTabs")) return;
+  $("#categoryTabs").innerHTML = ["All", ...CATEGORIES].map(category =>
+    `<button class="${category === activeCategory ? "active" : ""}" data-cat="${category}">${category}</button>`
+  ).join("");
+  $$("#categoryTabs button").forEach(button => {
+    button.onclick = () => {
+      activeCategory = button.dataset.cat;
+      renderTabs();
+      renderProducts();
+    };
+  });
+}
+
+function renderProducts() {
+  if (!$("#productGrid") || !$("#searchInput")) return;
+  const query = $("#searchInput").value.trim().toLowerCase();
+  const filtered = products.filter(product =>
+    product.active &&
+    (activeCategory === "All" || product.category === activeCategory) &&
+    `${product.name} ${product.description}`.toLowerCase().includes(query)
+  );
+  $("#productGrid").innerHTML = filtered.map((product, index) =>
+    `<article class="product-card" style="animation-delay:${Math.min(index * .05, .4)}s">
+      <div class="product-image">
+        <img src="${product.image || "product-documents.webp"}" alt="${product.name}">
+        <span class="stock-badge ${product.inventory < 10 ? "low" : ""}">${product.inventory === 0 ? "Unavailable" : product.inventory < 10 ? `Only ${product.inventory} available` : "Available"}</span>
+      </div>
+      <div class="product-info">
+        <span class="product-category">${product.category}</span>
+        <h3>${product.name}</h3><p>${product.description}</p>
+        <div class="product-bottom"><strong>${product.price === 0 ? "Free" : money(product.price)}</strong><button class="add-button" data-add="${product.id}" ${product.inventory === 0 ? "disabled" : ""} aria-label="Add ${product.name}">+</button></div>
+      </div>
+    </article>`
+  ).join("");
+  $("#emptyState").classList.toggle("hidden", filtered.length > 0);
+  $$("[data-add]").forEach(button => button.onclick = () => addToCart(button.dataset.add));
+}
+
+function addToCart(id) {
+  const item = cart.find(candidate => candidate.id === id);
+  const product = products.find(candidate => candidate.id === id);
+  if (item) {
+    if (item.quantity < product.inventory) item.quantity++;
+  } else {
+    cart.push({id, quantity:1});
+  }
+  persist();
+  renderCart();
+  toast(`${product.name} added to your bag`);
+}
+
+function renderCart() {
+  if (!$("#cartCount") || !$("#cartItems")) return;
+  const items = cart.map(item => ({...item, product:products.find(product => product.id === item.id)})).filter(item => item.product);
+  $("#cartCount").textContent = items.reduce((sum, item) => sum + item.quantity, 0);
+  $("#cartItems").innerHTML = items.map(item =>
+    `<div class="cart-item">
+      <div class="cart-thumb">BH</div>
+      <div><h4>${item.product.name}</h4><div class="qty"><button data-qty="${item.id}" data-delta="-1">-</button><span>${item.quantity}</span><button data-qty="${item.id}" data-delta="1">+</button></div></div>
+      <div><strong>${money(item.product.price * item.quantity)}</strong><button class="remove" data-remove="${item.id}">Remove</button></div>
+    </div>`
+  ).join("");
+  const subtotal = cartSubtotal();
+  const fee = processingFee(subtotal);
+  $("#cartTotal").textContent = money(subtotal);
+  $("#checkoutSubtotal").textContent = money(subtotal);
+  $("#checkoutFee").textContent = money(fee);
+  $("#checkoutTotal").textContent = money(subtotal + fee);
+  $("#checkoutFeeLabel").textContent = feeSettings.enabled && feeSettings.type === "percent" ? `${feeSettings.label} (${feeSettings.amount}%)` : feeSettings.label;
+  $("#cartEmpty").classList.toggle("hidden", items.length > 0);
+  $("#cartFooter").classList.toggle("hidden", !items.length);
+  $$("[data-qty]").forEach(button => button.onclick = () => changeQty(button.dataset.qty, +button.dataset.delta));
+  $$("[data-remove]").forEach(button => button.onclick = () => {
+    cart = cart.filter(item => item.id !== button.dataset.remove);
+    persist();
+    renderCart();
+  });
+}
+
+function renderLegalNotice() {
+  if (!$("#legalVersion") || !$("#legalDocument")) return;
+  $("#legalVersion").textContent = `Document version ${LEGAL_NOTICE_VERSION}`;
+  $("#legalDocument").innerHTML = window.BH_LEGAL_NOTICE.sections.map((section, index) =>
+    `<section><${index ? "h3" : "h2"}>${section.title}</${index ? "h3" : "h2"}><p>${section.body}</p></section>`
+  ).join("");
+}
+
+function changeQty(id, delta) {
+  const item = cart.find(candidate => candidate.id === id);
+  const product = products.find(candidate => candidate.id === id);
+  item.quantity = Math.max(0, Math.min(product.inventory, item.quantity + delta));
+  if (!item.quantity) cart = cart.filter(candidate => candidate.id !== id);
+  persist();
+  renderCart();
+}
+
+function setDrawer(open) {
+  if (!$("#cartDrawer") || !$("#drawerBackdrop")) return;
+  $("#cartDrawer").classList.toggle("open", open);
+  $("#drawerBackdrop").classList.toggle("open", open);
+}
+
+function openModal(selector) { $(selector)?.classList.add("open"); }
+function closeModal(selector) { $(selector)?.classList.remove("open"); }
+function toast(message) {
+  const element = $("#toast");
+  if (!element) return;
+  element.textContent = message;
+  element.classList.add("show");
+  setTimeout(() => element.classList.remove("show"), 2200);
+}
+
+async function auditManagement(action, recordType = "management", recordId = null, beforeData = null, afterData = null) {
+  if (!managementAuthClient || !managementProfile) return;
+  try {
+    const {error} = await managementAuthClient.from("audit_logs").insert({
+      actor_user_id:managementProfile.user_id,
+      action,
+      record_type:recordType,
+      record_id:recordId,
+      before_data:beforeData,
+      after_data:afterData
+    });
+    if (error) console.warn("Management audit log unavailable", error);
+  } catch (error) {
+    console.warn("Management audit log unavailable", error);
+  }
+}
+window.auditManagement = auditManagement;
+window.recordManagementAudit = auditManagement;
+
+if ($("#cartOpen")) $("#cartOpen").onclick = () => setDrawer(true);
+if ($("#drawerBackdrop")) $("#drawerBackdrop").onclick = () => setDrawer(false);
+if ($('[data-close="cart"]')) $('[data-close="cart"]').onclick = () => setDrawer(false);
+if ($("#checkoutOpen")) $("#checkoutOpen").onclick = () => { setDrawer(false); openModal("#checkoutModal"); };
+if ($("#searchInput")) $("#searchInput").oninput = renderProducts;
+if ($("#legalNoticeOpen")) $("#legalNoticeOpen").onclick = () => openModal("#legalModal");
+if ($("#legalAcceptance")) $("#legalAcceptance").onchange = event => {
+  $("#checkoutSubmit").disabled = !event.target.checked;
+};
+
+$$("[data-close]").forEach(button => button.addEventListener("click", () => {
+  if (button.dataset.close === "checkout") closeModal("#checkoutModal");
+  if (button.dataset.close === "success") closeModal("#successModal");
+  if (button.dataset.close === "product") closeModal("#productModal");
+  if (button.dataset.close === "legal") closeModal("#legalModal");
+}));
+
+if ($("#checkoutForm")) $("#checkoutForm").onsubmit = event => {
+  event.preventDefault();
+  if (!$("#legalAcceptance").checked) {
+    toast("Please accept the legal notice before submitting");
+    return;
+  }
+  const resident = Object.fromEntries(new FormData(event.target));
+  const number = generateOrderNumber();
+  const date = todayISO();
+  const acceptedAt = acceptanceDateTime();
+  const fee = processingFee(cartSubtotal());
+  cart.forEach((cartItem, index) => {
+    const product = products.find(candidate => candidate.id === cartItem.id);
+    orders.push({
+      number,date,name:resident.name,unit:resident.unit,email:resident.email,phone:resident.phone,
+      product:product.name,quantity:cartItem.quantity,price:product.price,glCode:product.glCode,
+      processingFee:index === 0 ? fee : 0,feeLabel:feeSettings.label,feeGlCode:feeSettings.glCode,
+      legalAccepted:true,legalAcceptedAt:acceptedAt,legalNoticeVersion:LEGAL_NOTICE_VERSION,
+      termsVersion:null,privacyPolicyVersion:null
+    });
+    product.inventory = Math.max(0, product.inventory - cartItem.quantity);
+  });
+  // Square handoff should send the product GL and fee GL as private order metadata.
+  $("#successName").textContent = resident.name.split(" ")[0];
+  $("#successOrder").textContent = number;
+  cart = [];
+  persist();
+  renderCart();
+  renderProducts();
+  renderAdmin();
+  event.target.reset();
+  $("#checkoutSubmit").disabled = true;
+  closeModal("#checkoutModal");
+  openModal("#successModal");
+};
+
+function renderAdmin() {
+  if (!$("#adminOverview")) return;
+  if (!window.managementAccessGranted) return;
+  auditManagement("report_access", "management_report", "overview");
+  const revenue = revenueFor(orders);
+  const units = new Set(orders.map(order => order.unit)).size;
+  const lowProducts = products.filter(product => product.active && product.inventory <= 15);
+  const lowInventory = lowProducts.length;
+  const monthly = {};
+  orders.forEach(order => {
+    const key = order.date.slice(0, 7);
+    monthly[key] = (monthly[key] || 0) + order.price * order.quantity + (+order.processingFee || 0);
+  });
+  const monthRows = Object.entries(monthly).sort(([a], [b]) => b.localeCompare(a)).slice(0, 12);
+  const largestMonth = Math.max(1, ...monthRows.map(([, value]) => value));
+
+  $("#adminOverview").innerHTML = `
+    <div class="metric-grid">
+      <div class="metric"><span>Total orders</span><strong>${new Set(orders.map(order => order.number)).size}</strong></div>
+      <div class="metric"><span>Collected revenue</span><strong>${money(revenue)}</strong></div>
+      <div class="metric"><span>Resident units</span><strong>${units}</strong></div>
+      <button class="metric metric-button" id="lowInventoryMetric"><span>Low inventory (15 or fewer)</span><strong>${lowInventory}</strong><small>View items</small></button>
+    </div>
+    <div class="admin-panel low-inventory-panel hidden" id="lowInventoryPanel">
+      <h3>Low inventory items</h3>
+      ${lowProducts.length ? `<div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Remaining</th><th>Price</th><th></th></tr></thead><tbody>${lowProducts.map(product =>
+        `<tr><td><strong>${product.name}</strong></td><td>${product.category}</td><td><span class="inventory-count">${product.inventory}</span></td><td>${product.price === 0 ? "Free" : money(product.price)}</td><td><button class="table-action" data-low-edit="${product.id}">Edit inventory</button></td></tr>`
+      ).join("")}</tbody></table></div>` : `<div class="inventory-ok">All active products have more than 15 items available.</div>`}
+    </div>
+    <div class="admin-panel">
+      <h3>Revenue by period</h3>
+      <div class="report-controls">
+        <label><span>View by</span><select id="revenuePeriod"><option value="all">All time</option><option value="day">Day</option><option value="month">Month</option><option value="year">Year</option></select></label>
+        <label id="revenueValueLabel" class="hidden"><span>Period</span><input id="revenueValue"></label>
+        <button class="outline-button" id="applyRevenueFilter">Apply</button>
+      </div>
+      <div class="metric"><span id="filteredRevenueLabel">All-time revenue</span><strong id="filteredRevenue">${money(revenue)}</strong></div>
+    </div>
+    <div class="admin-panel">
+      <h3>Monthly revenue</h3>
+      <div class="monthly-bars">${monthRows.length ? monthRows.map(([key, value]) => {
+        const [year, month] = key.split("-");
+        return `<div class="monthly-row"><span>${month}/${year}</span><div class="monthly-track"><div class="monthly-fill" style="width:${value / largestMonth * 100}%"></div></div><strong>${money(value)}</strong></div>`;
+      }).join("") : "<p>No revenue yet.</p>"}</div>
+    </div>
+    <div class="admin-panel">
+      <h3>Recent resident orders</h3>
+      <div class="table-wrap">${orders.length ? `<table><thead><tr><th>Order</th><th>Resident</th><th>Product</th><th>Total</th><th>Date</th></tr></thead><tbody>${orders.slice(-5).reverse().map(order =>
+        `<tr><td>${order.number}</td><td><strong>${order.name}</strong>Unit ${order.unit}</td><td>${order.product}</td><td>${money(order.price * order.quantity + (+order.processingFee || 0))}</td><td>${formatDate(order.date)}</td></tr>`
+      ).join("")}</tbody></table>` : "<p>No orders yet.</p>"}</div>
+    </div>`;
+
+  $("#productTable").innerHTML = products.map(product =>
+    `<tr><td><strong>${product.name}</strong><span>${product.internalName}</span><span>${product.description}</span></td><td>${product.category}</td><td>${money(product.price)}</td><td>${product.inventory}</td><td><span class="status ${product.active ? "" : "inactive"}">${product.active ? "Active" : "Inactive"}</span></td><td><button class="table-action" data-edit="${product.id}">Edit</button> | <button class="table-action" data-toggle="${product.id}">${product.active ? "Deactivate" : "Activate"}</button> | <button class="table-action" data-delete="${product.id}">Remove</button></td></tr>`
+  ).join("");
+
+  renderOrderTable();
+
+  bindRevenueControls();
+  populateFeeSettings();
+  bindOrderSearch();
+  const lowMetric = $("#lowInventoryMetric");
+  if (lowMetric) lowMetric.onclick = () => {
+    const panel = $("#lowInventoryPanel");
+    panel.classList.toggle("hidden");
+    if (!panel.classList.contains("hidden")) panel.scrollIntoView({behavior:"smooth",block:"start"});
+  };
+  $$("[data-low-edit]").forEach(button => button.onclick = () => {
+    auditManagement("report_access", "management_report", "low_inventory");
+    showAdminView("products");
+    editProduct(button.dataset.lowEdit);
+  });
+  $$("[data-edit]").forEach(button => button.onclick = () => editProduct(button.dataset.edit));
+  $$("[data-toggle]").forEach(button => button.onclick = () => {
+    const product = products.find(candidate => candidate.id === button.dataset.toggle);
+    const before = {...product};
+    product.active = !product.active;
+    persist(); renderProducts(); renderAdmin();
+    auditManagement("product_status_change", "product", product.id, before, product);
+  });
+  $$("[data-delete]").forEach(button => button.onclick = () => {
+    if (confirm("Remove this product from the catalog?")) {
+      const removed = products.find(product => product.id === button.dataset.delete);
+      products = products.filter(product => product.id !== button.dataset.delete);
+      persist(); renderProducts(); renderAdmin();
+      auditManagement("product_delete", "product", button.dataset.delete, removed, null);
+    }
+  });
+}
+
+function matchingOrders() {
+  const query = orderSearchQuery.trim().toLowerCase();
+  if (!query) return orders;
+  return orders.filter(order => {
+    if (orderSearchField === "all") {
+      return [order.number,order.name,order.unit,order.email,order.phone,order.product,order.glCode,order.feeGlCode,formatDate(order.date)]
+        .some(value => String(value || "").toLowerCase().includes(query));
+    }
+    return String(order[orderSearchField] || "").toLowerCase().includes(query);
+  });
+}
+
+function renderOrderTable() {
+  if (!$("#orderTable")) return;
+  const matches = matchingOrders();
+  $("#orderTable").innerHTML = matches.slice().reverse().map(order => {
+    const subtotal = order.price * order.quantity;
+    const fee = +order.processingFee || 0;
+    const acceptance = order.legalAccepted
+      ? `<strong>Yes</strong>${order.legalAcceptedAt || ""}<br><small>Version ${order.legalNoticeVersion || "Not recorded"}</small>`
+      : `<span class="acceptance-missing">Not recorded</span>`;
+    return `<tr><td>${order.number}</td><td><strong>${order.name}</strong>Unit ${order.unit}</td><td>${order.product}</td><td>${order.quantity}</td><td>${money(subtotal)}</td><td>${fee ? `${money(fee)}<br><small>${order.feeGlCode || ""}</small>` : "-"}</td><td>${money(subtotal + fee)}</td><td>${order.glCode}</td><td>${formatDate(order.date)}</td><td>${acceptance}</td></tr>`;
+  }).join("") || `<tr><td colspan="10">No orders match this search.</td></tr>`;
+  if ($("#orderSearchCount")) $("#orderSearchCount").textContent = `${matches.length} line item${matches.length === 1 ? "" : "s"} found`;
+}
+
+function bindOrderSearch() {
+  const field = $("#orderSearchField");
+  const input = $("#orderSearchInput");
+  if (!field || !input) return;
+  const placeholders = {unit:"Enter unit number",number:"Enter order number",name:"Enter resident name",email:"Enter email",phone:"Enter phone number",product:"Enter product name",glCode:"Enter GL code",all:"Search all order information"};
+  field.value = orderSearchField;
+  input.value = orderSearchQuery;
+  input.placeholder = placeholders[orderSearchField];
+  field.onchange = () => {
+    orderSearchField = field.value;
+    input.placeholder = placeholders[orderSearchField];
+    renderOrderTable();
+  };
+  input.oninput = () => {
+    orderSearchQuery = input.value;
+    renderOrderTable();
+  };
+  $("#clearOrderSearch").onclick = () => {
+    orderSearchQuery = "";
+    input.value = "";
+    renderOrderTable();
+  };
+}
+
+function bindRevenueControls() {
+  const period = $("#revenuePeriod");
+  const label = $("#revenueValueLabel");
+  const input = $("#revenueValue");
+  if (!period) return;
+  period.onchange = () => {
+    const type = period.value;
+    label.classList.toggle("hidden", type === "all");
+    if (type === "day") { input.type = "date"; input.value = todayISO(); }
+    if (type === "month") { input.type = "month"; input.value = todayISO().slice(0, 7); }
+    if (type === "year") { input.type = "number"; input.min = "2000"; input.max = "2100"; input.value = new Date().getFullYear(); }
+  };
+  $("#applyRevenueFilter").onclick = () => {
+    const type = period.value;
+    const value = input.value;
+    const filtered = orders.filter(order =>
+      type === "all" ||
+      type === "day" && order.date === value ||
+      type === "month" && order.date.startsWith(value) ||
+      type === "year" && order.date.startsWith(`${value}-`)
+    );
+    const labels = {
+      all:"All-time revenue",
+      day:`Revenue for ${formatDate(value)}`,
+      month:`Revenue for ${value ? `${value.slice(5, 7)}/${value.slice(0, 4)}` : ""}`,
+      year:`Revenue for ${value}`
+    };
+    $("#filteredRevenueLabel").textContent = labels[type];
+    $("#filteredRevenue").textContent = money(revenueFor(filtered));
+  };
+}
+
+function populateFeeSettings() {
+  const form = $("#feeSettingsForm");
+  if (!form) return;
+  form.elements.type.value = feeSettings.type;
+  form.elements.amount.value = feeSettings.amount;
+  form.elements.label.value = feeSettings.label;
+  form.elements.glCode.value = feeSettings.glCode;
+  form.elements.enabled.checked = feeSettings.enabled;
+}
+
+function showAdminView(view) {
+  if (!$(`#admin${view[0].toUpperCase() + view.slice(1)}`)) return;
+  auditManagement("report_access", "management_view", view);
+  $$(".admin-view").forEach(element => element.classList.add("hidden"));
+  $(`#admin${view[0].toUpperCase() + view.slice(1)}`).classList.remove("hidden");
+  $("#adminTitle").textContent = view[0].toUpperCase() + view.slice(1);
+  $$("[data-admin-view]").forEach(button => button.classList.toggle("active", button.dataset.adminView === view));
+}
+
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    const existing = [...document.scripts].find(script => script.src === src);
+    if (existing) {
+      if (window.supabase?.createClient) resolve();
+      else existing.addEventListener("load", resolve, {once:true});
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = src;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error("Supabase login library could not load."));
+    document.head.appendChild(script);
+  });
+}
+
+function isLocalPrototypeHost() {
+  return ["localhost", "127.0.0.1", ""].includes(location.hostname);
+}
+
+async function loadManagementAuthClient() {
+  if (managementAuthClient) return managementAuthClient;
+  await loadScriptOnce("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2");
+  if (!window.supabase?.createClient) throw new Error("Supabase login library is unavailable.");
+  const response = await fetch("/api/supabase-config", {headers:{"Accept":"application/json"}});
+  if (!response.ok) throw new Error("Supabase configuration route is unavailable.");
+  const config = await response.json();
+  if (!config.enabled) throw new Error("Supabase Auth is not configured.");
+  managementAuthClient = window.supabase.createClient(config.url, config.anonKey, {
+    auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+  });
+  return managementAuthClient;
+}
+
+async function approvedManagementSession() {
+  const client = await loadManagementAuthClient();
+  const {data:{session}} = await client.auth.getSession();
+  if (!session?.user) return null;
+  const {data:{user}, error:userError} = await client.auth.getUser();
+  if (userError || !user || user.id !== session.user.id) return null;
+  const {data:profile, error:profileError} = await client
+    .from("management_users")
+    .select("user_id,email,role,active")
+    .eq("user_id", user.id)
+    .eq("active", true)
+    .maybeSingle();
+  if (profileError) throw profileError;
+  if (!profile) return null;
+  managementProfile = profile;
+  return {session, profile};
+}
+
+function openManagementLogin() {
+  location.href = "/management/login.html?next=%2Fmanagement%2Fdashboard.html";
+}
+
+function openAdminShell() {
+  window.managementAccessGranted = true;
+  $("#adminShell")?.classList.add("open");
+  if (managementProfile?.email) $("#adminUserEmail").textContent = managementProfile.email;
+  renderAdmin();
+}
+
+async function checkAndOpenManagement({silent = false} = {}) {
+  if (managementAccessPending) return;
+  managementAccessPending = true;
+  if (!silent) toast("Checking management access...");
+  try {
+    const approved = await approvedManagementSession();
+    if (!approved) {
+      if (isManagementPage) {
+        openManagementLogin();
+        return;
+      }
+      if (!silent) openManagementLogin();
+      else toast("Please use Management Login to access the dashboard.");
+      return;
+    }
+    openAdminShell();
+  } catch (error) {
+    if (isLocalPrototypeHost()) {
+      managementProfile = {user_id:"local-prototype", email:"Local prototype mode", role:"admin"};
+      openAdminShell();
+      toast("Local prototype management mode");
+      return;
+    }
+    toast(error.message || "Management access is unavailable.");
+  } finally {
+    managementAccessPending = false;
+  }
+}
+
+if ($("#adminOpen")) $("#adminOpen").onclick = () => checkAndOpenManagement();
+if ($("#adminClose")) $("#adminClose").onclick = () => $("#adminShell").classList.remove("open");
+if ($("#adminLogout")) $("#adminLogout").onclick = async () => {
+  try {
+    if (managementAuthClient) await managementAuthClient.auth.signOut();
+  } catch (error) {
+    console.warn("Unable to sign out of management session", error);
+  }
+  managementProfile = null;
+  window.managementAccessGranted = false;
+  $("#adminShell").classList.remove("open");
+  location.href = isManagementPage ? "/management/login.html" : "#home";
+  $("#adminUserEmail").textContent = "Property Management";
+  toast("Signed out of management");
+};
+if (isManagementPage && $("#adminShell")) checkAndOpenManagement({silent:true});
+$$("[data-admin-view]").forEach(button => button.onclick = () => showAdminView(button.dataset.adminView));
+
+const categorySelect = $('#productForm select[name="category"]');
+if (categorySelect) categorySelect.innerHTML = CATEGORIES.map(category => `<option>${category}</option>`).join("");
+
+if ($("#addProduct")) $("#addProduct").onclick = () => {
+  $("#productForm").reset();
+  $("#productForm [name=id]").value = "";
+  $("#productForm [name=active]").checked = true;
+  $("#productFormTitle").textContent = "Add product";
+  openModal("#productModal");
+};
+
+function editProduct(id) {
+  const product = products.find(candidate => candidate.id === id);
+  const form = $("#productForm");
+  Object.keys(product).forEach(key => {
+    if (form.elements[key]) {
+      if (form.elements[key].type === "checkbox") form.elements[key].checked = product[key];
+      else form.elements[key].value = product[key] || "";
+    }
+  });
+  $("#productFormTitle").textContent = "Edit product";
+  openModal("#productModal");
+}
+
+if ($("#productForm")) $("#productForm").onsubmit = event => {
+  event.preventDefault();
+  const form = event.target;
+  const data = Object.fromEntries(new FormData(form));
+  const product = {
+    id:data.id || `p${Date.now()}`,name:data.name,description:data.description,category:data.category,
+    internalName:data.internalName,price:+data.price,inventory:+data.inventory,glCode:data.glCode,
+    image:data.image,active:form.elements.active.checked
+  };
+  const index = products.findIndex(candidate => candidate.id === product.id);
+  const before = index >= 0 ? {...products[index]} : null;
+  if (index >= 0) products[index] = product;
+  else products.push(product);
+  persist(); renderProducts(); renderAdmin(); closeModal("#productModal"); toast("Catalog updated");
+  auditManagement(index >= 0 ? "product_update" : "product_create", "product", product.id, before, product);
+};
+
+if ($("#feeSettingsForm")) $("#feeSettingsForm").onsubmit = event => {
+  event.preventDefault();
+  const form = event.target;
+  const data = Object.fromEntries(new FormData(form));
+  const before = {...feeSettings};
+  feeSettings = {enabled:form.elements.enabled.checked,type:data.type,amount:+data.amount,label:data.label,glCode:data.glCode};
+  persist(); renderCart(); renderAdmin(); toast("Processing fee settings saved");
+  auditManagement("checkout_settings_update", "portal_settings", "processing_fee", before, feeSettings);
+};
+
+if ($("#exportOrders")) $("#exportOrders").onclick = () => {
+  const rows = [
+    ["Order Number","Resident Name","Unit Number","Product","Quantity","Unit Price","Subtotal","Processing Fee","Fee GL Code","Total","Hidden Product GL Code","Date","Legal Notice Accepted","Acceptance Date/Time","Legal Notice Version","Terms Version","Privacy Policy Version"],
+    ...orders.map(order => {
+      const subtotal = order.price * order.quantity;
+      const fee = +order.processingFee || 0;
+      return [order.number,order.name,order.unit,order.product,order.quantity,order.price,subtotal,fee,order.feeGlCode || "",subtotal + fee,order.glCode,formatDate(order.date),order.legalAccepted ? "Yes" : "Not recorded",order.legalAcceptedAt || "",order.legalNoticeVersion || "",order.termsVersion || "",order.privacyPolicyVersion || ""];
+    })
+  ];
+  const csv = rows.map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(",")).join("\r\n");
+  const blob = new Blob(["\ufeff" + csv], {type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `BrickellHouse-Orders-${fileDate()}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+  toast("Excel-compatible report exported");
+  auditManagement("export_orders", "export", "orders", null, {rows:orders.length});
+};
+
+const observer = new IntersectionObserver(entries => entries.forEach(entry => entry.isIntersecting && entry.target.classList.add("visible")), {threshold:.12});
+$$(".reveal").forEach(element => observer.observe(element));
+
+let parallaxFrame = 0;
+function updateParallax() {
+  parallaxFrame = 0;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const viewportCenter = window.innerHeight / 2;
+  $$(".parallax-image").forEach(image => {
+    const rect = image.parentElement.getBoundingClientRect();
+    if (rect.bottom < 0 || rect.top > window.innerHeight) return;
+    const distance = rect.top + rect.height / 2 - viewportCenter;
+    image.style.transform = `translate3d(0, ${distance * +image.dataset.parallax}px, 0) scale(1.04)`;
+  });
+  const heroImage = $(".hero-image");
+  if (heroImage && window.scrollY < window.innerHeight * 1.2) {
+    heroImage.style.transform = `translate3d(0, ${window.scrollY * .12}px, 0) scale(1.04)`;
+  }
+}
+window.addEventListener("scroll", () => {
+  if (!parallaxFrame) parallaxFrame = requestAnimationFrame(updateParallax);
+}, {passive:true});
+window.addEventListener("resize", updateParallax);
+
+persist();
+renderTabs();
+renderProducts();
+renderCart();
+renderLegalNotice();
+updateParallax();

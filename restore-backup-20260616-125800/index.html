@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="BrickellHouse resident services and essentials portal.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://sandbox.web.squarecdn.com https://cdn.jsdelivr.net; frame-src 'self' https://sandbox.web.squarecdn.com; connect-src 'self' https://sandbox.web.squarecdn.com https://pci-connect.squareupsandbox.com https://o160250.ingest.sentry.io https://*.supabase.co wss://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://sandbox.web.squarecdn.com; font-src 'self' https://fonts.gstatic.com https://square-fonts-production-f.squarecdn.com https://d1g145x70srn7h.cloudfront.net; img-src 'self' data:;">
+  <title>BrickellHouse | Resident Services</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=20260615-roadmap2">
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"><i></i><i></i><i></i></div>
+  <header class="site-header">
+    <a class="brand" href="#home" aria-label="BrickellHouse home">
+      <img class="official-logo logo-on-dark" src="bh-logo-transparent.png" alt="Brickell House">
+      <span class="brand-name"><small>RESIDENT SERVICES</small></span>
+    </a>
+    <nav aria-label="Main navigation">
+      <a href="#shop">Services</a>
+      <a href="#track">Track Order</a>
+      <a href="#feedback">Feedback</a>
+      <a href="#concierge">Concierge</a>
+      <a class="management-login-link" href="login.html">Management Login</a>
+      <button class="text-button hidden" id="adminOpen">Management</button>
+    </nav>
+    <button class="cart-button" id="cartOpen" aria-label="Open cart">
+      <span>Bag</span><b id="cartCount">0</b>
+    </button>
+  </header>
+
+  <main>
+    <section class="hero" id="home">
+      <div class="hero-image" role="img" aria-label="Luxury Miami glass residence at sunrise"></div>
+      <div class="hero-overlay"></div>
+      <div class="hero-content reveal">
+        <p class="eyebrow light">Exclusively for residents</p>
+        <div class="hero-logo">
+          <img src="bh-logo-transparent.png" alt="Brickell House">
+        </div>
+        <p class="hero-copy">Elevated resident essentials,<br>thoughtfully delivered.</p>
+        <a class="primary-button light-button" href="#shop">Explore resident services <span>↗</span></a>
+      </div>
+      <div class="residence-note"><span>25.7617° N</span><span>Miami, Florida</span></div>
+    </section>
+
+    <section class="shop-section" id="shop">
+      <div class="shop-head reveal">
+        <div>
+          <p class="eyebrow">Resident collection</p>
+          <h2>Services & essentials</h2>
+        </div>
+        <label class="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+          <input id="searchInput" type="search" placeholder="Search resident services">
+        </label>
+      </div>
+      <div class="category-tabs reveal" id="categoryTabs" aria-label="Product categories"></div>
+      <div class="product-grid" id="productGrid"></div>
+      <div class="empty-state hidden" id="emptyState">No services match your search.</div>
+    </section>
+
+    <section class="concierge" id="concierge">
+      <div class="concierge-card reveal">
+        <p class="eyebrow light">Private concierge</p>
+        <h2>Need a little assistance?</h2>
+        <p>Our management team is available to guide your request and coordinate collection.</p>
+        <a href="mailto:admin@brickellhouse.net">Contact management <span>↗</span></a>
+      </div>
+      <div class="concierge-hours reveal">
+        <span>Management office</span>
+        <strong>Monday – Friday</strong>
+        <p>9:00 AM – 5:00 PM</p>
+        <a class="office-phone" href="tel:+13054009661">305-400-9661</a>
+        <div class="extension-list">
+          <span><b>Receiving</b> Ext. 7000</span>
+          <span><b>Front Desk</b> Ext. 7002</span>
+          <span><b>Administrative Assistant</b> Ext. 7007</span>
+          <span><b>Parking Attendant</b> Ext. 7009</span>
+        </div>
+        <small>1300 Brickell Bay Drive, Miami</small>
+      </div>
+    </section>
+
+    <section class="resident-tools" id="track">
+      <div class="resident-tool-card reveal">
+        <p class="eyebrow">Order updates</p>
+        <h2>Track your order</h2>
+        <p>Enter your BrickellHouse order number to see its current status.</p>
+        <form id="trackingForm" class="compact-form">
+          <label><span>Order ID</span><input name="orderNumber" required placeholder="BH-06152026-XXXXXXXXXX" autocomplete="off"></label>
+          <button class="primary-button" type="submit">Check status</button>
+        </form>
+        <div class="tracking-result hidden" id="trackingResult" aria-live="polite"></div>
+      </div>
+      <div class="resident-tool-card reveal" id="feedback">
+        <p class="eyebrow">Resident voice</p>
+        <h2>Feedback & suggestions</h2>
+        <p>Share a question, suggestion, compliment, product request, or general feedback privately with management.</p>
+        <form id="feedbackForm">
+          <div class="field-grid">
+            <label><span>Resident name</span><input name="name" required autocomplete="name"></label>
+            <label><span>Unit number</span><input name="unit" required></label>
+            <label><span>Email</span><input name="email" type="email" autocomplete="email"></label>
+            <label><span>Category</span><select name="category" required><option>Suggestions</option><option>Questions</option><option>Compliments</option><option>Product Requests</option><option>General Feedback</option></select></label>
+          </div>
+          <label><span>Message</span><textarea name="message" required></textarea></label>
+          <button class="primary-button" type="submit">Send feedback</button>
+        </form>
+        <div class="feedback-confirmation hidden" id="feedbackConfirmation" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="closing-pool" aria-label="BrickellHouse rooftop pool">
+      <div class="closing-pool-image parallax-image" data-parallax="0.08"></div>
+      <div class="closing-pool-shade"></div>
+      <div class="closing-pool-copy reveal">
+        <p class="eyebrow light">At home above Brickell</p>
+        <img src="bh-logo-transparent.png" alt="Brickell House">
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-brand"><img class="official-logo logo-on-dark" src="bh-logo-transparent.png" alt="Brickell House"></div>
+    <p>Resident Services Portal<br>1300 Brickell Bay Drive, Miami, FL</p>
+    <div><a href="#">Privacy</a><a href="#">Resident Support</a><a href="login.html">Management Login</a></div>
+    <small>© 2026 BrickellHouse Condominium Association</small>
+  </footer>
+
+  <div class="drawer-backdrop" id="drawerBackdrop"></div>
+  <aside class="drawer" id="cartDrawer" aria-label="Shopping bag">
+    <div class="drawer-head"><div><p class="eyebrow">Resident order</p><h2>Your bag</h2></div><button class="icon-button" data-close="cart">×</button></div>
+    <div class="cart-items" id="cartItems"></div>
+    <div class="cart-empty" id="cartEmpty"><span>BH</span><h3>Your bag is empty</h3><p>Resident services you select will appear here.</p></div>
+    <div class="cart-footer" id="cartFooter">
+      <div class="total-row"><span>Subtotal</span><strong id="cartTotal">$0.00</strong></div>
+      <p>Requests may require management approval and resident verification.</p>
+      <button class="primary-button full" id="checkoutOpen">Continue to checkout <span>→</span></button>
+    </div>
+  </aside>
+
+  <div class="modal" id="checkoutModal" role="dialog" aria-modal="true" aria-labelledby="checkoutTitle">
+    <div class="modal-card checkout-card">
+      <button class="icon-button modal-close" data-close="checkout">×</button>
+      <div class="checkout-intro">
+        <p class="eyebrow">Secure resident checkout</p>
+        <h2 id="checkoutTitle">Complete your request</h2>
+        <p>Verify your residence details. Management will contact you when your items are ready.</p>
+      </div>
+      <form id="checkoutForm">
+        <div class="field-grid">
+          <label><span>Resident name</span><input name="name" required autocomplete="name" placeholder="Full name"></label>
+          <label><span>Unit number</span><input name="unit" required placeholder="e.g. 2504"></label>
+          <label><span>Email</span><input name="email" type="email" required autocomplete="email" placeholder="you@example.com"></label>
+          <label><span>Phone</span><input name="phone" type="tel" required autocomplete="tel" placeholder="(305) 555-0000"></label>
+        </div>
+        <div class="payment-box">
+          <div><span class="square-icon">S</span><div><strong>Square secure payment</strong><small id="paymentDescription">Checking secure payment availability.</small></div></div>
+          <div class="demo-note" id="paymentMode">LOADING</div>
+        </div>
+        <div class="square-card-container hidden" id="squareCardContainer">
+          <label><span>Card information</span></label>
+          <div id="squareCard"></div>
+        </div>
+        <div class="payment-message hidden" id="paymentMessage" aria-live="polite"></div>
+        <div class="checkout-breakdown">
+          <div><span>Subtotal</span><strong id="checkoutSubtotal">$0.00</strong></div>
+          <div><span id="checkoutFeeLabel">Processing fee</span><strong id="checkoutFee">$0.00</strong></div>
+          <div class="checkout-total"><span>Order total</span><strong id="checkoutTotal">$0.00</strong></div>
+        </div>
+        <div class="legal-acceptance">
+          <label class="check-label">
+            <input id="legalAcceptance" name="legalAcceptance" type="checkbox" required>
+            <span>I acknowledge that I have read and agree to the <button class="inline-legal-button" id="legalNoticeOpen" type="button">Legal Notice and Limitation of Liability</button>.</span>
+          </label>
+          <small>Your acceptance date, time, order number, and document version will be saved with this order.</small>
+        </div>
+        <button class="primary-button full" id="checkoutSubmit" type="submit" disabled>Submit resident order <span>→</span></button>
+        <p class="fine-print">By submitting, you authorize BrickellHouse management to verify your resident status.</p>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="legalModal" role="dialog" aria-modal="true" aria-labelledby="legalTitle">
+    <div class="modal-card legal-card">
+      <button class="icon-button modal-close" data-close="legal">×</button>
+      <p class="eyebrow">Resident legal notice</p>
+      <h2 id="legalTitle">Legal Notice and Limitation of Liability</h2>
+      <p class="legal-version" id="legalVersion"></p>
+      <div class="legal-document" id="legalDocument"></div>
+      <button class="primary-button" data-close="legal">Return to checkout</button>
+    </div>
+  </div>
+
+  <div class="modal" id="successModal" role="dialog" aria-modal="true">
+    <div class="modal-card success-card">
+      <span class="success-icon">✓</span><p class="eyebrow">Request received</p><h2>Thank you, <span id="successName"></span>.</h2>
+      <p>Your order <strong id="successOrder"></strong> has been received. <span id="successPaymentNote"></span></p>
+      <button class="primary-button" data-close="success">Return to residence portal</button>
+    </div>
+  </div>
+
+  <div class="admin-shell" id="adminShell">
+    <aside class="admin-sidebar">
+      <div class="footer-brand"><img class="official-logo logo-on-dark" src="bh-logo-transparent.png" alt="Brickell House"></div>
+      <p>Management Portal</p>
+      <nav><button class="active" data-admin-view="overview">Overview</button><button data-admin-view="products">Products</button><button data-admin-view="orders">Orders</button><button data-admin-view="feedback">Feedback</button><button data-admin-view="settings">Settings</button></nav>
+      <button class="admin-exit" id="adminClose">← Return to resident portal</button>
+    </aside>
+    <section class="admin-main">
+      <header><div><p class="eyebrow">Management</p><h2 id="adminTitle">Overview</h2></div><div class="admin-user"><span id="adminUserEmail">Property Management</span><b>PM</b><button class="table-action" id="adminLogout">Sign out</button></div></header>
+      <div class="admin-view" id="adminOverview"></div>
+      <div class="admin-view hidden" id="adminProducts">
+        <div class="admin-toolbar"><p>Manage resident services, pricing, and inventory.</p><button class="primary-button" id="addProduct">+ Add product</button></div>
+        <div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Inventory</th><th>Status</th><th></th></tr></thead><tbody id="productTable"></tbody></table></div>
+      </div>
+      <div class="admin-view hidden" id="adminOrders">
+        <div class="admin-toolbar"><p>Resident order history and accounting records.</p><button class="outline-button" id="exportOrders">↓ Export for Excel</button></div>
+        <div class="order-search">
+          <label><span>Look up by</span><select id="orderSearchField"><option value="unit">Unit number</option><option value="number">Order number</option><option value="name">Resident name</option><option value="email">Email</option><option value="phone">Phone</option><option value="product">Product</option><option value="glCode">GL code</option><option value="all">All information</option></select></label>
+          <label class="order-search-input"><span>Search</span><input id="orderSearchInput" type="search" placeholder="Enter unit number"></label>
+          <button class="outline-button" id="clearOrderSearch">Clear</button>
+          <small id="orderSearchCount"></small>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Order</th><th>Resident / Unit</th><th>Product</th><th>Qty</th><th>Total</th><th>Payment</th><th>GL Code</th><th>Date</th><th>Status</th><th>Legal Acceptance</th><th>Notes</th></tr></thead><tbody id="orderTable"></tbody></table></div>
+      </div>
+      <div class="admin-view hidden" id="adminFeedback">
+        <div class="admin-toolbar"><p>Private resident feedback and management responses.</p><button class="outline-button" id="exportFeedback">↓ Export feedback</button></div>
+        <div class="feedback-filters">
+          <label><span>Search</span><input id="feedbackSearch" type="search" placeholder="Name, unit, email, or message"></label>
+          <label><span>Status</span><select id="feedbackStatusFilter"><option value="All">All statuses</option><option>New</option><option>In Review</option><option>Answered</option><option>Closed</option></select></label>
+          <label><span>Category</span><select id="feedbackCategoryFilter"><option value="All">All categories</option><option>Suggestions</option><option>Questions</option><option>Compliments</option><option>Product Requests</option><option>General Feedback</option></select></label>
+          <label><span>Date</span><input id="feedbackDateFilter" type="date"></label>
+        </div>
+        <div class="feedback-admin-list" id="feedbackAdminList"></div>
+      </div>
+      <div class="admin-view hidden" id="adminSettings">
+        <div class="settings-card">
+          <p class="eyebrow">Checkout settings</p>
+          <h3>Processing fee</h3>
+          <p>Choose how the resident processing fee is calculated and shown in the checkout breakdown.</p>
+          <form id="feeSettingsForm">
+            <div class="field-grid">
+              <label><span>Fee type</span><select name="type"><option value="percent">Percentage</option><option value="fixed">Fixed amount</option></select></label>
+              <label><span>Fee amount</span><input name="amount" type="number" min="0" step="0.01" required></label>
+              <label><span>Fee label</span><input name="label" required></label>
+              <label><span>Internal GL code</span><input name="glCode" required></label>
+            </div>
+            <label class="check-label"><input name="enabled" type="checkbox"> Charge processing fee at checkout</label>
+            <button class="primary-button" type="submit">Save fee settings</button>
+          </form>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal" id="productModal" role="dialog" aria-modal="true">
+    <div class="modal-card product-form-card">
+      <button class="icon-button modal-close" data-close="product">×</button>
+      <p class="eyebrow">Catalog management</p><h2 id="productFormTitle">Add product</h2>
+      <form id="productForm">
+        <input type="hidden" name="id">
+          <label><span>Product name</span><input name="name" required></label>
+          <label><span>Internal / Square name</span><input name="internalName" required></label>
+        <label><span>Description</span><textarea name="description" required></textarea></label>
+        <div class="field-grid">
+          <label><span>Category</span><select name="category" required></select></label>
+          <label><span>Price</span><input name="price" type="number" min="0" step=".01" required></label>
+          <label><span>Inventory</span><input name="inventory" type="number" min="0" required></label>
+          <label><span>Internal GL code</span><input name="glCode" required></label>
+        </div>
+        <label><span>Image URL (optional)</span><input name="image" type="url"></label>
+        <label class="check-label"><input name="active" type="checkbox" checked> Active in resident store</label>
+        <button class="primary-button full" type="submit">Save product</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="passwordChangeModal" role="dialog" aria-modal="true" aria-labelledby="passwordChangeTitle">
+    <div class="modal-card auth-card">
+      <p class="eyebrow">Account security</p>
+      <h2 id="passwordChangeTitle">Create a new password</h2>
+      <p>Your temporary password must be changed before management access continues.</p>
+      <form id="passwordChangeForm">
+        <label><span>New password</span><input name="password" type="password" minlength="12" required autocomplete="new-password"></label>
+        <label><span>Confirm new password</span><input name="confirmation" type="password" minlength="12" required autocomplete="new-password"></label>
+        <button class="primary-button full" type="submit">Update password</button>
+        <p class="auth-message hidden" id="passwordChangeMessage" aria-live="polite"></p>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="legal.js?v=20260615-legal1"></script>
+  <script src="app.js?v=20260616-stable1"></script>
+  <script src="roadmap.js?v=20260616-security1"></script>
+  <script src="auth.js?v=20260616-stable2"></script>
+</body>
+</html>
