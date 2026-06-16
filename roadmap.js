@@ -6,9 +6,72 @@ let feedbackRecords = [];
 let squareConfig = {enabled:false, environment:"demo"};
 let squareCard = null;
 
+const LUNA_FALLBACK = "Please contact the Management Office at admin@brickellhouse.net or 305-400-9661.";
+const LUNA_VENDOR_DISCLAIMER = "Vendors are listed for resident convenience only. Vendor selection is always the resident's decision.";
+const LUNA_RESPONSES = [
+  {keywords:["gym","fitness"], answer:"Fitness Center / Gym: Location PL. Hours: 7:00 AM - 11:00 PM."},
+  {keywords:["pool","spa"], answer:"Pool / Spa: Location PL & RL. Hours: 8:00 AM - Sundown."},
+  {keywords:["rooftop","terrace"], answer:"Rooftop Terrace: Location RL. Hours: 8:00 AM - Sundown."},
+  {keywords:["clubroom","club room","lounge"], answer:"Clubroom / Lounge: Location PL. Hours: 8:00 AM - 11:00 PM."},
+  {keywords:["business center"], answer:"Business Center: Location 4th Floor. Hours: 7:00 AM - 3:00 PM."},
+  {keywords:["party","event room"], answer:"Party / Event Room: Location PL. Hours: 8:00 AM - 11:00 PM."},
+  {keywords:["electrician","electric"], answer:`Electricians: Orion Electric: 305-521-9091. Switchgear: 305-596-1500. ${LUNA_VENDOR_DISCLAIMER}`},
+  {keywords:["hvac","ac repair","a/c","air conditioning"], answer:`HVAC / AC Repairs: Raircon: 786-367-6386. Cam Seer Service: 305-934-6929. ${LUNA_VENDOR_DISCLAIMER}`},
+  {keywords:["locksmith","lock"], answer:`Locksmiths: Caraballo Locksmith: 305-858-6860. AAA Miami Locksmith: 305-576-9320. Brickell Locksmith: 786-565-3400. Locksmith in Miami: 305-224-1980. ${LUNA_VENDOR_DISCLAIMER}`},
+  {keywords:["plumber","plumbing"], answer:`Plumbers: Raircon: 786-367-6386 / 305-885-4422. Island Plumbing: 305-361-2929. US Contracting: 305-667-4036. Bay Plumbing: 305-446-8141. ${LUNA_VENDOR_DISCLAIMER}`},
+  {keywords:["appliance","refrigeration"], answer:`Appliance Repairs: AJ Appliance & Refrigeration: 305-244-0114. ${LUNA_VENDOR_DISCLAIMER}`},
+  {keywords:["shower","sliding door","sliding doors"], answer:`Shower Doors / Sliding Doors: Rapetti Shower: 786-663-0080. All Comp: 305-338-7623. World of Eagles: 786-286-3170. ${LUNA_VENDOR_DISCLAIMER}`},
+  {keywords:["curtain","curtains","blind","blinds"], answer:`Curtains / Blinds: Curtains & Blinds, INC: 786-506-3348. ${LUNA_VENDOR_DISCLAIMER}`},
+  {keywords:["handyman","handy"], answer:`Handyman: American Handy Paint & Clean Co.: 833-426-3987. ${LUNA_VENDOR_DISCLAIMER}`},
+  {keywords:["mover","moving","storage","trash pick","trash pickup"], answer:`Movers / Storage / Trash Pick-up: Rushmore Movers: 305-244-1840. Ciao Moving & Storage: 305-531-4222. ${LUNA_VENDOR_DISCLAIMER}`}
+];
+
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, character => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
 }[character]));
+
+function lunaAnswer(question) {
+  const value = String(question || "").toLowerCase();
+  const match = LUNA_RESPONSES.find(entry => entry.keywords.some(keyword => value.includes(keyword)));
+  return match ? match.answer : LUNA_FALLBACK;
+}
+
+function addLunaMessage(role, text) {
+  const log = $("#lunaMessages");
+  if (!log) return;
+  log.insertAdjacentHTML("beforeend", `<div class="luna-message ${role}">${escapeHtml(text)}</div>`);
+  log.scrollTop = log.scrollHeight;
+}
+
+function initializeLuna() {
+  if (document.body.classList.contains("management-page") || !$("#shop") || $("#lunaWidget")) return;
+  document.body.insertAdjacentHTML("beforeend", `
+    <aside class="luna-widget" id="lunaWidget" aria-label="Ask Luna resident assistant">
+      <button class="luna-toggle" id="lunaToggle" type="button">Ask Luna</button>
+      <section class="luna-panel hidden" id="lunaPanel">
+        <div class="luna-head"><strong>Luna</strong><button type="button" id="lunaClose" aria-label="Close Luna">×</button></div>
+        <div class="luna-messages" id="lunaMessages">
+          <div class="luna-message bot">Hi, I am Luna. Ask me about amenity hours or resident vendor categories.</div>
+        </div>
+        <form id="lunaForm">
+          <input name="question" autocomplete="off" placeholder="Ask about gym hours, plumbers, movers...">
+          <button type="submit">Send</button>
+        </form>
+      </section>
+    </aside>
+  `);
+  $("#lunaToggle").onclick = () => $("#lunaPanel").classList.toggle("hidden");
+  $("#lunaClose").onclick = () => $("#lunaPanel").classList.add("hidden");
+  $("#lunaForm").onsubmit = event => {
+    event.preventDefault();
+    const input = event.target.elements.question;
+    const question = input.value.trim();
+    if (!question) return;
+    addLunaMessage("user", question);
+    addLunaMessage("bot", lunaAnswer(question));
+    input.value = "";
+  };
+}
 
 function persistFeedback() {
   localStorage.removeItem(FEEDBACK_STORAGE_KEY);
@@ -33,9 +96,10 @@ function orderLines(number) {
   return orders.filter(order => order.number.toUpperCase() === number.toUpperCase());
 }
 
-function updateOrder(number, changes) {
+async function updateOrder(number, changes) {
   const before = orderLines(number).map(order => ({...order}));
   orderLines(number).forEach(order => Object.assign(order, changes));
+  await window.saveOrderToSupabase?.(number, changes);
   persist();
   auditRoadmapManagement("order_update", "order", number, before, orderLines(number));
 }
@@ -79,19 +143,27 @@ function renderOrderTableRoadmap() {
   if ($("#orderSearchCount")) $("#orderSearchCount").textContent = `${matches.length} line item${matches.length === 1 ? "" : "s"} found`;
 
   $$("[data-order-status]").forEach(select => {
-    select.onchange = () => {
-      updateOrder(select.dataset.orderStatus, {status:select.value});
+    select.onchange = async () => {
+      try {
+        await updateOrder(select.dataset.orderStatus, {status:select.value});
+        toast(`Order status updated to ${select.value}`);
+      } catch (error) {
+        toast(error.message || "Unable to update order status");
+      }
       renderOrderTableRoadmap();
-      toast(`Order status updated to ${select.value}`);
     };
   });
   $$("[data-save-order]").forEach(button => {
-    button.onclick = () => {
+    button.onclick = async () => {
       const number = button.dataset.saveOrder;
       const publicNote = $(`[data-public-note="${CSS.escape(number)}"]`).value.trim();
       const internalNote = $(`[data-internal-note="${CSS.escape(number)}"]`).value.trim();
-      updateOrder(number, {publicNote, internalNote});
-      toast("Order notes saved");
+      try {
+        await updateOrder(number, {publicNote, internalNote});
+        toast("Order notes saved");
+      } catch (error) {
+        toast(error.message || "Unable to save order notes");
+      }
     };
   });
 }
@@ -137,31 +209,44 @@ function renderFeedbackAdmin() {
   `).join("") || `<div class="admin-panel">No feedback matches the current filters.</div>`;
 
   $$("[data-save-feedback]").forEach(button => {
-    button.onclick = () => {
+    button.onclick = async () => {
       const record = feedbackRecords.find(item => item.id === button.dataset.saveFeedback);
       const before = {...record};
       const status = $(`[data-feedback-status="${record.id}"]`).value;
-      record.status = status;
-      record.managementResponse = $(`[data-feedback-response="${record.id}"]`).value.trim();
-      record.internalNotes = $(`[data-feedback-notes="${record.id}"]`).value.trim();
-      record.dateResponded = status === "Answered" && record.managementResponse ? new Date().toISOString() : record.dateResponded;
-      persistFeedback();
-      renderFeedbackAdmin();
-      renderRoadmapMetrics();
-      toast("Feedback record saved");
-      auditRoadmapManagement("feedback_response_update", "feedback", record.id, before, record);
+      const changes = {
+        status,
+        managementResponse:$(`[data-feedback-response="${record.id}"]`).value.trim(),
+        internalNotes:$(`[data-feedback-notes="${record.id}"]`).value.trim(),
+        dateResponded:status === "Answered" && $(`[data-feedback-response="${record.id}"]`).value.trim() ? new Date().toISOString() : record.dateResponded
+      };
+      try {
+        await window.saveFeedbackToSupabase?.(record.id, changes);
+        Object.assign(record, changes);
+        persistFeedback();
+        renderFeedbackAdmin();
+        renderRoadmapMetrics();
+        toast("Feedback record saved");
+        auditRoadmapManagement("feedback_response_update", "feedback", record.id, before, record);
+      } catch (error) {
+        toast(error.message || "Unable to save feedback record");
+      }
     };
   });
   $$("[data-delete-feedback]").forEach(button => {
-    button.onclick = () => {
+    button.onclick = async () => {
       if (!confirm("Delete this feedback record?")) return;
       const deleted = feedbackRecords.find(record => record.id === button.dataset.deleteFeedback);
-      feedbackRecords = feedbackRecords.filter(record => record.id !== button.dataset.deleteFeedback);
-      persistFeedback();
-      renderFeedbackAdmin();
-      renderRoadmapMetrics();
-      toast("Feedback record deleted");
-      auditRoadmapManagement("feedback_delete", "feedback", button.dataset.deleteFeedback, deleted, null);
+      try {
+        await window.deleteFeedbackFromSupabase?.(button.dataset.deleteFeedback);
+        feedbackRecords = feedbackRecords.filter(record => record.id !== button.dataset.deleteFeedback);
+        persistFeedback();
+        renderFeedbackAdmin();
+        renderRoadmapMetrics();
+        toast("Feedback record deleted");
+        auditRoadmapManagement("feedback_delete", "feedback", button.dataset.deleteFeedback, deleted, null);
+      } catch (error) {
+        toast(error.message || "Unable to delete feedback record");
+      }
     };
   });
 }
@@ -191,37 +276,42 @@ renderAdmin = function renderAdminWithRoadmap() {
   renderRoadmapMetrics();
 };
 
-if ($("#trackingForm")) $("#trackingForm").onsubmit = event => {
+if ($("#trackingForm")) $("#trackingForm").onsubmit = async event => {
   event.preventDefault();
   const number = new FormData(event.target).get("orderNumber").trim().toUpperCase();
-  const lines = orderLines(number);
   const result = $("#trackingResult");
   result.classList.remove("hidden", "error");
-  if (!lines.length) {
+  result.innerHTML = "<strong>Checking order...</strong>";
+  try {
+    const response = await fetch(`/api/order-status?number=${encodeURIComponent(number)}`, {headers:{"Accept":"application/json"}});
+    const payload = await response.json();
+    if (!response.ok || !payload.success) throw new Error(payload.message || "Order not found");
+    result.innerHTML = `<div class="tracking-status"><span>Current Status</span><strong>${escapeHtml(payload.order.status)}</strong></div>${payload.order.publicNote ? `<p>${escapeHtml(payload.order.publicNote)}</p>` : ""}`;
+  } catch (error) {
     result.classList.add("error");
     result.innerHTML = `<strong>Order not found.</strong><br>Check the order ID and try again, or contact management for assistance.`;
-    return;
   }
-  const order = lines[0];
-  result.innerHTML = `<div class="tracking-status"><span>Current Status</span><strong>${escapeHtml(order.status)}</strong></div>${order.publicNote ? `<p>${escapeHtml(order.publicNote)}</p>` : ""}`;
 };
 
-if ($("#feedbackForm")) $("#feedbackForm").onsubmit = event => {
+if ($("#feedbackForm")) $("#feedbackForm").onsubmit = async event => {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.target));
-  feedbackRecords.push({
-    id:`FB-${Date.now()}-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase()}`,
-    name:data.name.trim(),unit:data.unit.trim(),email:data.email.trim(),category:data.category,
-    message:data.message.trim(),dateSubmitted:new Date().toISOString(),status:"New",
-    managementResponse:"",dateResponded:"",internalNotes:""
-  });
-  persistFeedback();
-  event.target.reset();
   const confirmation = $("#feedbackConfirmation");
   confirmation.classList.remove("hidden");
-  confirmation.innerHTML = `<strong>Thank you for your feedback.</strong><br><br>Your submission has been received by management.<br><br>We will review your message and respond within 48 hours.<br><br>Thank you for helping us improve the BrickellHouse resident experience.`;
-  renderFeedbackAdmin();
-  renderRoadmapMetrics();
+  confirmation.innerHTML = `<strong>Sending feedback...</strong>`;
+  try {
+    const response = await fetch("/api/feedback", {
+      method:"POST",
+      headers:{"Content-Type":"application/json","Accept":"application/json"},
+      body:JSON.stringify(data)
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) throw new Error(payload.message || "Unable to save feedback");
+    event.target.reset();
+    confirmation.innerHTML = `<strong>Thank you for your feedback.</strong><br><br>Your submission has been received.<br><br>We will review your message and respond within 48 hours.<br><br>Thank you for helping us improve the BrickellHouse resident experience.`;
+  } catch (error) {
+    confirmation.innerHTML = `<strong>Feedback was not submitted.</strong><br><br>${escapeHtml(error.message || "Please try again.")}`;
+  }
 };
 
 ["feedbackSearch","feedbackStatusFilter","feedbackCategoryFilter","feedbackDateFilter"].forEach(id => {
@@ -383,15 +473,27 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
     submit.innerHTML = `Submit resident order <span>→</span>`;
     return;
   }
+  const acceptedAt = new Date().toISOString();
   const records = createOrderRecords({
-    number,resident,fee,acceptedAt:acceptanceDateTime(),
+    number,resident,fee,acceptedAt,
     paymentStatus:requiresPayment ? "Pending" : "No Payment Required"
   });
 
   try {
     let payment;
     if (!requiresPayment) {
-      payment = {status:"No Payment Required",id:"",createdAt:acceptanceDateTime()};
+      const response = await fetch("/api/create-order", {
+        method:"POST",
+        headers:{"Content-Type":"application/json","Accept":"application/json"},
+        body:JSON.stringify({
+          orderNumber:number,resident,
+          items:cart.map(item => ({id:item.id,quantity:item.quantity})),
+          legalAccepted:true,legalNoticeVersion:LEGAL_NOTICE_VERSION,legalAcceptedAt:acceptedAt
+        })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || "Order could not be saved");
+      payment = {status:"No Payment Required",id:"",createdAt:acceptedAt};
     } else if (squareConfig.enabled) {
       const tokenResult = await squareCard.tokenize();
       if (tokenResult.status !== "OK") throw new Error(tokenResult.errors?.[0]?.message || "Card tokenization failed");
@@ -401,7 +503,7 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
         body:JSON.stringify({
           sourceId:tokenResult.token,idempotencyKey:number,orderNumber:number,resident,
           items:cart.map(item => ({id:item.id,quantity:item.quantity})),
-          legalAccepted:true,legalNoticeVersion:LEGAL_NOTICE_VERSION
+          legalAccepted:true,legalNoticeVersion:LEGAL_NOTICE_VERSION,legalAcceptedAt:acceptedAt
         })
       });
       const result = await response.json();
@@ -409,7 +511,6 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
       payment = {status:"Paid",id:result.payment.id,createdAt:formatResidentDateTime(result.payment.createdAt)};
     }
 
-    orders.push(...records);
     finalizeSuccessfulOrder(records, payment);
     $("#successName").textContent = resident.name.trim().split(" ")[0];
     $("#successOrder").textContent = number;
@@ -430,3 +531,4 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
 };
 
 initializeSquare();
+initializeLuna();

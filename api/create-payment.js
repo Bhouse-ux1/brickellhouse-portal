@@ -1,4 +1,5 @@
 const {products} = require("./_catalog");
+const {supabaseRequest, assertSupabaseStorageReady} = require("./_supabase");
 
 const SQUARE_VERSION = process.env.SQUARE_API_VERSION || "2026-05-20";
 
@@ -33,8 +34,11 @@ module.exports = async function handler(request, response) {
   if (!accessToken || !locationId) {
     return send(response, 503, {success:false,message:"Square is not configured"});
   }
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return send(response, 503, {success:false,message:"Supabase order storage is not configured"});
+  }
 
-  const {sourceId,idempotencyKey,orderNumber,resident,items,legalAccepted,legalNoticeVersion} = request.body || {};
+  const {sourceId,idempotencyKey,orderNumber,resident,items,legalAccepted,legalNoticeVersion,legalAcceptedAt} = request.body || {};
   if (!sourceId || !idempotencyKey || !orderNumber || !resident?.name || !resident?.unit || !resident?.email) {
     return send(response, 400, {success:false,message:"Missing required payment or resident data"});
   }
@@ -68,6 +72,17 @@ module.exports = async function handler(request, response) {
   const feeCents = Math.round(subtotalCents * feePercent / 100);
   const amountCents = subtotalCents + feeCents;
   const apiBase = "https://connect.squareupsandbox.com";
+  let verifiedPayment = null;
+
+  try {
+    await assertSupabaseStorageReady();
+  } catch (error) {
+    return send(response, error.status || 503, {
+      success:false,
+      message:`Supabase order storage is not ready: ${error.message}. No Square payment was attempted.`,
+      detail:error.message
+    });
+  }
 
   try {
     const squareResponse = await fetch(`${apiBase}/v2/payments`, {
@@ -102,7 +117,7 @@ module.exports = async function handler(request, response) {
       }
     });
     const verifyResult = await verifyResponse.json();
-    const verifiedPayment = verifyResult.payment;
+    verifiedPayment = verifyResult.payment;
     const verified = verifyResponse.ok &&
       verifiedPayment?.status === "COMPLETED" &&
       verifiedPayment?.location_id === locationId &&
@@ -111,9 +126,61 @@ module.exports = async function handler(request, response) {
     if (!verified) {
       return send(response, 502, {success:false,message:"Square payment verification failed"});
     }
+  } catch (error) {
+    return send(response, 502, {success:false,message:"Unable to reach Square",detail:error.message});
+  }
+
+  try {
+    const now = new Date().toISOString();
+    const orderRows = await supabaseRequest("orders", {
+      method:"POST",
+      body:[{
+        order_number:String(orderNumber),
+        resident_name:String(resident.name).trim(),
+        unit_number:String(resident.unit).trim(),
+        email:String(resident.email).trim().toLowerCase(),
+        phone,
+        subtotal_cents:subtotalCents,
+        processing_fee_cents:feeCents,
+        total_cents:amountCents,
+        status:"Received",
+        payment_status:"Paid",
+        square_payment_id:verifiedPayment.id,
+        payment_at:verifiedPayment.created_at || now,
+        legal_accepted:true,
+        legal_accepted_at:legalAcceptedAt || now,
+        legal_notice_version:String(legalNoticeVersion),
+        terms_version:null,
+        privacy_policy_version:null
+      }]
+    });
+    const order = Array.isArray(orderRows) ? orderRows[0] : orderRows;
+    await supabaseRequest("order_items", {
+      method:"POST",
+      body:accounting.map(item => ({
+        order_id:order.id,
+        product_id:null,
+        resident_name_snapshot:products[item.productId].name,
+        internal_name_snapshot:item.internalName,
+        gl_code_snapshot:item.glCode,
+        quantity:item.quantity,
+        unit_price_cents:products[item.productId].priceCents
+      }))
+    });
+    await supabaseRequest("payment_events", {
+      method:"POST",
+      body:[{
+        order_number:String(orderNumber),
+        square_payment_id:verifiedPayment.id,
+        status:"COMPLETED",
+        amount_cents:amountCents,
+        payload:{payment:verifiedPayment}
+      }]
+    });
 
     return send(response, 200, {
       success:true,
+      order:{id:order.id, orderNumber:order.order_number},
       payment:{
         id:verifiedPayment.id,
         status:verifiedPayment.status,
@@ -123,6 +190,11 @@ module.exports = async function handler(request, response) {
       privateAccounting:accounting
     });
   } catch (error) {
-    return send(response, 502, {success:false,message:"Unable to reach Square",detail:error.message});
+    return send(response, error.status || 500, {
+      success:false,
+      message:"Square payment succeeded, but the order could not be saved to Supabase. Please contact management with the Square payment ID.",
+      payment:{id:verifiedPayment?.id || "", status:verifiedPayment?.status || ""},
+      detail:error.message
+    });
   }
 };

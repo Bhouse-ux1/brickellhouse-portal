@@ -5,6 +5,7 @@ window.managementAccessGranted = false;
 let managementAuthClient = null;
 let managementProfile = null;
 let managementAccessPending = false;
+let managementDataLoaded = false;
 
 const seedProducts = [
   {id:"svc1",name:"Mailbox Key Copy",category:"Keys & Access",description:"Replacement key for your assigned mailbox.",price:1,inventory:99,glCode:"4051-MAILBOX",image:"offer-mailbox-key.webp",active:true},
@@ -99,6 +100,10 @@ function processingFee(subtotal) {
 
 function revenueFor(list) {
   return list.reduce((sum, order) => sum + order.price * order.quantity + (+order.processingFee || 0), 0);
+}
+
+function centsToDollars(value) {
+  return +(Number(value || 0) / 100).toFixed(2);
 }
 
 function generateOrderNumber() {
@@ -274,42 +279,6 @@ $$("[data-close]").forEach(button => button.addEventListener("click", () => {
   if (button.dataset.close === "legal") closeModal("#legalModal");
 }));
 
-if ($("#checkoutForm")) $("#checkoutForm").onsubmit = event => {
-  event.preventDefault();
-  if (!$("#legalAcceptance").checked) {
-    toast("Please accept the legal notice before submitting");
-    return;
-  }
-  const resident = Object.fromEntries(new FormData(event.target));
-  const number = generateOrderNumber();
-  const date = todayISO();
-  const acceptedAt = acceptanceDateTime();
-  const fee = processingFee(cartSubtotal());
-  cart.forEach((cartItem, index) => {
-    const product = products.find(candidate => candidate.id === cartItem.id);
-    orders.push({
-      number,date,name:resident.name,unit:resident.unit,email:resident.email,phone:resident.phone,
-      product:product.name,quantity:cartItem.quantity,price:product.price,glCode:product.glCode,
-      processingFee:index === 0 ? fee : 0,feeLabel:feeSettings.label,feeGlCode:feeSettings.glCode,
-      legalAccepted:true,legalAcceptedAt:acceptedAt,legalNoticeVersion:LEGAL_NOTICE_VERSION,
-      termsVersion:null,privacyPolicyVersion:null
-    });
-    product.inventory = Math.max(0, product.inventory - cartItem.quantity);
-  });
-  // Square handoff should send the product GL and fee GL as private order metadata.
-  $("#successName").textContent = resident.name.split(" ")[0];
-  $("#successOrder").textContent = number;
-  cart = [];
-  persist();
-  renderCart();
-  renderProducts();
-  renderAdmin();
-  event.target.reset();
-  $("#checkoutSubmit").disabled = true;
-  closeModal("#checkoutModal");
-  openModal("#successModal");
-};
-
 function renderAdmin() {
   if (!$("#adminOverview")) return;
   if (!window.managementAccessGranted) return;
@@ -383,19 +352,30 @@ function renderAdmin() {
     editProduct(button.dataset.lowEdit);
   });
   $$("[data-edit]").forEach(button => button.onclick = () => editProduct(button.dataset.edit));
-  $$("[data-toggle]").forEach(button => button.onclick = () => {
+  $$("[data-toggle]").forEach(button => button.onclick = async () => {
     const product = products.find(candidate => candidate.id === button.dataset.toggle);
     const before = {...product};
     product.active = !product.active;
-    persist(); renderProducts(); renderAdmin();
-    auditManagement("product_status_change", "product", product.id, before, product);
+    try {
+      await saveProductToSupabase(product);
+      persist(); renderProducts(); renderAdmin();
+      auditManagement("product_status_change", "product", product.id, before, product);
+    } catch (error) {
+      Object.assign(product, before);
+      toast(error.message || "Unable to update product");
+    }
   });
-  $$("[data-delete]").forEach(button => button.onclick = () => {
+  $$("[data-delete]").forEach(button => button.onclick = async () => {
     if (confirm("Remove this product from the catalog?")) {
       const removed = products.find(product => product.id === button.dataset.delete);
-      products = products.filter(product => product.id !== button.dataset.delete);
-      persist(); renderProducts(); renderAdmin();
-      auditManagement("product_delete", "product", button.dataset.delete, removed, null);
+      try {
+        await deleteProductFromSupabase(button.dataset.delete);
+        products = products.filter(product => product.id !== button.dataset.delete);
+        persist(); renderProducts(); renderAdmin();
+        auditManagement("product_delete", "product", button.dataset.delete, removed, null);
+      } catch (error) {
+        toast(error.message || "Unable to remove product");
+      }
     }
   });
 }
@@ -553,14 +533,160 @@ async function approvedManagementSession() {
   return {session, profile};
 }
 
+function mapSupabaseOrderRows(rows) {
+  return (rows || []).flatMap(order => {
+    const items = order.order_items || [];
+    if (!items.length) {
+      return [{
+        id:order.id,number:order.order_number,date:(order.created_at || "").slice(0, 10),
+        name:order.resident_name,unit:order.unit_number,email:order.email,phone:order.phone || "",
+        product:"Order total",internalName:"No line items recorded",productId:"",
+        quantity:1,price:centsToDollars(order.subtotal_cents),glCode:"",
+        processingFee:centsToDollars(order.processing_fee_cents),feeLabel:feeSettings.label,feeGlCode:feeSettings.glCode,
+        legalAccepted:order.legal_accepted,legalAcceptedAt:order.legal_accepted_at || "",
+        legalNoticeVersion:order.legal_notice_version,termsVersion:order.terms_version,privacyPolicyVersion:order.privacy_policy_version,
+        status:order.status,publicNote:order.public_note || "",internalNote:order.internal_note || "",
+        paymentStatus:order.payment_status,squareTransactionId:order.square_payment_id || "",paymentDateTime:order.payment_at || ""
+      }];
+    }
+    return items.map((item, index) => ({
+      id:order.id,itemId:item.id,number:order.order_number,date:(order.created_at || "").slice(0, 10),
+      name:order.resident_name,unit:order.unit_number,email:order.email,phone:order.phone || "",
+      product:item.resident_name_snapshot,internalName:item.internal_name_snapshot,productId:item.product_id,
+      quantity:item.quantity,price:centsToDollars(item.unit_price_cents),glCode:item.gl_code_snapshot,
+      processingFee:index === 0 ? centsToDollars(order.processing_fee_cents) : 0,feeLabel:feeSettings.label,feeGlCode:feeSettings.glCode,
+      legalAccepted:order.legal_accepted,legalAcceptedAt:order.legal_accepted_at || "",
+      legalNoticeVersion:order.legal_notice_version,termsVersion:order.terms_version,privacyPolicyVersion:order.privacy_policy_version,
+      status:order.status,publicNote:order.public_note || "",internalNote:order.internal_note || "",
+      paymentStatus:order.payment_status,squareTransactionId:order.square_payment_id || "",paymentDateTime:order.payment_at || ""
+    }));
+  });
+}
+
+function mapSupabaseFeedbackRows(rows) {
+  return (rows || []).map(record => ({
+    id:record.id,
+    name:record.resident_name,
+    unit:record.unit_number,
+    email:record.email || "",
+    category:record.category,
+    message:record.message,
+    dateSubmitted:record.submitted_at,
+    status:record.status,
+    managementResponse:record.management_response || "",
+    dateResponded:record.responded_at || "",
+    internalNotes:record.internal_notes || ""
+  }));
+}
+
+function mapSupabaseProductRows(rows) {
+  return (rows || []).map(product => ({
+    id:product.id,
+    name:product.resident_name,
+    internalName:product.internal_name,
+    glCode:product.gl_code,
+    description:product.description,
+    category:product.category,
+    price:centsToDollars(product.price_cents),
+    inventory:product.inventory,
+    image:product.image_url || "",
+    active:product.active
+  }));
+}
+
+async function loadManagementData() {
+  if (!managementAuthClient || !window.managementAccessGranted) return;
+  const [ordersResult, feedbackResult, productsResult, settingsResult] = await Promise.all([
+    managementAuthClient.from("orders").select("*,order_items(*)").order("created_at", {ascending:true}),
+    managementAuthClient.from("feedback").select("*").order("submitted_at", {ascending:true}),
+    managementAuthClient.from("products").select("*").order("resident_name", {ascending:true}),
+    managementAuthClient.from("portal_settings").select("*")
+  ]);
+  if (ordersResult.error) throw ordersResult.error;
+  if (feedbackResult.error) throw feedbackResult.error;
+  if (productsResult.error) throw productsResult.error;
+  if (settingsResult.error) throw settingsResult.error;
+  orders = mapSupabaseOrderRows(ordersResult.data);
+  if (typeof feedbackRecords !== "undefined") feedbackRecords = mapSupabaseFeedbackRows(feedbackResult.data);
+  products = mapSupabaseProductRows(productsResult.data);
+  const feeSetting = (settingsResult.data || []).find(setting => setting.key === "processing_fee");
+  if (feeSetting?.value) feeSettings = {...feeSettings, ...feeSetting.value};
+  managementDataLoaded = true;
+}
+
+async function saveOrderToSupabase(number, changes) {
+  if (!managementAuthClient) return;
+  const payload = {};
+  if ("status" in changes) payload.status = changes.status;
+  if ("publicNote" in changes) payload.public_note = changes.publicNote;
+  if ("internalNote" in changes) payload.internal_note = changes.internalNote;
+  payload.updated_at = new Date().toISOString();
+  const {error} = await managementAuthClient.from("orders").update(payload).eq("order_number", number);
+  if (error) throw error;
+}
+
+async function saveFeedbackToSupabase(id, changes) {
+  if (!managementAuthClient) return;
+  const payload = {};
+  if ("status" in changes) payload.status = changes.status;
+  if ("managementResponse" in changes) payload.management_response = changes.managementResponse;
+  if ("internalNotes" in changes) payload.internal_notes = changes.internalNotes;
+  if ("dateResponded" in changes) payload.responded_at = changes.dateResponded || null;
+  const {error} = await managementAuthClient.from("feedback").update(payload).eq("id", id);
+  if (error) throw error;
+}
+
+async function deleteFeedbackFromSupabase(id) {
+  if (!managementAuthClient) return;
+  const {error} = await managementAuthClient.from("feedback").delete().eq("id", id);
+  if (error) throw error;
+}
+async function saveProductToSupabase(product) {
+  if (!managementAuthClient) return;
+  const payload = {
+    id:product.id,
+    resident_name:product.name,
+    internal_name:product.internalName,
+    gl_code:product.glCode,
+    description:product.description,
+    category:product.category,
+    price_cents:Math.round(Number(product.price || 0) * 100),
+    inventory:Number(product.inventory || 0),
+    image_url:product.image || null,
+    active:Boolean(product.active),
+    updated_at:new Date().toISOString()
+  };
+  const {error} = await managementAuthClient.from("products").upsert(payload, {onConflict:"id"});
+  if (error) throw error;
+}
+async function deleteProductFromSupabase(id) {
+  if (!managementAuthClient) return;
+  const {error} = await managementAuthClient.from("products").delete().eq("id", id);
+  if (error) throw error;
+}
+async function saveFeeSettingsToSupabase(settings) {
+  if (!managementAuthClient) return;
+  const {error} = await managementAuthClient.from("portal_settings").upsert({
+    key:"processing_fee",
+    value:settings,
+    updated_at:new Date().toISOString(),
+    updated_by:managementProfile?.user_id || null
+  }, {onConflict:"key"});
+  if (error) throw error;
+}
+window.saveOrderToSupabase = saveOrderToSupabase;
+window.saveFeedbackToSupabase = saveFeedbackToSupabase;
+window.deleteFeedbackFromSupabase = deleteFeedbackFromSupabase;
+
 function openManagementLogin() {
   location.href = "/management/login.html?next=%2Fmanagement%2Fdashboard.html";
 }
 
-function openAdminShell() {
+async function openAdminShell() {
   window.managementAccessGranted = true;
   $("#adminShell")?.classList.add("open");
   if (managementProfile?.email) $("#adminUserEmail").textContent = managementProfile.email;
+  if (managementAuthClient) await loadManagementData();
   renderAdmin();
 }
 
@@ -579,11 +705,11 @@ async function checkAndOpenManagement({silent = false} = {}) {
       else toast("Please use Management Login to access the dashboard.");
       return;
     }
-    openAdminShell();
+    await openAdminShell();
   } catch (error) {
     if (isLocalPrototypeHost()) {
       managementProfile = {user_id:"local-prototype", email:"Local prototype mode", role:"admin"};
-      openAdminShell();
+      await openAdminShell();
       toast("Local prototype management mode");
       return;
     }
@@ -635,7 +761,7 @@ function editProduct(id) {
   openModal("#productModal");
 }
 
-if ($("#productForm")) $("#productForm").onsubmit = event => {
+if ($("#productForm")) $("#productForm").onsubmit = async event => {
   event.preventDefault();
   const form = event.target;
   const data = Object.fromEntries(new FormData(form));
@@ -646,20 +772,31 @@ if ($("#productForm")) $("#productForm").onsubmit = event => {
   };
   const index = products.findIndex(candidate => candidate.id === product.id);
   const before = index >= 0 ? {...products[index]} : null;
-  if (index >= 0) products[index] = product;
-  else products.push(product);
-  persist(); renderProducts(); renderAdmin(); closeModal("#productModal"); toast("Catalog updated");
-  auditManagement(index >= 0 ? "product_update" : "product_create", "product", product.id, before, product);
+  try {
+    await saveProductToSupabase(product);
+    if (index >= 0) products[index] = product;
+    else products.push(product);
+    persist(); renderProducts(); renderAdmin(); closeModal("#productModal"); toast("Catalog updated");
+    auditManagement(index >= 0 ? "product_update" : "product_create", "product", product.id, before, product);
+  } catch (error) {
+    toast(error.message || "Unable to save product");
+  }
 };
 
-if ($("#feeSettingsForm")) $("#feeSettingsForm").onsubmit = event => {
+if ($("#feeSettingsForm")) $("#feeSettingsForm").onsubmit = async event => {
   event.preventDefault();
   const form = event.target;
   const data = Object.fromEntries(new FormData(form));
   const before = {...feeSettings};
   feeSettings = {enabled:form.elements.enabled.checked,type:data.type,amount:+data.amount,label:data.label,glCode:data.glCode};
-  persist(); renderCart(); renderAdmin(); toast("Processing fee settings saved");
-  auditManagement("checkout_settings_update", "portal_settings", "processing_fee", before, feeSettings);
+  try {
+    await saveFeeSettingsToSupabase(feeSettings);
+    persist(); renderCart(); renderAdmin(); toast("Processing fee settings saved");
+    auditManagement("checkout_settings_update", "portal_settings", "processing_fee", before, feeSettings);
+  } catch (error) {
+    feeSettings = before;
+    toast(error.message || "Unable to save processing fee settings");
+  }
 };
 
 if ($("#exportOrders")) $("#exportOrders").onclick = () => {

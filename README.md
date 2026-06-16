@@ -76,6 +76,6 @@ See [SQUARE_SETUP.md](SQUARE_SETUP.md) for the card and verification procedure.
 
 ## Current Limitation
 
-Orders and management data are still stored in the browser’s `localStorage`. Square Sandbox payment creation is server-side, but Supabase must become the permanent order database before production use.
+Resident orders, order items, payment events, and feedback are now saved through secure Vercel API routes into Supabase. The management dashboard reads approved management data from Supabase after login. The browser still uses `localStorage` only for temporary cart/catalog UI state.
 
 Live Square payments are disabled in code and must not be activated.
