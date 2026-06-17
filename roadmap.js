@@ -6,72 +6,9 @@ let feedbackRecords = [];
 let squareConfig = {enabled:false, environment:"demo"};
 let squareCard = null;
 
-const LUNA_FALLBACK = "Please contact the Front Desk at frontdesk@brickellhouse.net, Ext. 7000, or 305-400-9661.";
-const LUNA_VENDOR_DISCLAIMER = "Vendors are listed for resident convenience only. Vendor selection is always the resident's decision.";
-const LUNA_RESPONSES = [
-  {keywords:["gym","fitness"], answer:"Fitness Center / Gym: Location PL. Hours: 7:00 AM - 11:00 PM."},
-  {keywords:["pool","spa"], answer:"Pool / Spa: Location PL & RL. Hours: 8:00 AM - Sundown."},
-  {keywords:["rooftop","terrace"], answer:"Rooftop Terrace: Location RL. Hours: 8:00 AM - Sundown."},
-  {keywords:["clubroom","club room","lounge"], answer:"Clubroom / Lounge: Location PL. Hours: 8:00 AM - 11:00 PM."},
-  {keywords:["business center"], answer:"Business Center: Location 4th Floor. Hours: 7:00 AM - 3:00 PM."},
-  {keywords:["party","event room"], answer:"Party / Event Room: Location PL. Hours: 8:00 AM - 11:00 PM."},
-  {keywords:["electrician","electric"], answer:`Electricians: Orion Electric: 305-521-9091. Switchgear: 305-596-1500. ${LUNA_VENDOR_DISCLAIMER}`},
-  {keywords:["hvac","ac repair","a/c","air conditioning"], answer:`HVAC / AC Repairs: Raircon: 786-367-6386. Cam Seer Service: 305-934-6929. ${LUNA_VENDOR_DISCLAIMER}`},
-  {keywords:["locksmith","lock"], answer:`Locksmiths: Caraballo Locksmith: 305-858-6860. AAA Miami Locksmith: 305-576-9320. Brickell Locksmith: 786-565-3400. Locksmith in Miami: 305-224-1980. ${LUNA_VENDOR_DISCLAIMER}`},
-  {keywords:["plumber","plumbing"], answer:`Plumbers: Raircon: 786-367-6386 / 305-885-4422. Island Plumbing: 305-361-2929. US Contracting: 305-667-4036. Bay Plumbing: 305-446-8141. ${LUNA_VENDOR_DISCLAIMER}`},
-  {keywords:["appliance","refrigeration"], answer:`Appliance Repairs: AJ Appliance & Refrigeration: 305-244-0114. ${LUNA_VENDOR_DISCLAIMER}`},
-  {keywords:["shower","sliding door","sliding doors"], answer:`Shower Doors / Sliding Doors: Rapetti Shower: 786-663-0080. All Comp: 305-338-7623. World of Eagles: 786-286-3170. ${LUNA_VENDOR_DISCLAIMER}`},
-  {keywords:["curtain","curtains","blind","blinds"], answer:`Curtains / Blinds: Curtains & Blinds, INC: 786-506-3348. ${LUNA_VENDOR_DISCLAIMER}`},
-  {keywords:["handyman","handy"], answer:`Handyman: American Handy Paint & Clean Co.: 833-426-3987. ${LUNA_VENDOR_DISCLAIMER}`},
-  {keywords:["mover","moving","storage","trash pick","trash pickup"], answer:`Movers / Storage / Trash Pick-up: Rushmore Movers: 305-244-1840. Ciao Moving & Storage: 305-531-4222. ${LUNA_VENDOR_DISCLAIMER}`}
-];
-
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, character => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
 }[character]));
-
-function lunaAnswer(question) {
-  const value = String(question || "").toLowerCase();
-  const match = LUNA_RESPONSES.find(entry => entry.keywords.some(keyword => value.includes(keyword)));
-  return match ? match.answer : LUNA_FALLBACK;
-}
-
-function addLunaMessage(role, text) {
-  const log = $("#lunaMessages");
-  if (!log) return;
-  log.insertAdjacentHTML("beforeend", `<div class="luna-message ${role}">${escapeHtml(text)}</div>`);
-  log.scrollTop = log.scrollHeight;
-}
-
-function initializeLuna() {
-  if (document.body.classList.contains("management-page") || !$("#shop") || $("#lunaWidget")) return;
-  document.body.insertAdjacentHTML("beforeend", `
-    <aside class="luna-widget" id="lunaWidget" aria-label="Ask Luna resident assistant">
-      <button class="luna-toggle" id="lunaToggle" type="button">Ask Luna</button>
-      <section class="luna-panel hidden" id="lunaPanel">
-        <div class="luna-head"><strong>Luna</strong><button type="button" id="lunaClose" aria-label="Close Luna">×</button></div>
-        <div class="luna-messages" id="lunaMessages">
-          <div class="luna-message bot">Hi, I am Luna. Ask me about amenity hours or resident vendor categories.</div>
-        </div>
-        <form id="lunaForm">
-          <input name="question" autocomplete="off" placeholder="Ask about gym hours, plumbers, movers...">
-          <button type="submit">Send</button>
-        </form>
-      </section>
-    </aside>
-  `);
-  $("#lunaToggle").onclick = () => $("#lunaPanel").classList.toggle("hidden");
-  $("#lunaClose").onclick = () => $("#lunaPanel").classList.add("hidden");
-  $("#lunaForm").onsubmit = event => {
-    event.preventDefault();
-    const input = event.target.elements.question;
-    const question = input.value.trim();
-    if (!question) return;
-    addLunaMessage("user", question);
-    addLunaMessage("bot", lunaAnswer(question));
-    input.value = "";
-  };
-}
 
 function persistFeedback() {
   localStorage.removeItem(FEEDBACK_STORAGE_KEY);
@@ -556,4 +493,3 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
 };
 
 initializeSquare();
-initializeLuna();
