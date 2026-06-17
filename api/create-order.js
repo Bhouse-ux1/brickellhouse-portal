@@ -49,7 +49,7 @@ module.exports = async function handler(request, response) {
   const feeCents = Math.round(subtotalCents * feePercent / 100);
   const amountCents = subtotalCents + feeCents;
   if (amountCents > 0) {
-    return send(response, 400, {success:false,message:"Paid orders must be processed through Square Sandbox"});
+    return send(response, 400, {success:false,message:"Paid orders must be processed through Square payment"});
   }
 
   try {

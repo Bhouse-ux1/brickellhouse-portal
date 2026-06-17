@@ -4,10 +4,11 @@ module.exports = function handler(request, response) {
     return response.status(405).json({enabled:false,message:"Method not allowed"});
   }
 
-  const environment = process.env.SQUARE_ENVIRONMENT || "sandbox";
+  const environment = (process.env.SQUARE_ENVIRONMENT || "sandbox").toLowerCase();
   const applicationId = process.env.SQUARE_APPLICATION_ID || "";
   const locationId = process.env.SQUARE_LOCATION_ID || "";
-  const enabled = environment === "sandbox" && Boolean(applicationId && locationId && process.env.SQUARE_ACCESS_TOKEN);
+  const supportedEnvironment = environment === "sandbox" || environment === "production";
+  const enabled = supportedEnvironment && Boolean(applicationId && locationId && process.env.SQUARE_ACCESS_TOKEN);
 
   response.setHeader("Cache-Control", "no-store");
   return response.status(200).json({
@@ -16,7 +17,9 @@ module.exports = function handler(request, response) {
     applicationId:enabled ? applicationId : "",
     locationId:enabled ? locationId : "",
     processingFeePercent:Number(process.env.PROCESSING_FEE_PERCENT || "3"),
-    message:environment === "sandbox" ? "" : "Only Square Sandbox is enabled",
-    sdkUrl:"https://sandbox.web.squarecdn.com/v1/square.js"
+    message:supportedEnvironment ? "" : "Square environment must be sandbox or production",
+    sdkUrl:environment === "production"
+      ? "https://web.squarecdn.com/v1/square.js"
+      : "https://sandbox.web.squarecdn.com/v1/square.js"
   });
 };

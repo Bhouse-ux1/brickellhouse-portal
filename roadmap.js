@@ -6,7 +6,7 @@ let feedbackRecords = [];
 let squareConfig = {enabled:false, environment:"demo"};
 let squareCard = null;
 
-const LUNA_FALLBACK = "Please contact the Management Office at admin@brickellhouse.net or 305-400-9661.";
+const LUNA_FALLBACK = "Please contact the Front Desk at frontdesk@brickellhouse.net, Ext. 7000, or 305-400-9661.";
 const LUNA_VENDOR_DISCLAIMER = "Vendors are listed for resident convenience only. Vendor selection is always the resident's decision.";
 const LUNA_RESPONSES = [
   {keywords:["gym","fitness"], answer:"Fitness Center / Gym: Location PL. Hours: 7:00 AM - 11:00 PM."},
@@ -368,7 +368,7 @@ async function initializeSquare() {
     const response = await fetch("/api/square-config");
     if (!response.ok) throw new Error("Square API route is unavailable");
     squareConfig = await response.json();
-    if (!squareConfig.enabled) throw new Error("Square Sandbox is not configured");
+    if (!squareConfig.enabled) throw new Error(squareConfig.message || "Square payment is not configured");
     feeSettings = {
       ...feeSettings,
       enabled:true,
@@ -382,12 +382,14 @@ async function initializeSquare() {
     squareCard = await payments.card();
     await squareCard.attach("#squareCard");
     $("#squareCardContainer").classList.remove("hidden");
-    mode.textContent = "SANDBOX";
-    description.textContent = "Use a Square Sandbox test card. No live charge will occur.";
+    mode.textContent = squareConfig.environment === "production" ? "SQUARE" : "SANDBOX";
+    description.textContent = squareConfig.environment === "production"
+      ? "Secure card payment is available."
+      : "Use a Square Sandbox test card. No live charge will occur.";
   } catch (error) {
     squareConfig = {enabled:false, environment:"demo"};
-    mode.textContent = "SANDBOX OFFLINE";
-    description.textContent = "Square Sandbox is not available. Paid orders cannot be submitted until the secure backend is configured.";
+    mode.textContent = "SQUARE OFFLINE";
+    description.textContent = "Square payment is currently unavailable. Please contact management.";
   }
 }
 
@@ -466,7 +468,7 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
   const fee = processingFee(subtotal);
   const requiresPayment = subtotal + fee > 0;
   if (requiresPayment && !squareConfig.enabled) {
-    message.textContent = "Square Sandbox is unavailable. No order was created and no payment was attempted.";
+    message.textContent = "Square payment is currently unavailable. Please contact management.";
     message.classList.remove("hidden");
     message.classList.add("error");
     submit.disabled = false;
@@ -516,7 +518,7 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
     $("#successOrder").textContent = number;
     $("#successPaymentNote").textContent = !requiresPayment
       ? "No payment was required. Management can now process your request."
-      : "Square confirmed the Sandbox payment. Management can now process your request.";
+      : "Square confirmed the payment. Management can now process your request.";
     form.reset();
     closeModal("#checkoutModal");
     openModal("#successModal");

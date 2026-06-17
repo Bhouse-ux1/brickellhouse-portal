@@ -27,9 +27,9 @@ module.exports = async function handler(request, response) {
 
   const accessToken = process.env.SQUARE_ACCESS_TOKEN;
   const locationId = process.env.SQUARE_LOCATION_ID;
-  const environment = process.env.SQUARE_ENVIRONMENT || "sandbox";
-  if (environment !== "sandbox") {
-    return send(response, 503, {success:false,message:"Live Square payments are disabled. Set SQUARE_ENVIRONMENT=sandbox."});
+  const environment = (process.env.SQUARE_ENVIRONMENT || "sandbox").toLowerCase();
+  if (environment !== "sandbox" && environment !== "production") {
+    return send(response, 503, {success:false,message:"Square environment must be sandbox or production."});
   }
   if (!accessToken || !locationId) {
     return send(response, 503, {success:false,message:"Square is not configured"});
@@ -71,7 +71,9 @@ module.exports = async function handler(request, response) {
   const feePercent = Number(process.env.PROCESSING_FEE_PERCENT || "3");
   const feeCents = Math.round(subtotalCents * feePercent / 100);
   const amountCents = subtotalCents + feeCents;
-  const apiBase = "https://connect.squareupsandbox.com";
+  const apiBase = environment === "production"
+    ? "https://connect.squareup.com"
+    : "https://connect.squareupsandbox.com";
   let verifiedPayment = null;
 
   try {
