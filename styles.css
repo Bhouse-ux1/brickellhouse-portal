@@ -130,3 +130,30 @@ footer{padding:65px 5vw;background:#181c1c;color:#fff;display:grid;grid-template
 .status-pill.feedback-status{border-radius:999px;padding:7px 10px;font-weight:600}
 .status-pill.status-new,.status-pill.status-in-review{background:#f6e2e2;color:#943f3f}
 .status-pill.status-completed,.status-pill.status-closed{background:#e4f0e5;color:#3f6d49}
+.feedback-record{padding:0;overflow:hidden}
+.feedback-record-toggle{width:100%;border:0;background:#fff;padding:18px 20px;display:grid;grid-template-columns:110px minmax(160px,1fr) minmax(150px,1fr) 120px 150px;gap:14px;align-items:center;text-align:left;cursor:pointer}
+.feedback-record-toggle:hover{background:#fafaf7}
+.feedback-record-toggle span{display:grid;gap:5px}
+.feedback-record-toggle small{font-size:8px;text-transform:uppercase;letter-spacing:.12em;color:#818681}
+.feedback-record-toggle strong{font-family:var(--serif);font-size:15px;font-weight:500;color:var(--ink)}
+.feedback-record-toggle .status-pill{width:max-content}
+.feedback-record-body{display:none;border-top:1px solid #eceeeb;padding:20px}
+.feedback-record.expanded .feedback-record-body{display:block}
+.feedback-record-detail{display:grid;grid-template-columns:1.4fr .8fr .8fr;gap:14px;margin-bottom:18px}
+.feedback-record-detail p{margin:0;color:#666;line-height:1.6}
+.feedback-record-detail strong{display:block;font-size:8px;text-transform:uppercase;letter-spacing:.12em;color:#2f3433;margin-bottom:6px}
+.lifestyle-page{min-height:100vh;background:#101616;color:#fff;overflow-x:hidden}
+.lifestyle-page .site-header{position:absolute}
+.lifestyle-hero{position:relative;min-height:100vh;display:grid;place-items:center;overflow:hidden;isolation:isolate;padding:130px 22px 70px}
+.lifestyle-hero video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-3;background:#0d1111}
+.lifestyle-hero:before{content:"";position:absolute;inset:0;z-index:-2;background:linear-gradient(180deg,rgba(8,13,14,.34),rgba(8,13,14,.72)),radial-gradient(ellipse at center,rgba(8,13,14,.08),rgba(8,13,14,.58))}
+.lifestyle-hero:after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(0,0,0,.25),transparent 28%,transparent 72%,rgba(0,0,0,.22))}
+.lifestyle-hero-content{text-align:center;width:min(760px,100%);text-shadow:0 2px 24px rgba(0,0,0,.55)}
+.lifestyle-hero-content img{width:min(360px,70vw);filter:invert(1) grayscale(1);display:block;margin:0 auto 24px}
+.lifestyle-hero-content h1{font-family:var(--serif);font-size:clamp(52px,9vw,112px);font-weight:400;line-height:.95;margin:8px 0 12px}
+.lifestyle-hero-content h2{font-family:var(--serif);font-size:clamp(34px,5vw,62px);font-weight:400;margin:0 0 20px}
+.lifestyle-hero-content p:not(.eyebrow){font-family:var(--serif);font-size:clamp(17px,2vw,24px);line-height:1.55;color:#e4e8e6;margin:0 auto 32px;max-width:660px}
+.lifestyle-home-link{border:1px solid rgba(255,255,255,.72);background:rgba(255,255,255,.08);backdrop-filter:blur(10px)}
+.lifestyle-home-link:hover{background:#fff;color:var(--ink)}
+@media(max-width:1000px){.feedback-record-toggle{grid-template-columns:90px 1fr 1fr}.feedback-record-detail{grid-template-columns:1fr}}
+@media(max-width:700px){.feedback-record-toggle{grid-template-columns:1fr 1fr;padding:16px}.feedback-record-body{padding:16px}.lifestyle-hero{min-height:100svh;padding:110px 18px 48px}.lifestyle-hero-content img{width:min(270px,72vw)}.lifestyle-hero-content p:not(.eyebrow){font-size:17px}}

@@ -185,7 +185,7 @@ function matchingFeedback() {
   const date = $("#feedbackDateFilter")?.value || "";
   return feedbackRecords.filter(record => {
     const recordStatus = normalizeFeedbackStatus(record.status);
-    const matchesQuery = !query || [record.name,record.unit,record.email,record.message].some(value => String(value || "").toLowerCase().includes(query));
+    const matchesQuery = !query || [record.name,record.unit,record.email,record.phone,record.message].some(value => String(value || "").toLowerCase().includes(query));
     return matchesQuery &&
       (status === "All" || recordStatus === status) &&
       (category === "All" || record.category === category) &&
@@ -200,21 +200,37 @@ function renderFeedbackAdmin() {
   container.innerHTML = matches.map(record => {
     const status = normalizeFeedbackStatus(record.status);
     return `
-    <article class="feedback-record">
-      <div class="feedback-record-head">
-        <div><h3>${escapeHtml(record.category)}</h3><p>${escapeHtml(record.name)} · Unit ${escapeHtml(record.unit)}${record.email ? ` · ${escapeHtml(record.email)}` : ""}</p></div>
-        <div><span class="status-pill feedback-status ${feedbackStatusClass(status)}">${escapeHtml(status)}</span><p>${formatResidentDateTime(record.dateSubmitted)}</p></div>
+    <article class="feedback-record" data-feedback-record="${record.id}">
+      <button class="feedback-record-toggle" type="button" data-feedback-toggle="${record.id}" aria-expanded="false">
+        <span><small>Unit</small><strong>${escapeHtml(record.unit)}</strong></span>
+        <span><small>Resident</small><strong>${escapeHtml(record.name)}</strong></span>
+        <span><small>Type</small><strong>${escapeHtml(record.category)}</strong></span>
+        <span><small>Status</small><b class="status-pill feedback-status ${feedbackStatusClass(status)}">${escapeHtml(status)}</b></span>
+        <span><small>Submitted</small><strong>${formatResidentDateTime(record.dateSubmitted)}</strong></span>
+      </button>
+      <div class="feedback-record-body">
+        <div class="feedback-record-detail">
+          <p><strong>Message</strong>${escapeHtml(record.message)}</p>
+          <p><strong>Email</strong>${record.email ? escapeHtml(record.email) : "Not provided"}</p>
+          <p><strong>Phone</strong>${record.phone ? escapeHtml(record.phone) : "Not provided"}</p>
+        </div>
+        <div class="feedback-record-grid">
+          <label><span>Status</span><select data-feedback-status="${record.id}">${FEEDBACK_STATUSES.map(option => `<option ${option === status ? "selected" : ""}>${option}</option>`).join("")}</select></label>
+          <label><span>Management response</span><textarea data-feedback-response="${record.id}">${escapeHtml(record.managementResponse)}</textarea></label>
+          <label><span>Internal notes</span><textarea data-feedback-notes="${record.id}">${escapeHtml(record.internalNotes)}</textarea></label>
+        </div>
+        <div class="feedback-record-actions"><button class="table-action" data-delete-feedback="${record.id}">Delete</button><button class="primary-button" data-save-feedback="${record.id}">Save feedback record</button></div>
       </div>
-      <p>${escapeHtml(record.message)}</p>
-      <div class="feedback-record-grid">
-        <label><span>Status</span><select data-feedback-status="${record.id}">${FEEDBACK_STATUSES.map(option => `<option ${option === status ? "selected" : ""}>${option}</option>`).join("")}</select></label>
-        <label><span>Management response</span><textarea data-feedback-response="${record.id}">${escapeHtml(record.managementResponse)}</textarea></label>
-        <label><span>Internal notes</span><textarea data-feedback-notes="${record.id}">${escapeHtml(record.internalNotes)}</textarea></label>
-      </div>
-      <div class="feedback-record-actions"><button class="table-action" data-delete-feedback="${record.id}">Delete</button><button class="primary-button" data-save-feedback="${record.id}">Save feedback record</button></div>
     </article>
   `}).join("") || `<div class="admin-panel">No feedback matches the current filters.</div>`;
 
+  $$("[data-feedback-toggle]").forEach(button => {
+    button.onclick = () => {
+      const record = button.closest(".feedback-record");
+      const expanded = record.classList.toggle("expanded");
+      button.setAttribute("aria-expanded", String(expanded));
+    };
+  });
   $$("[data-save-feedback]").forEach(button => {
     button.onclick = async () => {
       const record = feedbackRecords.find(item => item.id === button.dataset.saveFeedback);
@@ -327,9 +343,9 @@ if ($("#feedbackForm")) $("#feedbackForm").onsubmit = async event => {
 
 if ($("#exportFeedback")) $("#exportFeedback").onclick = () => {
   downloadCsv(`BrickellHouse-Feedback-${fileDate()}.csv`, [
-    ["Feedback ID","Resident Name","Unit","Email","Category","Message","Date Submitted","Status","Management Response","Date Responded","Internal Notes"],
+    ["Feedback ID","Resident Name","Unit","Email","Phone","Category","Message","Date Submitted","Status","Management Response","Date Responded","Internal Notes"],
     ...feedbackRecords.map(record => [
-      record.id,record.name,record.unit,record.email,record.category,record.message,
+      record.id,record.name,record.unit,record.email,record.phone,record.category,record.message,
       formatResidentDateTime(record.dateSubmitted),record.status,record.managementResponse,
       formatResidentDateTime(record.dateResponded),record.internalNotes
     ])

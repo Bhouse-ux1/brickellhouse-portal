@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260617-feedback-status1">
+  <link rel="stylesheet" href="styles.css?v=20260617-feedback-compact1">
 </head>
 <body>
   <div class="ambient" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -23,6 +23,7 @@
       <a href="#track">Track Order</a>
       <a href="#feedback">Feedback</a>
       <a href="#concierge">Concierge</a>
+      <a href="lifestyle.html">Lifestyle</a>
     </nav>
     <button class="cart-button" id="cartOpen" aria-label="Open cart">
       <span>Bag</span><b id="cartCount">0</b>
@@ -102,6 +103,7 @@
             <label><span>Resident name</span><input name="name" required autocomplete="name"></label>
             <label><span>Unit number</span><input name="unit" required></label>
             <label><span>Email</span><input name="email" type="email" autocomplete="email"></label>
+            <label><span>Phone optional</span><input name="phone" type="tel" autocomplete="tel"></label>
             <label><span>Category</span><select name="category" required><option>Suggestions</option><option>Questions</option><option>Compliments</option><option>Product Requests</option><option>General Feedback</option></select></label>
           </div>
           <label><span>Message</span><textarea name="message" required></textarea></label>
@@ -119,6 +121,7 @@
         <img src="bh-logo-transparent.png" alt="Brickell House">
       </div>
     </section>
+
   </main>
 
   <footer>
@@ -203,7 +206,7 @@
 
   <div class="toast" id="toast"></div>
   <script src="legal.js?v=20260615-legal1"></script>
-  <script src="app.js?v=20260617-supabase-source1"></script>
-  <script src="roadmap.js?v=20260617-feedback-status1"></script>
+  <script src="app.js?v=20260617-feedback-compact1"></script>
+  <script src="roadmap.js?v=20260617-feedback-compact1"></script>
 </body>
 </html>

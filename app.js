@@ -569,6 +569,7 @@ function mapSupabaseFeedbackRows(rows) {
     name:record.resident_name,
     unit:record.unit_number,
     email:record.email || "",
+    phone:record.phone || "",
     category:record.category,
     message:record.message,
     dateSubmitted:record.submitted_at,
