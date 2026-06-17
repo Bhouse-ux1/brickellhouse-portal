@@ -12,6 +12,7 @@
 </head>
 <body class="lifestyle-page">
   <header class="site-header">
+    <button class="mobile-menu-toggle" type="button" aria-expanded="false" aria-controls="mobileMenu" aria-label="Open menu"><span></span><span></span><span></span></button>
     <a class="brand" href="index.html#home" aria-label="BrickellHouse home">
       <img class="official-logo logo-on-dark" src="bh-logo-transparent.png" alt="Brickell House">
       <span class="brand-name"><small>RESIDENT SERVICES</small></span>
@@ -23,11 +24,15 @@
       <a href="index.html#concierge">Concierge</a>
     </nav>
     <a class="primary-button light-button" href="index.html#home">Home</a>
+    <div class="mobile-menu" id="mobileMenu">
+      <a href="index.html">Home</a>
+      <a href="lifestyle.html">Lifestyle</a>
+    </div>
   </header>
 
   <main>
     <section class="lifestyle-hero" aria-label="BrickellHouse lifestyle coming soon">
-      <video autoplay muted loop playsinline preload="metadata" aria-hidden="true">
+      <video autoplay muted loop playsinline webkit-playsinline preload="metadata" aria-hidden="true">
         <source src="BHouse_Drone_Web_Optimized.mp4" type="video/mp4">
       </video>
       <div class="lifestyle-hero-content">
@@ -40,5 +45,6 @@
       </div>
     </section>
   </main>
+  <script src="public-nav.js?v=20260617-mobile-nav1"></script>
 </body>
 </html>

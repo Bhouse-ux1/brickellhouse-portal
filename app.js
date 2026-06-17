@@ -332,7 +332,7 @@ function renderAdmin() {
     </div>`;
 
   $("#productTable").innerHTML = products.map(product =>
-    `<tr><td><strong>${product.name}</strong><span>${product.internalName}</span><span>${product.description}</span></td><td>${product.category}</td><td>${money(product.price)}</td><td>${product.inventory}</td><td><span class="status ${product.active ? "" : "inactive"}">${product.active ? "Active" : "Inactive"}</span></td><td><button class="table-action" data-edit="${product.id}">Edit</button> | <button class="table-action" data-toggle="${product.id}">${product.active ? "Deactivate" : "Activate"}</button> | <button class="table-action" data-delete="${product.id}">Remove</button></td></tr>`
+    `<tr><td><strong>${product.name}</strong><span>${product.internalName}</span><span>${product.description}</span></td><td>${product.category}</td><td>${product.glCode}</td><td>${money(product.price)}</td><td>${product.inventory}</td><td><span class="status ${product.active ? "" : "inactive"}">${product.active ? "Active" : "Inactive"}</span></td><td><button class="table-action" data-edit="${product.id}">Edit</button> | <button class="table-action" data-toggle="${product.id}">${product.active ? "Deactivate" : "Activate"}</button> | <button class="table-action" data-delete="${product.id}">Remove</button></td></tr>`
   ).join("");
 
   renderOrderTable();
@@ -609,7 +609,8 @@ async function loadManagementData() {
   if (settingsResult.error) throw settingsResult.error;
   orders = mapSupabaseOrderRows(ordersResult.data);
   if (typeof feedbackRecords !== "undefined") feedbackRecords = mapSupabaseFeedbackRows(feedbackResult.data);
-  products = mapSupabaseProductRows(productsResult.data);
+  const supabaseProducts = mapSupabaseProductRows(productsResult.data);
+  products = supabaseProducts.length ? supabaseProducts : seedProducts.map(product => ({...product}));
   const feeSetting = (settingsResult.data || []).find(setting => setting.key === "processing_fee");
   if (feeSetting?.value) feeSettings = {...feeSettings, ...feeSetting.value};
   managementDataLoaded = true;
