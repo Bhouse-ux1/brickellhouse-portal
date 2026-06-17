@@ -498,7 +498,7 @@ function loadScriptOnce(src) {
 }
 
 function isLocalPrototypeHost() {
-  return ["localhost", "127.0.0.1", ""].includes(location.hostname);
+  return false;
 }
 
 async function loadManagementAuthClient() {
@@ -707,12 +707,6 @@ async function checkAndOpenManagement({silent = false} = {}) {
     }
     await openAdminShell();
   } catch (error) {
-    if (isLocalPrototypeHost()) {
-      managementProfile = {user_id:"local-prototype", email:"Local prototype mode", role:"admin"};
-      await openAdminShell();
-      toast("Local prototype management mode");
-      return;
-    }
     toast(error.message || "Management access is unavailable.");
   } finally {
     managementAccessPending = false;

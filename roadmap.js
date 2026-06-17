@@ -1,5 +1,5 @@
 const ORDER_STATUSES = ["Received", "Processing", "Ready for Pickup", "Completed", "Cancelled"];
-const FEEDBACK_STATUSES = ["New", "In Review", "Answered", "Closed"];
+const FEEDBACK_STATUSES = ["New", "In Review", "Completed", "Closed"];
 const FEEDBACK_STORAGE_KEY = "bh_feedback";
 
 let feedbackRecords = [];
@@ -174,15 +174,20 @@ function feedbackStatusClass(status) {
   return `status-${status.toLowerCase().replaceAll(" ", "-")}`;
 }
 
+function normalizeFeedbackStatus(status) {
+  return status === "Answered" ? "Completed" : status;
+}
+
 function matchingFeedback() {
   const query = ($("#feedbackSearch")?.value || "").trim().toLowerCase();
   const status = $("#feedbackStatusFilter")?.value || "All";
   const category = $("#feedbackCategoryFilter")?.value || "All";
   const date = $("#feedbackDateFilter")?.value || "";
   return feedbackRecords.filter(record => {
+    const recordStatus = normalizeFeedbackStatus(record.status);
     const matchesQuery = !query || [record.name,record.unit,record.email,record.message].some(value => String(value || "").toLowerCase().includes(query));
     return matchesQuery &&
-      (status === "All" || record.status === status) &&
+      (status === "All" || recordStatus === status) &&
       (category === "All" || record.category === category) &&
       (!date || record.dateSubmitted.slice(0, 10) === date);
   });
@@ -192,21 +197,23 @@ function renderFeedbackAdmin() {
   const container = $("#feedbackAdminList");
   if (!container) return;
   const matches = matchingFeedback().sort((a, b) => b.dateSubmitted.localeCompare(a.dateSubmitted));
-  container.innerHTML = matches.map(record => `
-    <article class="feedback-record ${feedbackStatusClass(record.status)}">
+  container.innerHTML = matches.map(record => {
+    const status = normalizeFeedbackStatus(record.status);
+    return `
+    <article class="feedback-record">
       <div class="feedback-record-head">
         <div><h3>${escapeHtml(record.category)}</h3><p>${escapeHtml(record.name)} · Unit ${escapeHtml(record.unit)}${record.email ? ` · ${escapeHtml(record.email)}` : ""}</p></div>
-        <div><span class="status-pill ${record.status === "New" ? "new" : ""}">${escapeHtml(record.status)}</span><p>${formatResidentDateTime(record.dateSubmitted)}</p></div>
+        <div><span class="status-pill feedback-status ${feedbackStatusClass(status)}">${escapeHtml(status)}</span><p>${formatResidentDateTime(record.dateSubmitted)}</p></div>
       </div>
       <p>${escapeHtml(record.message)}</p>
       <div class="feedback-record-grid">
-        <label><span>Status</span><select data-feedback-status="${record.id}">${FEEDBACK_STATUSES.map(status => `<option ${status === record.status ? "selected" : ""}>${status}</option>`).join("")}</select></label>
+        <label><span>Status</span><select data-feedback-status="${record.id}">${FEEDBACK_STATUSES.map(option => `<option ${option === status ? "selected" : ""}>${option}</option>`).join("")}</select></label>
         <label><span>Management response</span><textarea data-feedback-response="${record.id}">${escapeHtml(record.managementResponse)}</textarea></label>
         <label><span>Internal notes</span><textarea data-feedback-notes="${record.id}">${escapeHtml(record.internalNotes)}</textarea></label>
       </div>
       <div class="feedback-record-actions"><button class="table-action" data-delete-feedback="${record.id}">Delete</button><button class="primary-button" data-save-feedback="${record.id}">Save feedback record</button></div>
     </article>
-  `).join("") || `<div class="admin-panel">No feedback matches the current filters.</div>`;
+  `}).join("") || `<div class="admin-panel">No feedback matches the current filters.</div>`;
 
   $$("[data-save-feedback]").forEach(button => {
     button.onclick = async () => {
@@ -217,7 +224,7 @@ function renderFeedbackAdmin() {
         status,
         managementResponse:$(`[data-feedback-response="${record.id}"]`).value.trim(),
         internalNotes:$(`[data-feedback-notes="${record.id}"]`).value.trim(),
-        dateResponded:status === "Answered" && $(`[data-feedback-response="${record.id}"]`).value.trim() ? new Date().toISOString() : record.dateResponded
+        dateResponded:status === "Completed" && $(`[data-feedback-response="${record.id}"]`).value.trim() ? new Date().toISOString() : record.dateResponded
       };
       try {
         await window.saveFeedbackToSupabase?.(record.id, changes);
@@ -263,7 +270,7 @@ function renderRoadmapMetrics() {
   if (!grid) return;
   const existing = $("#feedbackMetric");
   if (existing) existing.remove();
-  const newFeedback = feedbackRecords.filter(record => record.status === "New").length;
+  const newFeedback = feedbackRecords.filter(record => ["New", "In Review"].includes(normalizeFeedbackStatus(record.status))).length;
   grid.insertAdjacentHTML("beforeend", `<button class="metric metric-button" id="feedbackMetric"><span>New feedback</span><strong>${newFeedback}</strong><small>Review messages</small></button>`);
   $("#feedbackMetric").onclick = () => showAdminView("feedback");
 }
