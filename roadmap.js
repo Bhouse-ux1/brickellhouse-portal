@@ -359,9 +359,6 @@ async function prepareApplePay() {
 }
 
 async function initializeSquare() {
-  const mode = $("#paymentMode");
-  const description = $("#paymentDescription");
-  if (!mode || !description) return;
   try {
     const response = await fetch("/api/square-config");
     if (!response.ok) throw new Error("Square API route is unavailable");
@@ -380,16 +377,10 @@ async function initializeSquare() {
     squareCard = await squarePayments.card();
     await squareCard.attach("#squareCard");
     $("#squareCardContainer").classList.remove("hidden");
-    mode.textContent = squareConfig.environment === "production" ? "SQUARE" : "SANDBOX";
-    description.textContent = squareConfig.environment === "production"
-      ? "Secure card payment is available."
-      : "Use a Square Sandbox test card. No live charge will occur.";
   } catch (error) {
     squareConfig = {enabled:false, environment:"demo"};
     squarePayments = null;
     hideApplePay();
-    mode.textContent = "SQUARE OFFLINE";
-    description.textContent = "Square payment is currently unavailable. Please contact management.";
   }
 }
 
