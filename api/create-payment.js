@@ -1,5 +1,6 @@
 const {products} = require("./_catalog");
 const {supabaseRequest, assertSupabaseStorageReady} = require("./_supabase");
+const {sendOrderEmails} = require("./order-emails");
 
 const SQUARE_VERSION = process.env.SQUARE_API_VERSION || "2026-05-20";
 
@@ -179,6 +180,31 @@ module.exports = async function handler(request, response) {
         payload:{payment:verifiedPayment}
       }]
     });
+
+    const walletType = verifiedPayment.card_details?.card?.digital_wallet_type;
+    const paymentMethod = walletType === "APPLE_PAY"
+      ? "Apple Pay"
+      : verifiedPayment.source_type === "CARD" ? "Credit/debit card" : verifiedPayment.source_type || "Square";
+    try {
+      await sendOrderEmails({
+        paymentId:verifiedPayment.id,
+        orderNumber:String(orderNumber),
+        residentName:String(resident.name).trim(),
+        unit:String(resident.unit).trim(),
+        email:String(resident.email).trim().toLowerCase(),
+        phone,
+        items:accounting.map(item => ({
+          name:products[item.productId].name,
+          quantity:item.quantity,
+          unitPriceCents:products[item.productId].priceCents
+        })),
+        totalCents:amountCents,
+        paymentMethod,
+        createdAt:verifiedPayment.created_at || now
+      });
+    } catch (error) {
+      console.error(`Order email notification failed after successful payment: ${error.message || "Unknown error"}`);
+    }
 
     return send(response, 200, {
       success:true,

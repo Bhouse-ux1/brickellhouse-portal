@@ -1,0 +1,9 @@
+{
+  "name": "brickellhouse-portal",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BrickellHouse resident services portal",
+  "dependencies": {
+    "resend": "^6.14.0"
+  }
+}
