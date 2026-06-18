@@ -5,6 +5,10 @@ const FEEDBACK_STORAGE_KEY = "bh_feedback";
 let feedbackRecords = [];
 let squareConfig = {enabled:false, environment:"demo"};
 let squareCard = null;
+let squarePayments = null;
+let squareApplePay = null;
+let applePayAmount = "";
+let paymentInProgress = false;
 
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, character => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
@@ -320,6 +324,40 @@ function loadSquareScript(url) {
   });
 }
 
+function hideApplePay() {
+  squareApplePay = null;
+  applePayAmount = "";
+  $("#applePayOption")?.classList.add("hidden");
+}
+
+async function prepareApplePay() {
+  const total = cartSubtotal() + processingFee(cartSubtotal());
+  if (!squarePayments || total <= 0) {
+    hideApplePay();
+    return;
+  }
+
+  const amount = total.toFixed(2);
+  if (squareApplePay && applePayAmount === amount) {
+    $("#applePayOption")?.classList.remove("hidden");
+    return;
+  }
+
+  hideApplePay();
+  try {
+    const paymentRequest = squarePayments.paymentRequest({
+      countryCode:"US",
+      currencyCode:"USD",
+      total:{amount,label:"BrickellHouse"}
+    });
+    squareApplePay = await squarePayments.applePay(paymentRequest);
+    applePayAmount = amount;
+    $("#applePayOption")?.classList.remove("hidden");
+  } catch (_) {
+    hideApplePay();
+  }
+}
+
 async function initializeSquare() {
   const mode = $("#paymentMode");
   const description = $("#paymentDescription");
@@ -338,8 +376,8 @@ async function initializeSquare() {
     persist();
     renderCart();
     await loadSquareScript(squareConfig.sdkUrl);
-    const payments = window.Square.payments(squareConfig.applicationId, squareConfig.locationId);
-    squareCard = await payments.card();
+    squarePayments = window.Square.payments(squareConfig.applicationId, squareConfig.locationId);
+    squareCard = await squarePayments.card();
     await squareCard.attach("#squareCard");
     $("#squareCardContainer").classList.remove("hidden");
     mode.textContent = squareConfig.environment === "production" ? "SQUARE" : "SANDBOX";
@@ -348,10 +386,89 @@ async function initializeSquare() {
       : "Use a Square Sandbox test card. No live charge will occur.";
   } catch (error) {
     squareConfig = {enabled:false, environment:"demo"};
+    squarePayments = null;
+    hideApplePay();
     mode.textContent = "SQUARE OFFLINE";
     description.textContent = "Square payment is currently unavailable. Please contact management.";
   }
 }
+
+async function createSquarePayment(sourceId, {number, resident, acceptedAt}) {
+  const response = await fetch("/api/create-payment", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      sourceId,idempotencyKey:number,orderNumber:number,resident,
+      items:cart.map(item => ({id:item.id,quantity:item.quantity})),
+      legalAccepted:true,legalNoticeVersion:LEGAL_NOTICE_VERSION,legalAcceptedAt:acceptedAt
+    })
+  });
+  const result = await response.json();
+  if (!response.ok || !result.success) throw new Error(result.message || "Square payment failed");
+  return {status:"Paid",id:result.payment.id,createdAt:formatResidentDateTime(result.payment.createdAt)};
+}
+
+function showPaymentError(message) {
+  const element = $("#paymentMessage");
+  element.textContent = message;
+  element.classList.remove("hidden");
+  element.classList.add("error");
+}
+
+function showSuccessfulOrder(records, payment, resident, number) {
+  finalizeSuccessfulOrder(records, payment);
+  $("#successName").textContent = resident.name.trim().split(" ")[0];
+  $("#successOrder").textContent = number;
+  $("#successPaymentNote").textContent = "Square confirmed the payment. Management can now process your request.";
+  $("#checkoutForm").reset();
+  closeModal("#checkoutModal");
+  openModal("#successModal");
+}
+
+async function handleApplePay() {
+  if (!squareApplePay || paymentInProgress) return;
+  const form = $("#checkoutForm");
+  const resident = Object.fromEntries(new FormData(form));
+  const validationMessage = checkoutValidationMessage(form, resident);
+  if (validationMessage) {
+    showPaymentError(validationMessage);
+    toast(validationMessage);
+    return;
+  }
+
+  resident.phone = normalizeUsPhone(resident.phone);
+  form.elements.phone.value = resident.phone;
+  const button = $("#applePayButton");
+  const message = $("#paymentMessage");
+  paymentInProgress = true;
+  button.disabled = true;
+  $("#checkoutSubmit").disabled = true;
+  message.classList.add("hidden");
+  message.classList.remove("error");
+
+  const number = generateOrderNumber();
+  const acceptedAt = new Date().toISOString();
+  const fee = processingFee(cartSubtotal());
+  const records = createOrderRecords({number,resident,fee,acceptedAt,paymentStatus:"Pending"});
+
+  try {
+    const tokenResult = await squareApplePay.tokenize();
+    if (tokenResult.status !== "OK") {
+      throw new Error(tokenResult.errors?.[0]?.message || "Apple Pay was canceled. You can continue using card payment.");
+    }
+    const payment = await createSquarePayment(tokenResult.token, {number,resident,acceptedAt});
+    showSuccessfulOrder(records, payment, resident, number);
+  } catch (error) {
+    showPaymentError(`Apple Pay was not completed: ${error.message}`);
+  } finally {
+    paymentInProgress = false;
+    button.disabled = false;
+    $("#checkoutSubmit").disabled = !$("#legalAcceptance").checked;
+  }
+}
+
+if ($("#applePayButton")) $("#applePayButton").addEventListener("click", handleApplePay);
+if ($("#checkoutOpen")) $("#checkoutOpen").addEventListener("click", prepareApplePay);
 
 function createOrderRecords({number, resident, fee, acceptedAt, paymentStatus}) {
   return cart.map((cartItem, index) => {
@@ -403,6 +520,7 @@ function finalizeSuccessfulOrder(records, payment) {
 
 if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
   event.preventDefault();
+  if (paymentInProgress) return;
   const form = event.target;
   const resident = Object.fromEntries(new FormData(form));
   const validationMessage = checkoutValidationMessage(form, resident);
@@ -419,6 +537,7 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
   const submit = $("#checkoutSubmit");
   const message = $("#paymentMessage");
   submit.disabled = true;
+  paymentInProgress = true;
   submit.textContent = squareConfig.enabled ? "Processing secure payment..." : "Recording demo order...";
   message.classList.add("hidden");
   message.classList.remove("error");
@@ -432,6 +551,7 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
     message.classList.remove("hidden");
     message.classList.add("error");
     submit.disabled = false;
+    paymentInProgress = false;
     submit.innerHTML = `Submit resident order <span>→</span>`;
     return;
   }
@@ -459,18 +579,7 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
     } else if (squareConfig.enabled) {
       const tokenResult = await squareCard.tokenize();
       if (tokenResult.status !== "OK") throw new Error(tokenResult.errors?.[0]?.message || "Card tokenization failed");
-      const response = await fetch("/api/create-payment", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          sourceId:tokenResult.token,idempotencyKey:number,orderNumber:number,resident,
-          items:cart.map(item => ({id:item.id,quantity:item.quantity})),
-          legalAccepted:true,legalNoticeVersion:LEGAL_NOTICE_VERSION,legalAcceptedAt:acceptedAt
-        })
-      });
-      const result = await response.json();
-      if (!response.ok || !result.success) throw new Error(result.message || "Square payment failed");
-      payment = {status:"Paid",id:result.payment.id,createdAt:formatResidentDateTime(result.payment.createdAt)};
+      payment = await createSquarePayment(tokenResult.token, {number,resident,acceptedAt});
     }
 
     finalizeSuccessfulOrder(records, payment);
@@ -488,6 +597,7 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
     message.classList.add("error");
     submit.disabled = false;
   } finally {
+    paymentInProgress = false;
     submit.innerHTML = `Submit resident order <span>→</span>`;
   }
 };
