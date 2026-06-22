@@ -9,6 +9,8 @@ let squarePayments = null;
 let squareApplePay = null;
 let applePayAmount = "";
 let paymentInProgress = false;
+const FRIENDLY_PAYMENT_ERROR = "Sorry, your payment did not go through. Please check your card information, expiration date, and CVV, then try again.";
+const PAYMENT_CANCELLED_MESSAGE = "Payment was not completed. Please try again when you are ready.";
 
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, character => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
@@ -257,6 +259,55 @@ if ($("#trackingForm")) $("#trackingForm").onsubmit = async event => {
   }
 };
 
+let feedbackReturnFocus = null;
+
+function showFeedbackView(view) {
+  ["feedbackChoiceView","feedbackFormView","feedbackThanksView"].forEach(id => {
+    $(`#${id}`)?.classList.toggle("hidden", id !== view);
+  });
+}
+
+function resetFeedbackFlow() {
+  $("#feedbackForm")?.reset();
+  if ($("#feedbackCategory")) $("#feedbackCategory").value = "";
+  if ($("#feedbackSelectedType")) $("#feedbackSelectedType").textContent = "Feedback";
+  if ($("#feedbackConfirmation")) {
+    $("#feedbackConfirmation").classList.add("hidden");
+    $("#feedbackConfirmation").innerHTML = "";
+  }
+  showFeedbackView("feedbackChoiceView");
+}
+
+function openFeedbackFlow() {
+  feedbackReturnFocus = document.activeElement;
+  resetFeedbackFlow();
+  $("#feedbackModal")?.classList.add("open");
+  requestAnimationFrame(() => $("[data-feedback-category]")?.focus());
+}
+
+function closeFeedbackFlow() {
+  $("#feedbackModal")?.classList.remove("open");
+  resetFeedbackFlow();
+  feedbackReturnFocus?.focus?.();
+}
+
+if ($("#feedbackOpen")) $("#feedbackOpen").addEventListener("click", openFeedbackFlow);
+if ($("#feedbackClose")) $("#feedbackClose").addEventListener("click", closeFeedbackFlow);
+if ($("#feedbackDone")) $("#feedbackDone").addEventListener("click", closeFeedbackFlow);
+if ($("#feedbackBack")) $("#feedbackBack").addEventListener("click", () => showFeedbackView("feedbackChoiceView"));
+if ($("#feedbackModal")) $("#feedbackModal").addEventListener("click", event => {
+  if (event.target === event.currentTarget) closeFeedbackFlow();
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && $("#feedbackModal")?.classList.contains("open")) closeFeedbackFlow();
+});
+$$('[data-feedback-category]').forEach(button => button.addEventListener("click", () => {
+  $("#feedbackCategory").value = button.dataset.feedbackCategory;
+  $("#feedbackSelectedType").textContent = button.dataset.feedbackLabel;
+  showFeedbackView("feedbackFormView");
+  requestAnimationFrame(() => $('#feedbackForm [name="name"]')?.focus());
+}));
+
 if ($("#feedbackForm")) $("#feedbackForm").onsubmit = async event => {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.target));
@@ -272,7 +323,9 @@ if ($("#feedbackForm")) $("#feedbackForm").onsubmit = async event => {
     const payload = await response.json();
     if (!response.ok || !payload.success) throw new Error(payload.message || "Unable to save feedback");
     event.target.reset();
-    confirmation.innerHTML = `<strong>Thank you for your feedback.</strong><br><br>Your submission has been received.<br><br>We will review your message and respond within 48 hours.<br><br>Thank you for helping us improve the BrickellHouse resident experience.`;
+    confirmation.classList.add("hidden");
+    confirmation.innerHTML = "";
+    showFeedbackView("feedbackThanksView");
   } catch (error) {
     confirmation.innerHTML = `<strong>Feedback was not submitted.</strong><br><br>${escapeHtml(error.message || "Please try again.")}`;
   }
@@ -444,13 +497,19 @@ async function handleApplePay() {
 
   try {
     const tokenResult = await squareApplePay.tokenize();
-    if (tokenResult.status !== "OK") {
+    const tokenStatus = String(tokenResult.status || "").toUpperCase();
+    if (tokenStatus !== "OK") {
+      if (["CANCEL","CANCELED","CANCELLED"].includes(tokenStatus)) {
+        showPaymentError(PAYMENT_CANCELLED_MESSAGE);
+        return;
+      }
       throw new Error(tokenResult.errors?.[0]?.message || "Apple Pay was canceled. You can continue using card payment.");
     }
     const payment = await createSquarePayment(tokenResult.token, {number,resident,acceptedAt});
     showSuccessfulOrder(records, payment, resident, number);
   } catch (error) {
-    showPaymentError(`Apple Pay was not completed: ${error.message}`);
+    console.error("Apple Pay payment failed", error);
+    showPaymentError(FRIENDLY_PAYMENT_ERROR);
   } finally {
     paymentInProgress = false;
     button.disabled = false;
@@ -583,7 +642,10 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
     closeModal("#checkoutModal");
     openModal("#successModal");
   } catch (error) {
-    message.textContent = `Payment was not completed: ${error.message}`;
+    console.error(requiresPayment ? "Card payment failed" : "Order submission failed", error);
+    message.textContent = requiresPayment
+      ? FRIENDLY_PAYMENT_ERROR
+      : "Sorry, your order could not be submitted. Please try again.";
     message.classList.remove("hidden");
     message.classList.add("error");
     submit.disabled = false;

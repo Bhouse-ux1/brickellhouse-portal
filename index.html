@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260617-feedback-compact1">
+  <link rel="stylesheet" href="styles.css?v=20260622-ui-polish1">
 </head>
 <body>
   <div class="ambient" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -45,7 +45,7 @@
           <img src="bh-logo-transparent.png" alt="Brickell House">
         </div>
         <p class="hero-copy">Elevated resident essentials,<br>thoughtfully delivered.</p>
-        <a class="primary-button light-button" href="#shop">Explore resident services <span>↗</span></a>
+        <a class="primary-button light-button" href="#shop">Explore resident services <svg class="cta-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
       </div>
       <div class="residence-note"><span>25.7617° N</span><span>Miami, Florida</span></div>
     </section>
@@ -71,7 +71,7 @@
         <p class="eyebrow light">Private concierge</p>
         <h2>Need a little assistance?</h2>
         <p>Our resident services team is available to guide your request and coordinate collection.</p>
-        <a href="mailto:frontdesk@brickellhouse.net">Contact resident support <span>↗</span></a>
+        <a href="mailto:frontdesk@brickellhouse.net">Contact resident support <svg class="cta-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
       </div>
       <div class="concierge-hours reveal">
         <span>Resident services office</span>
@@ -99,22 +99,11 @@
         </form>
         <div class="tracking-result hidden" id="trackingResult" aria-live="polite"></div>
       </div>
-      <div class="resident-tool-card reveal" id="feedback">
+      <div class="resident-tool-card feedback-entry-card reveal" id="feedback">
         <p class="eyebrow">Resident voice</p>
-        <h2>Feedback & suggestions</h2>
-        <p>Share a question, suggestion, compliment, product request, or general feedback privately with the resident services team.</p>
-        <form id="feedbackForm">
-          <div class="field-grid">
-            <label><span>Resident name</span><input name="name" required autocomplete="name"></label>
-            <label><span>Unit number</span><input name="unit" required></label>
-            <label><span>Email</span><input name="email" type="email" autocomplete="email"></label>
-            <label><span>Phone optional</span><input name="phone" type="tel" autocomplete="tel"></label>
-            <label><span>Category</span><select name="category" required><option>Suggestions</option><option>Questions</option><option>Compliments</option><option>Product Requests</option><option>General Feedback</option></select></label>
-          </div>
-          <label><span>Message</span><textarea name="message" required></textarea></label>
-          <button class="primary-button" type="submit">Send feedback</button>
-        </form>
-        <div class="feedback-confirmation hidden" id="feedbackConfirmation" aria-live="polite"></div>
+        <h2>Tell us what you think.</h2>
+        <p>Your perspective helps us shape a better BrickellHouse resident experience.</p>
+        <button class="primary-button feedback-open-button" id="feedbackOpen" type="button">Share feedback <svg class="cta-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
       </div>
     </section>
 
@@ -190,6 +179,49 @@
     </div>
   </div>
 
+  <div class="modal feedback-modal" id="feedbackModal" role="dialog" aria-modal="true" aria-label="Resident feedback">
+    <div class="modal-card feedback-modal-card">
+      <button class="icon-button modal-close" id="feedbackClose" type="button" aria-label="Close feedback">×</button>
+
+      <div class="feedback-view" id="feedbackChoiceView">
+        <p class="eyebrow">Resident voice</p>
+        <h2 id="feedbackTitle">Tell us what you think.</h2>
+        <p class="feedback-view-copy">Choose the option that best describes what you would like to share.</p>
+        <div class="feedback-type-list">
+          <button type="button" data-feedback-category="Compliments" data-feedback-label="I like something"><span>I like something</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+          <button type="button" data-feedback-category="General Feedback" data-feedback-label="I don't like something"><span>I don't like something</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+          <button type="button" data-feedback-category="Suggestions" data-feedback-label="I have a suggestion"><span>I have a suggestion</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+        </div>
+      </div>
+
+      <div class="feedback-view feedback-form-view hidden" id="feedbackFormView">
+        <button class="feedback-back-button" id="feedbackBack" type="button">Back to feedback types</button>
+        <p class="eyebrow">Share your thoughts</p>
+        <h2 id="feedbackSelectedType">Feedback</h2>
+        <form id="feedbackForm">
+          <input name="category" id="feedbackCategory" type="hidden" required>
+          <div class="field-grid">
+            <label><span>Resident name</span><input name="name" required autocomplete="name"></label>
+            <label><span>Unit number</span><input name="unit" required></label>
+            <label><span>Email</span><input name="email" type="email" autocomplete="email"></label>
+            <label><span>Phone optional</span><input name="phone" type="tel" autocomplete="tel"></label>
+          </div>
+          <label><span>Message</span><textarea name="message" required></textarea></label>
+          <button class="primary-button full" type="submit">Send feedback</button>
+        </form>
+        <div class="feedback-confirmation hidden" id="feedbackConfirmation" aria-live="polite"></div>
+      </div>
+
+      <div class="feedback-view feedback-thanks hidden" id="feedbackThanksView">
+        <span class="feedback-success-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 12 4 4 8-9"></path></svg></span>
+        <p class="eyebrow">Feedback received</p>
+        <h2>Thank you.</h2>
+        <p>Thank you for your feedback. We appreciate you taking the time to share your thoughts with us.</p>
+        <button class="primary-button" id="feedbackDone" type="button">Return to resident services</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal" id="legalModal" role="dialog" aria-modal="true" aria-labelledby="legalTitle">
     <div class="modal-card legal-card">
       <button class="icon-button modal-close" data-close="legal">×</button>
@@ -211,9 +243,9 @@
 
   <div class="toast" id="toast"></div>
   <script src="legal.js?v=20260615-legal1"></script>
-  <script src="public-nav.js?v=20260617-mobile-nav1"></script>
+  <script src="public-nav.js?v=20260622-ui-polish1"></script>
   <script src="app.js?v=20260617-feedback-compact1"></script>
-  <script src="roadmap.js?v=20260617-feedback-compact1"></script>
+  <script src="roadmap.js?v=20260622-ui-polish1"></script>
   <script src="https://cdn.jotfor.ms/agent/embedjs/019ed5f4e7de76fdb528fe38d09a22347e64/embed.js"></script>
 </body>
 </html>
