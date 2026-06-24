@@ -191,7 +191,7 @@ function addToCart(id) {
 function renderCart() {
   if (!$("#cartCount") || !$("#cartItems")) return;
   const items = cart.map(item => ({...item, product:products.find(product => product.id === item.id)})).filter(item => item.product);
-  $("#cartCount").textContent = items.reduce((sum, item) => sum + item.quantity, 0);
+  updateCartSummary(items);
   $("#cartItems").innerHTML = items.map(item =>
     `<div class="cart-item">
       <div class="cart-thumb">BH</div>
@@ -199,6 +199,11 @@ function renderCart() {
       <div><strong>${money(item.product.price * item.quantity)}</strong><button class="remove" data-remove="${item.id}">Remove</button></div>
     </div>`
   ).join("");
+  bindCartControls();
+}
+
+function updateCartSummary(items = cart.map(item => ({...item, product:products.find(product => product.id === item.id)})).filter(item => item.product), {toggleEmptyState = true} = {}) {
+  $("#cartCount").textContent = items.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = cartSubtotal();
   const fee = processingFee(subtotal);
   $("#cartTotal").textContent = money(subtotal);
@@ -206,13 +211,27 @@ function renderCart() {
   $("#checkoutFee").textContent = money(fee);
   $("#checkoutTotal").textContent = money(subtotal + fee);
   $("#checkoutFeeLabel").textContent = feeSettings.enabled && feeSettings.type === "percent" ? `${feeSettings.label} (${feeSettings.amount}%)` : feeSettings.label;
-  $("#cartEmpty").classList.toggle("hidden", items.length > 0);
-  $("#cartFooter").classList.toggle("hidden", !items.length);
+  if (toggleEmptyState) {
+    $("#cartEmpty").classList.toggle("hidden", items.length > 0);
+    $("#cartFooter").classList.toggle("hidden", !items.length);
+  }
+}
+
+function bindCartControls() {
   $$("[data-qty]").forEach(button => button.onclick = () => changeQty(button.dataset.qty, +button.dataset.delta));
   $$("[data-remove]").forEach(button => button.onclick = () => {
+    const row = button.closest(".cart-item");
     cart = cart.filter(item => item.id !== button.dataset.remove);
     persist();
-    renderCart();
+    updateCartSummary(undefined, {toggleEmptyState:false});
+    if (!row) {
+      renderCart();
+      return;
+    }
+    row.classList.add("removing");
+    const finish = () => renderCart();
+    row.addEventListener("transitionend", finish, {once:true});
+    setTimeout(() => row.isConnected && finish(), 280);
   });
 }
 
