@@ -81,16 +81,16 @@ footer{padding:65px 5vw;background:#181c1c;color:#fff;display:grid;grid-template
 .order-search label{margin:0}.order-search .outline-button{height:45px}.order-search small{align-self:center;color:#777;white-space:nowrap}
 @media(max-width:700px){.order-search{grid-template-columns:1fr}.order-search small{padding:5px 0}}
 .shop-section{padding-top:82px;padding-bottom:82px}
-.product-grid{gap:12px}
-.product-card{display:grid;grid-template-rows:155px 1fr;min-width:0}
-.product-image{height:155px;background:#fff}
-.product-image img{object-fit:contain;padding:8px}
+.product-grid{gap:10px;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));max-width:1080px;margin:0 auto}
+.product-card{display:grid;grid-template-rows:118px 1fr;min-width:0}
+.product-image{height:118px;background:#fff}
+.product-image img{object-fit:contain;padding:12px;max-width:86%;max-height:86%;margin:auto}
 .stock-badge{display:none}
-.product-info{padding:15px}
-.product-info h3{font-size:17px;line-height:1.15;margin:6px 0}
-.product-info p{font-size:10px;line-height:1.45;height:30px;margin-bottom:12px;overflow:hidden}
-.product-bottom{padding-top:11px}
-.add-button{width:32px;height:32px}
+.product-info{padding:11px}
+.product-info h3{font-size:15px;line-height:1.15;margin:5px 0}
+.product-info p{font-size:9px;line-height:1.4;height:25px;margin-bottom:9px;overflow:hidden}
+.product-bottom{padding-top:9px}
+.add-button{width:28px;height:28px;font-size:17px}
 @media(max-width:700px){
   .shop-section{padding:62px 12px}
   .shop-head h2{font-size:34px}
