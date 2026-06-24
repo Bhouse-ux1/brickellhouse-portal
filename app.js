@@ -52,7 +52,13 @@ orders.forEach(order => {
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const isManagementPage = document.body.classList.contains("management-page");
+const PRODUCT_IMAGE_VERSION = "20260624-product-images1";
 const money = value => new Intl.NumberFormat("en-US", {style:"currency",currency:"USD"}).format(value);
+function productImageSrc(image) {
+  const source = image || "product-documents.webp";
+  if (/^(https?:|data:|blob:)/i.test(source) || source.includes("?")) return source;
+  return `${source}?v=${PRODUCT_IMAGE_VERSION}`;
+}
 const todayISO = () => {
   const date = new Date();
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -155,7 +161,7 @@ function renderProducts() {
   $("#productGrid").innerHTML = filtered.map((product, index) =>
     `<article class="product-card" style="animation-delay:${Math.min(index * .05, .4)}s">
       <div class="product-image">
-        <img src="${product.image || "product-documents.webp"}" alt="${product.name}">
+        <img src="${productImageSrc(product.image)}" alt="${product.name}">
         <span class="stock-badge ${product.inventory < 10 ? "low" : ""}">${product.inventory === 0 ? "Unavailable" : product.inventory < 10 ? `Only ${product.inventory} available` : "Available"}</span>
       </div>
       <div class="product-info">
