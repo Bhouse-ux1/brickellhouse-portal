@@ -20,6 +20,17 @@ function validEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
+function squareItemName(product) {
+  return `${product.name} | GL: ${product.glCode}`.slice(0, 255);
+}
+
+function paymentNote(accounting) {
+  return accounting
+    .map(item => `${products[item.productId].name} | GL: ${item.glCode}${item.quantity > 1 ? ` x${item.quantity}` : ""}`)
+    .join("; ")
+    .slice(0, 500);
+}
+
 module.exports = async function handler(request, response) {
   if (request.method !== "POST") {
     response.setHeader("Allow", "POST");
@@ -76,6 +87,7 @@ module.exports = async function handler(request, response) {
     ? "https://connect.squareup.com"
     : "https://connect.squareupsandbox.com";
   let verifiedPayment = null;
+  let squareOrder = null;
 
   try {
     await assertSupabaseStorageReady();
@@ -88,6 +100,40 @@ module.exports = async function handler(request, response) {
   }
 
   try {
+    const squareOrderResponse = await fetch(`${apiBase}/v2/orders`, {
+      method:"POST",
+      headers:{
+        "Authorization":`Bearer ${accessToken}`,
+        "Content-Type":"application/json",
+        "Square-Version":SQUARE_VERSION
+      },
+      body:JSON.stringify({
+        idempotency_key:`${String(idempotencyKey).slice(0, 32)}-order`,
+        order:{
+          location_id:locationId,
+          reference_id:String(orderNumber).slice(0, 40),
+          line_items:[
+            ...accounting.map(item => ({
+              name:squareItemName(products[item.productId]),
+              quantity:String(item.quantity),
+              base_price_money:{amount:products[item.productId].priceCents,currency:"USD"}
+            })),
+            ...(feeCents > 0 ? [{
+              name:"Processing fee",
+              quantity:"1",
+              base_price_money:{amount:feeCents,currency:"USD"}
+            }] : [])
+          ]
+        }
+      })
+    });
+    const squareOrderResult = await squareOrderResponse.json();
+    if (!squareOrderResponse.ok || !squareOrderResult.order?.id) {
+      const message = squareOrderResult.errors?.map(error => error.detail || error.code).join("; ") || "Square could not create the itemized order";
+      return send(response, 402, {success:false,message});
+    }
+    squareOrder = squareOrderResult.order;
+
     const squareResponse = await fetch(`${apiBase}/v2/payments`, {
       method:"POST",
       headers:{
@@ -100,7 +146,9 @@ module.exports = async function handler(request, response) {
         idempotency_key:String(idempotencyKey).slice(0, 45),
         amount_money:{amount:amountCents,currency:"USD"},
         location_id:locationId,
+        order_id:squareOrder.id,
         reference_id:String(orderNumber).slice(0, 40),
+        note:paymentNote(accounting),
         buyer_email_address:String(resident.email).trim().toLowerCase(),
         buyer_phone_number:phone,
         autocomplete:true
@@ -125,7 +173,8 @@ module.exports = async function handler(request, response) {
       verifiedPayment?.status === "COMPLETED" &&
       verifiedPayment?.location_id === locationId &&
       verifiedPayment?.amount_money?.currency === "USD" &&
-      Number(verifiedPayment?.amount_money?.amount) === amountCents;
+      Number(verifiedPayment?.amount_money?.amount) === amountCents &&
+      verifiedPayment?.order_id === squareOrder.id;
     if (!verified) {
       return send(response, 502, {success:false,message:"Square payment verification failed"});
     }
