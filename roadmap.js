@@ -11,6 +11,7 @@ let applePayAmount = "";
 let paymentInProgress = false;
 const FRIENDLY_PAYMENT_ERROR = "Sorry, your payment did not go through. Please check your card information, expiration date, and CVV, then try again.";
 const PAYMENT_CANCELLED_MESSAGE = "Payment was not completed. Please try again when you are ready.";
+const UNIT_VALIDATION_MESSAGE = "Please check unit number and try again.";
 
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, character => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
@@ -313,6 +314,14 @@ if ($("#feedbackForm")) $("#feedbackForm").onsubmit = async event => {
   const data = Object.fromEntries(new FormData(event.target));
   const confirmation = $("#feedbackConfirmation");
   confirmation.classList.remove("hidden");
+  const normalizedUnit = normalizeUnitNumber(data.unit);
+  if (!normalizedUnit) {
+    confirmation.innerHTML = `<strong>${UNIT_VALIDATION_MESSAGE}</strong>`;
+    toast(UNIT_VALIDATION_MESSAGE);
+    return;
+  }
+  data.unit = normalizedUnit;
+  event.target.elements.unit.value = normalizedUnit;
   confirmation.innerHTML = `<strong>Sending feedback...</strong>`;
   try {
     const response = await fetch("/api/feedback", {
@@ -481,7 +490,9 @@ async function handleApplePay() {
   }
 
   resident.phone = normalizeUsPhone(resident.phone);
+  resident.unit = normalizeUnitNumber(resident.unit);
   form.elements.phone.value = resident.phone;
+  form.elements.unit.value = resident.unit;
   const button = $("#applePayButton");
   const message = $("#paymentMessage");
   paymentInProgress = true;
@@ -543,10 +554,22 @@ function normalizeUsPhone(value) {
   return "";
 }
 
+function normalizeUnitNumber(value) {
+  const unit = String(value || "").toUpperCase();
+  if (/^\d{4}$/.test(unit)) return unit;
+  if (/^[A-Z0-9]{4}$/.test(unit)) {
+    const letters = (unit.match(/[A-Z]/g) || []).length;
+    const numbers = (unit.match(/\d/g) || []).length;
+    if (letters === 2 && numbers === 2) return unit;
+  }
+  return "";
+}
+
 function checkoutValidationMessage(form, resident) {
   if (!cart.length) return "Your bag is empty. Add a resident service before checkout.";
   if (!resident.name.trim()) return "Please enter the resident's full name.";
   if (!resident.unit.trim()) return "Please enter the unit number.";
+  if (!normalizeUnitNumber(resident.unit)) return UNIT_VALIDATION_MESSAGE;
   if (!form.elements.email.validity.valid) return "Please enter a valid email address.";
   if (!normalizeUsPhone(resident.phone)) return "Please enter a valid U.S. phone number, for example (305) 555-0000.";
   if (!$("#legalAcceptance").checked) return "Please accept the legal notice before submitting.";
@@ -582,7 +605,9 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
     return;
   }
   resident.phone = normalizeUsPhone(resident.phone);
+  resident.unit = normalizeUnitNumber(resident.unit);
   form.elements.phone.value = resident.phone;
+  form.elements.unit.value = resident.unit;
 
   const submit = $("#checkoutSubmit");
   const message = $("#paymentMessage");
