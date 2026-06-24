@@ -52,9 +52,9 @@ footer{padding:65px 5vw;background:#181c1c;color:#fff;display:grid;grid-template
   .story-wordmark span:last-child{margin-left:30px}
   .photo-story-copy>p:last-child{font-size:17px}
 }
-.shop-section{position:relative;isolation:isolate;color:var(--ink);overflow:hidden;background:#e6f0ef}
+.shop-section{position:relative;isolation:isolate;color:var(--ink);overflow:hidden;background:#8fb8c9}
 .shop-section:before{content:"";position:absolute;inset:-8%;z-index:-2;background:url("catalog-beach.webp") center/cover;animation:waterDrift 14s ease-in-out infinite alternate;will-change:transform}
-.shop-section:after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(223,232,228,.86),rgba(184,211,207,.7) 42%,rgba(224,235,229,.86)),radial-gradient(ellipse at 70% 30%,rgba(255,255,255,.08),transparent 50%);backdrop-filter:saturate(.72)}
+.shop-section:after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(142,188,207,.76),rgba(91,151,176,.56) 42%,rgba(134,184,203,.74)),radial-gradient(ellipse at 70% 30%,rgba(255,255,255,.05),transparent 50%);backdrop-filter:saturate(.88) contrast(1.06)}
 .shop-section .shop-head,.shop-section .category-tabs,.shop-section .product-grid,.shop-section .empty-state{position:relative;z-index:1}
 .shop-section .eyebrow{color:#526466}
 .shop-section .search{border-color:rgba(27,29,30,.55)}
