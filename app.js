@@ -601,6 +601,18 @@ function mapSupabaseProductRows(rows) {
   }));
 }
 
+function mergeManagedProductCatalog(supabaseProducts) {
+  const supabaseById = new Map(supabaseProducts.map(product => [product.id, product]));
+  const merged = seedProducts.map(seedProduct => ({
+    ...seedProduct,
+    ...(supabaseById.get(seedProduct.id) || {})
+  }));
+  supabaseProducts.forEach(product => {
+    if (!seedProducts.some(seedProduct => seedProduct.id === product.id)) merged.push(product);
+  });
+  return merged;
+}
+
 async function loadManagementData() {
   if (!managementAuthClient || !window.managementAccessGranted) return;
   const [ordersResult, feedbackResult, productsResult, settingsResult] = await Promise.all([
@@ -616,7 +628,7 @@ async function loadManagementData() {
   orders = mapSupabaseOrderRows(ordersResult.data);
   if (typeof feedbackRecords !== "undefined") feedbackRecords = mapSupabaseFeedbackRows(feedbackResult.data);
   const supabaseProducts = mapSupabaseProductRows(productsResult.data);
-  products = supabaseProducts.length ? supabaseProducts : seedProducts.map(product => ({...product}));
+  products = mergeManagedProductCatalog(supabaseProducts);
   const feeSetting = (settingsResult.data || []).find(setting => setting.key === "processing_fee");
   if (feeSetting?.value) feeSettings = {...feeSettings, ...feeSetting.value};
   managementDataLoaded = true;
