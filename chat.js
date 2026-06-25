@@ -12,10 +12,13 @@ if (chatWidget) {
   const errorMessage = "Sorry, I could not respond right now. Please try again.";
   const promptStorageKey = "bh_ai_prompt_seen";
   const promptDelay = 4200;
+  const promptVisibleDuration = 7600;
+  let promptHideTimer;
 
   function setChatOpen(open) {
     chatWidget.classList.toggle("open", open);
     chatWidget.classList.remove("teasing");
+    if (promptHideTimer) clearTimeout(promptHideTimer);
     launcher.setAttribute("aria-expanded", String(open));
     panel.setAttribute("aria-hidden", String(!open));
     if (open) sessionStorage.setItem(promptStorageKey, "1");
@@ -37,7 +40,10 @@ if (chatWidget) {
 
   if (!sessionStorage.getItem(promptStorageKey)) {
     setTimeout(() => {
-      if (!chatWidget.classList.contains("open")) chatWidget.classList.add("teasing");
+      if (chatWidget.classList.contains("open")) return;
+      chatWidget.classList.add("teasing");
+      sessionStorage.setItem(promptStorageKey, "1");
+      promptHideTimer = setTimeout(() => chatWidget.classList.remove("teasing"), promptVisibleDuration);
     }, promptDelay);
   }
 
