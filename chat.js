@@ -8,12 +8,17 @@ if (chatWidget) {
   const input = chatWidget.querySelector("#chatInput");
   const messages = chatWidget.querySelector("#chatMessages");
   const sendButton = chatWidget.querySelector("#chatSend");
+  const teaser = chatWidget.querySelector("#chatTeaser");
   const errorMessage = "Sorry, I could not respond right now. Please try again.";
+  const promptStorageKey = "bh_ai_prompt_seen";
+  const promptDelay = 4200;
 
   function setChatOpen(open) {
     chatWidget.classList.toggle("open", open);
+    chatWidget.classList.remove("teasing");
     launcher.setAttribute("aria-expanded", String(open));
     panel.setAttribute("aria-hidden", String(!open));
+    if (open) sessionStorage.setItem(promptStorageKey, "1");
     if (open) requestAnimationFrame(() => input.focus());
   }
 
@@ -27,7 +32,14 @@ if (chatWidget) {
   }
 
   launcher.addEventListener("click", () => setChatOpen(!chatWidget.classList.contains("open")));
+  teaser?.addEventListener("click", () => setChatOpen(true));
   closeButton.addEventListener("click", () => setChatOpen(false));
+
+  if (!sessionStorage.getItem(promptStorageKey)) {
+    setTimeout(() => {
+      if (!chatWidget.classList.contains("open")) chatWidget.classList.add("teasing");
+    }, promptDelay);
+  }
 
   form.addEventListener("submit", async event => {
     event.preventDefault();
@@ -35,7 +47,7 @@ if (chatWidget) {
     if (!message) return;
     input.value = "";
     appendMessage("resident", message);
-    const loading = appendMessage("assistant loading", "Typing...");
+    const loading = appendMessage("assistant loading", "Thinking");
     sendButton.disabled = true;
 
     try {
