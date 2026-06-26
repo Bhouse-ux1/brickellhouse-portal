@@ -13,6 +13,8 @@ if (chatWidget) {
   const promptStorageKey = "bh_ai_prompt_seen";
   const promptDelay = 4200;
   const promptVisibleDuration = 7600;
+  const conversation = [];
+  const maxConversationMessages = 10;
   let promptHideTimer;
 
   function setChatOpen(open) {
@@ -34,6 +36,11 @@ if (chatWidget) {
     return bubble;
   }
 
+  function remember(role, content) {
+    conversation.push({role, content});
+    while (conversation.length > maxConversationMessages) conversation.shift();
+  }
+
   launcher.addEventListener("click", () => setChatOpen(!chatWidget.classList.contains("open")));
   teaser?.addEventListener("click", () => setChatOpen(true));
   closeButton.addEventListener("click", () => setChatOpen(false));
@@ -53,6 +60,8 @@ if (chatWidget) {
     if (!message) return;
     input.value = "";
     appendMessage("resident", message);
+    const history = conversation.slice(-8);
+    remember("user", message);
     const loading = appendMessage("assistant loading", "Thinking");
     sendButton.disabled = true;
 
@@ -60,12 +69,13 @@ if (chatWidget) {
       const response = await fetch("/api/chat", {
         method:"POST",
         headers:{"Content-Type":"application/json","Accept":"application/json"},
-        body:JSON.stringify({message})
+        body:JSON.stringify({message,history})
       });
       const payload = await response.json();
       if (!response.ok || !payload.success) throw new Error(payload.message || errorMessage);
       loading.classList.remove("loading");
       loading.textContent = payload.reply;
+      remember("assistant", payload.reply);
     } catch (error) {
       loading.classList.remove("loading");
       loading.classList.add("error");
