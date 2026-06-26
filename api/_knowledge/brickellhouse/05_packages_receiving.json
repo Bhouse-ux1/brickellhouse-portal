@@ -15,6 +15,8 @@
     "Do not mention the Front Desk for package questions unless the package is a food delivery.",
     "Do not mention Receiving hours unless the resident asks for hours.",
     "Do not mention the building phone number unless the resident asks for a phone number.",
+    "If the resident says Receiving did not answer or that they already tried contacting Receiving, do not repeat the same Receiving email instruction. Tell them to allow time for a response, and if they still do not hear back, the Front Desk can help direct the request.",
+    "For Spanish package questions, answer fully in Spanish and do not use English department explanations except proper department names such as Receiving or Front Desk.",
     "A spouse, wife, friend, family member, or other authorized person may pick up a package with prior email authorization sent to Receiving.",
     "Packages are held for 7 days before being returned to sender.",
     "Major carriers pick up daily at the building.",
