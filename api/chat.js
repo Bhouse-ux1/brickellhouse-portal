@@ -121,7 +121,7 @@ function buildInstructions(message, history) {
 function isSpanish(message) {
   const text = normalizeText(message);
   return /[¿¡ñáéíóúü]/i.test(message)
-    || /\b(necesito|puedes|puedo|reservar|paquete|plomero|contesta|contestan|unidad|quien|quién|vive|hoy|proveedor|proveedores|gracias|hola|no encuentro|perdí|perdi|llave|correo|buzón|buzon|se puede|hablando)\b/.test(text);
+    || /\b(necesito|puedes|puedo|reservar|paquete|plomero|contesta|contestan|unidad|quien|quién|vive|hoy|proveedor|proveedores|gracias|hola|no encuentro|perdí|perdi|llave|correo|buzón|buzon|se puede|hablando|jefe|modelo|administra|junta|gimnasio)\b/.test(text);
 }
 
 function hasPackageContext(message, history) {
@@ -158,26 +158,81 @@ function alreadyTried(message) {
   ].some(phrase => text.includes(phrase));
 }
 
+function detectTopic(value) {
+  const text = foldText(value);
+  if (/\b(bbq|barbecue|parrilla)\b/.test(text)) return "bbq";
+  if (/\b(onr)\b/.test(text)) return "onr";
+  if (/\b(package|packages|paquete|paquetes|receiving|amazon|locker|no encuentro mi paquete)\b/.test(text)) return "package";
+  if (/\b(mailbox key|llave del buzon|llave de buzon|llave del correo|llave de correo)\b/.test(text) || (text.includes("llave") && text.includes("buzon"))) return "mailbox_key";
+  if (/\b(unit key|apartment key|llave de la unidad|llave del apartamento|llave de mi apartamento|perdi mi llave)\b/.test(text)) return "unit_key";
+  if (/\b(parking fob|fob de estacionamiento|llavero de estacionamiento|control de estacionamiento|perdi mi fob)\b/.test(text)) return "parking_fob";
+  if (/\b(smoke detector|smoke alarm|detector de humo|alarma de humo|mi detector pita|chirping|beeping|pitando|sonando)\b/.test(text)) return "smoke_detector";
+  if (/\b(plumber|plumbing|plomero|plomeria|air conditioner|a\/c|ac repair|hvac|aire acondicionado|vendor|proveedor|proveedores|electrician|electricista)\b/.test(text)) return "vendor";
+  if (/\b(hoa|owner portal|portal|cuenta|balance)\b/.test(text)) return "hoa";
+  if (privateInfoRequest(text)) return "privacy";
+  if (/\b(board|junta|president|presidente)\b/.test(text)) return "board";
+  if (/\b(move|move-in|mudanza)\b/.test(text)) return "move_in";
+  if (/\b(contractor|contratista|coi)\b/.test(text)) return "contractor";
+  if (/\b(delivery|deliveries|entrega|mueble|furniture|appliance)\b/.test(text)) return "delivery";
+  if (/\b(parking|estacionamiento|aps|valet|garage|garaje)\b/.test(text)) return "parking";
+  if (/\b(amenity|amenities|amenidad|amenidades|gym|gimnasio|pool|piscina|sauna|theater|teatro)\b/.test(text)) return "amenity";
+  return null;
+}
+
+function isStandaloneIntent(message) {
+  const text = foldText(message);
+  return [
+    /\b(who are you|what can you help me with|who is your boss|who programmed you|who built you|what model are you|what model do you use|what api do you use)\b/,
+    /\b(who manages the building|who is the manager|who is caleb|building manager)\b/,
+    /\b(who is on the board|who are the board members|who is the president|president of the board)\b/,
+    /\b(i need a plumber|need a plumber|i need an electrician|need an electrician)\b/,
+    /\b(what are the gym hours|gym hours|how do i register for onr|register for onr)\b/,
+    /\b(quien eres|como te llamas|como se llama tu jefe|se llama tu jefe|quien es tu jefe|tu jefe|quien te programo|que modelo usas)\b/,
+    /\b(quien administra el edificio|quien es el manager|quien es caleb|quien esta en la junta|quienes son los miembros de la junta|quien es el presidente)\b/,
+    /\b(necesito un plomero|necesito un electricista|cual es el horario del gimnasio|como me registro en onr)\b/
+  ].some(pattern => pattern.test(text));
+}
+
+function isAmbiguousFollowUp(message) {
+  const text = foldText(message);
+  return [
+    /\b(how much|how much is that|how much does that cost|cost|price|cuanto cuesta|precio|cuesta)\b/,
+    /\b(what'?s their email|what is their email|email again|their email|cual es el correo|correo)\b/,
+    /\b(can i do it today|do it today|possible to get it done by today|today|same day|same-day|now|se puede hacer hoy|hoy|manana|mañana|ahora)\b/,
+    /\b(what'?s next|what are the next steps|where do i go|que sigue|a donde voy)\b/,
+    /\b(the first one|first one|phone number|phone|telefono|teléfono|primer one|el primero|la primera)\b/,
+    /\b(i meant|i mean|i'?m talking about|me refiero|estoy hablando|hablando del)\b/
+  ].some(pattern => pattern.test(text));
+}
+
+function isCorrectionOnly(message) {
+  const text = foldText(message);
+  return [
+    "that's not what i asked",
+    "that is not what i asked",
+    "you didn't answer my question",
+    "you did not answer my question",
+    "i'm asking something else",
+    "im asking something else",
+    "eso no fue lo que pregunte",
+    "eso no fue lo que te pregunte",
+    "no te pregunte eso",
+    "no respondiste mi pregunta",
+    "estoy preguntando otra cosa"
+  ].some(phrase => text.includes(phrase));
+}
+
 function inferTopic(message, history = []) {
-  const samples = [{role:"user", content:message}, ...history.slice(-8).reverse()];
-  for (const item of samples) {
-    const text = foldText(item.content);
-    if (/\b(bbq|barbecue|parrilla)\b/.test(text)) return "bbq";
-    if (/\b(onr)\b/.test(text)) return "onr";
-    if (/\b(package|packages|paquete|paquetes|receiving|amazon|locker|no encuentro mi paquete)\b/.test(text)) return "package";
-    if (/\b(mailbox key|llave del buzón|llave del buzon|llave de buzón|llave de buzon|llave del correo|llave de correo|buzón|buzon)\b/.test(text)) return "mailbox_key";
-    if (/\b(unit key|apartment key|llave de la unidad|llave del apartamento|llave de mi apartamento|perdí mi llave|perdi mi llave)\b/.test(text)) return "unit_key";
-    if (/\b(parking fob|fob de estacionamiento|llavero de estacionamiento|control de estacionamiento|perdí mi fob|perdi mi fob)\b/.test(text)) return "parking_fob";
-    if (/\b(smoke detector|smoke alarm|detector de humo|alarma de humo|mi detector pita|chirping|beeping|pitando|sonando)\b/.test(text)) return "smoke_detector";
-    if (/\b(plumber|plomero|air conditioner|aire acondicionado|vendor|proveedor|proveedores|electrician|electricista)\b/.test(text)) return "vendor";
-    if (/\b(hoa|owner portal|portal|cuenta|balance)\b/.test(text)) return "hoa";
-    if (privateInfoRequest(text)) return "privacy";
-    if (/\b(board|junta|president|presidente)\b/.test(text)) return "board";
-    if (/\b(move|move-in|mudanza)\b/.test(text)) return "move_in";
-    if (/\b(contractor|contratista|coi)\b/.test(text)) return "contractor";
-    if (/\b(delivery|deliveries|entrega|mueble|furniture|appliance)\b/.test(text)) return "delivery";
-    if (/\b(parking|estacionamiento|aps|valet|garage|garaje)\b/.test(text)) return "parking";
-    if (/\b(amenity|amenities|amenidad|amenidades|gym|pool|piscina|sauna|theater|teatro)\b/.test(text)) return "amenity";
+  const currentTopic = detectTopic(message);
+  if (currentTopic) return currentTopic;
+  if (isStandaloneIntent(message) || isCorrectionOnly(message) || !isAmbiguousFollowUp(message)) return null;
+  const recentUserMessages = history
+    .slice(-10)
+    .reverse()
+    .filter(item => item.role === "user" && !isCorrectionOnly(item.content));
+  for (const item of recentUserMessages) {
+    const topic = detectTopic(item.content);
+    if (topic) return topic;
   }
   return null;
 }
@@ -205,7 +260,87 @@ function topicFollowUpReply(message, history) {
     if (topic === "parking_fob") return spanish ? "El fob de reemplazo para estacionamiento cuesta $55." : "The replacement parking fob is $55.";
     if (topic === "smoke_detector") return spanish ? "La batería del detector de humo cuesta $10. Si el detector completo necesita reemplazo, cuesta $55." : "The smoke detector battery is $10. If the detector itself needs replacement, the device is $55.";
   }
+  if (topic === "vendor" && /\b(first one|the first one|phone|phone number|telefono|teléfono|el primero|la primera)\b/.test(text)) {
+    const vendorCategory = inferVendorCategory(message, history);
+    if (vendorCategory === "plumber") {
+      return spanish ? "El primer plomero de la lista es Raircon: 786-367-6386 o 305-885-4422." : "The first plumbing vendor is Raircon: 786-367-6386 or 305-885-4422.";
+    }
+    if (vendorCategory === "hvac") {
+      return spanish ? "El primer proveedor de aire acondicionado es Raircon: 786-367-6386." : "The first A/C vendor is Raircon: 786-367-6386.";
+    }
+    if (vendorCategory === "electrician") {
+      return spanish ? "El primer electricista de la lista es Orion Electric: 305-521-9091." : "The first electrician is Orion Electric: 305-521-9091.";
+    }
+  }
   return null;
+}
+
+function inferVendorCategory(message, history = []) {
+  const samples = [{role:"user", content:message}, ...history.slice(-10).reverse().filter(item => item.role === "user")];
+  for (const item of samples) {
+    const text = foldText(item.content);
+    if (/\b(plumber|plumbing|plomero|plomeria)\b/.test(text)) return "plumber";
+    if (/\b(air conditioner|a\/c|ac repair|hvac|aire acondicionado|aire|acondicionado)\b/.test(text)) return "hvac";
+    if (/\b(electrician|electricista)\b/.test(text)) return "electrician";
+  }
+  return null;
+}
+
+function assistantIdentityReply(message, history) {
+  const text = foldText(message);
+  const spanish = isSpanish(message) || history.slice(-4).some(item => isSpanish(item.content));
+  const asksBoss = /\b(who is your boss|who'?s your boss|como se llama tu jefe|se llama tu jefe|quien es tu jefe|tu jefe)\b/.test(text);
+  const asksImplementation = /\b(who programmed you|who built you|what model are you|what model do you use|what api do you use|quien te programo|que modelo usas)\b/.test(text);
+  const asksIdentity = /\b(who are you|what can you help me with|quien eres|como te llamas)\b/.test(text);
+  const asksManagement = /\b(who manages the building|who is the manager|building manager|quien administra el edificio|quien es el manager)\b/.test(text);
+  const asksCaleb = /\b(who is caleb|quien es caleb)\b/.test(text);
+
+  if (asksBoss) {
+    return spanish
+      ? "No tengo un jefe como una persona. Soy Luna, la asistente virtual de BrickellHouse, y estoy aquí para ayudar con preguntas y servicios para residentes."
+      : "I don't have a boss like a person would. I'm Luna, BrickellHouse's virtual assistant, and I'm here to help with resident questions and services.";
+  }
+  if (asksImplementation) {
+    return spanish
+      ? "Soy Luna, la asistente virtual de BrickellHouse. Estoy aquí para ayudar con preguntas y servicios para residentes."
+      : "I'm Luna, BrickellHouse's virtual assistant. I'm here to help with resident questions and services.";
+  }
+  if (asksIdentity) {
+    return spanish
+      ? "Soy Luna, estoy aquí para ayudarte con cualquier cosa que necesites."
+      : "I'm Luna, I'm here to assist you with any help you may need.";
+  }
+  if (asksManagement) {
+    return spanish
+      ? "Para asistencia de Management, puedes escribir a admin@brickellhouse.net."
+      : "For building management assistance, please contact Management at admin@brickellhouse.net.";
+  }
+  if (asksCaleb) {
+    return spanish
+      ? "Caleb es el Assistant Manager de BrickellHouse."
+      : "Caleb is the Assistant Manager at BrickellHouse.";
+  }
+  return null;
+}
+
+function correctionReply(message, history) {
+  if (!isCorrectionOnly(message)) return null;
+  const spanish = isSpanish(message) || history.slice(-4).some(item => isSpanish(item.content));
+  const previousUser = history.slice().reverse().find(item => item.role === "user" && !isCorrectionOnly(item.content));
+  const previous = foldText(previousUser?.content || "");
+  if (/\b(who is your boss|who'?s your boss|como se llama tu jefe|se llama tu jefe|quien es tu jefe|tu jefe)\b/.test(previous)) {
+    return spanish
+      ? "Entiendo. Si te refieres a quién administra el edificio, puedes contactar a Management en admin@brickellhouse.net. Si te refieres a mi funcionamiento interno, no tengo un jefe como una persona."
+      : "I understand. If you mean who manages the building, please contact Management at admin@brickellhouse.net. If you mean my internal operation, I don't have a boss like a person would.";
+  }
+  if (/\b(who programmed you|who built you|what model are you|what model do you use|quien te programo|que modelo usas)\b/.test(previous)) {
+    return spanish
+      ? "Entiendo. Estoy aquí para ayudar con preguntas y servicios de BrickellHouse, pero no puedo proporcionar detalles internos de implementación."
+      : "I understand. I'm here to help with BrickellHouse resident questions and services, but I can't provide implementation or internal system details.";
+  }
+  return spanish
+    ? "Entiendo. ¿Puedes escribirme la pregunta de nuevo con un poco más de detalle para ayudarte correctamente?"
+    : "I understand. Please send the question again with a little more detail so I can help correctly.";
 }
 
 function privateInfoRequest(message) {
@@ -396,6 +531,10 @@ function packageReply(message, history) {
 }
 
 function deterministicReply(message, history) {
+  const directCorrection = correctionReply(message, history);
+  if (directCorrection) return directCorrection;
+  const identity = assistantIdentityReply(message, history);
+  if (identity) return identity;
   if (privateInfoRequest(message) || privacyContextPushback(message, history)) return privacyReply(message, history);
   return topicFollowUpReply(message, history)
     || residentStoreReply(message, history)
