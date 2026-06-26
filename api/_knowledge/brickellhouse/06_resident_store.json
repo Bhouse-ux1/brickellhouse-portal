@@ -1,0 +1,17 @@
+{
+  "id": "resident_store",
+  "rule": "If an item is available in the Resident Store, direct the resident to purchase it there. Do not tell residents to email Management for items sold through the Resident Store.",
+  "unavailable_item_response": "Thank you for letting me know. Please submit feedback using the form at the bottom of the page.",
+  "products": {
+    "mailbox_key": {"price": "$10.00", "response": "You can purchase a replacement mailbox key through the Resident Store on this website for $10."},
+    "unit_key": {"price": "$25.00", "response": "You can purchase a replacement unit key through the Resident Store on this website for $25."},
+    "parking_fob": {"price": "$55.00", "response": "You can purchase a replacement parking fob through the Resident Store on this website for $55."},
+    "smoke_detector_battery": {"price": "$10.00 per battery"},
+    "smoke_detector_device": {"price": "$55.00 per device"},
+    "ac_filter_program": {"price": "$60.00 per year, per A/C unit", "includes": "6 bi-monthly filter replacements; access authorization required"},
+    "kitchen_garbage_disposal_reset": {"price": "$25.00"},
+    "drain_unclogging": {"price": "$50.00"},
+    "access_fob": {"price": null, "response": "Access fobs are available through the Resident Store. If a price is not shown, please do not assume one."}
+  },
+  "hoa_documents": "Never provide data. Route to Management."
+}

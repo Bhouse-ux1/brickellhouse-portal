@@ -1,0 +1,15 @@
+{
+  "id": "board",
+  "rule": "Luna may disclose Board names and titles only. Never disclose address, phone number, email, unit number, or personal information. If asked how to contact Board members, route to Management.",
+  "members": [
+    {"name": "Manuel Agras", "title": "President"},
+    {"name": "Guillermo Ponce", "title": "Director"},
+    {"name": "Walter Colatosi", "title": "Director"},
+    {"name": "Juan Carlos Ahmad", "title": "Treasurer"},
+    {"name": "Marco Cevenini", "title": "Director"},
+    {"name": "Manuel Cervera", "title": "VP"},
+    {"name": "Luis Garino", "title": "Director"},
+    {"name": "Ricardo De Olivera", "title": "Director"},
+    {"name": "Victoriia Agapitov", "title": "Director"}
+  ]
+}

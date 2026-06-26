@@ -1,0 +1,14 @@
+{
+  "id": "emergency_urgent",
+  "entries": [
+    {"intent": "fire_police_medical", "response_en": "Please call 911 immediately. Once it is safe, please also notify the Front Desk.", "response_es": "Por favor llama al 911 de inmediato. Cuando sea seguro, también notifica a la recepción."},
+    {"intent": "active_leak", "response_en": "I'm sorry to hear that. Please contact the Front Desk immediately so they can assist you as quickly as possible.", "response_es": "Lamento escuchar eso. Por favor contacta a la recepción de inmediato para que puedan ayudarte lo antes posible."},
+    {"intent": "elevator_emergency", "response_en": "Please contact the Front Desk immediately so they can assist you as quickly as possible.", "response_es": "Por favor contacta a la recepción de inmediato para que puedan ayudarte lo antes posible."},
+    {"intent": "garage_vehicle_stuck", "response_en": "Please contact the parking attendant for assistance. If the attendant is unavailable, the Front Desk will be happy to help.", "response_es": "Por favor contacta al encargado de estacionamiento para asistencia. Si no está disponible, la recepción podrá ayudarte."},
+    {"intent": "power_outage", "response_en": "Please contact the Front Desk first. If the building has power and only your unit is affected, the issue may need to be reported to FPL."},
+    {"intent": "ac_not_cooling", "response_en": "Please contact an A/C technician so they can inspect the unit."},
+    {"intent": "noise_now", "response_en": "Please contact the Front Desk while the noise is occurring so they can look into it."},
+    {"intent": "security_concern", "response_en": "Please contact the Front Desk immediately so they can assist."}
+  ],
+  "urgent_rule": "For urgent issues, route through the Front Desk, never Maintenance."
+}

@@ -1,0 +1,17 @@
+{
+  "id": "rules_violations",
+  "hallways_common_areas_not_allowed": ["shopping carts in hallways", "carts outside units", "personal items in hallways", "shoes in common areas", "bicycles in common areas", "decorations in common areas", "plants in common areas", "furniture in common areas"],
+  "balconies": {"allowed": ["feeding birds from balconies"], "not_allowed": ["throwing anything from balconies", "washing balconies with excessive water", "smoking on balconies"]},
+  "rules": [
+    "Smoking is not allowed in common areas.",
+    "Pets may not be off leash in common areas.",
+    "Short-term rentals and Airbnb are strictly prohibited. Route sensitive rental questions to Management.",
+    "Contractors require a COI and may not begin work without approval.",
+    "Bulk items may not be left in the trash room; residents must hire a disposal company.",
+    "Trash disposal is available on each floor. Trash may not be left outside unit doors.",
+    "Residents may not park in another resident's space."
+  ],
+  "noise_now": "Please contact the Front Desk so they can investigate while the noise is occurring.",
+  "noise_recurring": "Please contact the Front Desk while it is happening. If it continues, Management can review the concern.",
+  "enforcement": "Luna explains rules but never enforces them or determines whether a violation occurred. Management determines violations."
+}

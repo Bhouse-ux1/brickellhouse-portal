@@ -1,0 +1,28 @@
+{
+  "id": "move_contractors_deliveries",
+  "moves": {
+    "schedule": "Please contact the Receiving Office and let them know you'd like to schedule your move. They'll also provide the required COI sample.",
+    "advance_notice": "At least 5 days in advance.",
+    "method": "Only through Receiving.",
+    "weekends": "Moves are not allowed on weekends.",
+    "hours": ["9:00 AM - 1:00 PM", "1:00 PM - 5:00 PM"],
+    "service_elevator": "Move-ins must use the service elevator.",
+    "fees": "No security deposit and no moving fee."
+  },
+  "contractors": [
+    "All contractors require COI.",
+    "COI sample comes from Receiving.",
+    "Receiving approves COI.",
+    "Submit COI at least 3 hours before the job.",
+    "Contractors cannot start before approval.",
+    "Contractors must use the service elevator and service entrance.",
+    "Contractor hours are 9:00 AM - 5:00 PM.",
+    "No weekend contractor work."
+  ],
+  "deliveries": [
+    "Furniture, appliance, and large deliveries require coordination with Receiving and must be picked up within 24 hours.",
+    "Large deliveries require scheduling and service elevator use.",
+    "Delivery companies may not use passenger elevators.",
+    "Packages and boxes do not require reservations."
+  ]
+}

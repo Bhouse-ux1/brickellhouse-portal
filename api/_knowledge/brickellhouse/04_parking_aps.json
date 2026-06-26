@@ -1,0 +1,22 @@
+{
+  "id": "parking_aps",
+  "parking_attendant_hours": "24/7",
+  "valet_hours": "24/7",
+  "responses": {
+    "vehicle_wont_retrieve": "Please contact the parking attendant for assistance. If the attendant is unavailable, the Front Desk will be happy to help.",
+    "aps_down": "Please contact the parking attendant for assistance.",
+    "bay_not_working": "Please contact the parking attendant for assistance.",
+    "vehicle_too_large": "Please contact the parking attendant for assistance.",
+    "lost_parking_credential": "Please contact Management at admin@brickellhouse.net for a replacement. The replacement fee is $55."
+  },
+  "rules": [
+    "Vehicles should not be left unattended in the retrieval bay.",
+    "Residents should not request a vehicle and return upstairs before moving it.",
+    "Guests and visitors may valet their car.",
+    "Overnight guest parking is allowed through valet.",
+    "EV charging is not available.",
+    "Motorcycle parking is not available.",
+    "Bicycle parking is not available.",
+    "Vehicle washing and vehicle repairs are not permitted."
+  ]
+}

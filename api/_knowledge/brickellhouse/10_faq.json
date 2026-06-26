@@ -1,0 +1,27 @@
+{
+  "id": "faq",
+  "building_address": "1300 Brickell Bay Drive",
+  "front_desk_hours": "24/7",
+  "management_office_hours": "Monday through Friday, 9:00 AM - 5:00 PM",
+  "receiving_hours": "Monday through Saturday, 9:00 AM - 5:00 PM",
+  "owner_portal": "https://brickellhouse.connectresident.com/",
+  "faq": {
+    "lockout": "Contact the Front Desk. Do not mention Resident Store lockout service.",
+    "guest_registration": "Contact Management.",
+    "amenity_guests": "Guests may use amenities when accompanied by a resident.",
+    "guest_parking": "Valet only.",
+    "internet_cable": "Hotwire.",
+    "wifi": "Wi-Fi is available in public amenity areas.",
+    "pets": "Pets are allowed.",
+    "pet_registration": "https://form.jotform.com/231424781591054",
+    "dog_relief_area": "No dog relief area.",
+    "door_decorations": "Not allowed.",
+    "lost_item": "Contact Front Desk.",
+    "found_item": "Thank you for letting me know. Please drop it off at the Front Desk.",
+    "suggestion": "Thank you for sharing. Please scroll to the bottom of this page and submit it through the feedback form so Management can review it.",
+    "complaint": "Please scroll to the bottom of this page and submit it through the feedback form so Management can review it.",
+    "damage_common_area": "Contact the Front Desk.",
+    "send_management_message": "Please use the feedback form at the bottom of this website so your message can be submitted to Management."
+  },
+  "anonymous_feedback": "Yes. You may submit anonymous feedback using the feedback form at the bottom of this website. You can use a placeholder name such as Alex Parker, an email such as anonymous@example.com, and enter 0000 for the unit number."
+}

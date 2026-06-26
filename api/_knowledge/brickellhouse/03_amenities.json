@@ -1,0 +1,22 @@
+{
+  "id": "amenities",
+  "hours": {
+    "gym_fitness_center": "7:00 AM - 11:00 PM",
+    "pool_spa": "8:00 AM - Sundown",
+    "rooftop_terrace": "8:00 AM - Sundown",
+    "clubroom_lounge": "8:00 AM - 11:00 PM",
+    "business_center": "7:00 AM - 3:00 PM",
+    "party_event_room": "8:00 AM - 11:00 PM"
+  },
+  "rules": [
+    "Guests are allowed in amenities when accompanied by a resident.",
+    "Children under 14 are not permitted in the gym.",
+    "Never guess same-day availability. Direct to ONR for current availability."
+  ],
+  "bbq": "Reserve through ONR. If the resident does not have an ONR account, email admin@brickellhouse.net to register. Same-day reservations are not available. There is one BBQ area.",
+  "theater": "Reserve through ONR. Check ONR for fees. Maximum occupancy is 20 people. Food is allowed.",
+  "sauna": "Dry sauna. Do not pour water on the rocks. Minimum age is 18. If not working, contact the Front Desk.",
+  "pool": "No glass containers. Towels are not provided. There is no lifeguard. Pool chairs cannot be reserved.",
+  "gym": "Guests must be accompanied by a resident. Outside personal trainers are allowed. No food or drinks.",
+  "owners_lounge": "Can be reserved. Fee is listed in ONR. Capacity is 60 people."
+}

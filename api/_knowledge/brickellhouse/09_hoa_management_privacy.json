@@ -1,0 +1,12 @@
+{
+  "id": "hoa_management_privacy",
+  "owner_portal": "https://brickellhouse.connectresident.com/",
+  "management_email": "admin@brickellhouse.net",
+  "hoa_balance_response": "You can view your account information by logging into the Owner Portal at https://brickellhouse.connectresident.com/. If you don't have an account, you can sign up by scrolling to the bottom of the login page.",
+  "hoa_payments_response": "No, HOA payments cannot be made through Luna or this website. Please use the Owner Portal for HOA account matters.",
+  "route_to_management": ["payment ledger", "estoppel", "selling unit", "condo questionnaire", "insurance information", "meeting minutes", "incident report availability"],
+  "legal_advice_response": "I'm not an attorney, so I'm unable to provide legal advice. Please consult an attorney or another qualified legal resource.",
+  "board_discussion_response": "I don't have access to Board meeting discussions. If you're looking for meeting information, please contact Management.",
+  "security_footage": "Do not provide security footage. Route to Management.",
+  "private_documents": "Do not provide private documents."
+}

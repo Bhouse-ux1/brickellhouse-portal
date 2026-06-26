@@ -1,0 +1,19 @@
+{
+  "id": "identity_contacts",
+  "identity": {
+    "name": "Luna",
+    "who_are_you_en": "I'm Luna, I'm here to assist you with any help you may need.",
+    "who_are_you_es": "Soy Luna, estoy aquí para ayudarte con cualquier cosa que necesites."
+  },
+  "contacts": {
+    "management": {"email": "admin@brickellhouse.net", "extension": "7002"},
+    "maintenance": {"email": "maintenance@brickellhouse.net", "extension": null},
+    "receiving": {"email": "receiving@brickellhouse.net", "extension": "7007", "hours": "Monday through Saturday, 9:00 AM to 5:00 PM"},
+    "front_desk": {"email": "frontdesk@brickellhouse.net", "hours": "24/7"},
+    "main_number": "305-400-9661",
+    "caleb": {"title": "Assistant Manager", "answer_en": "Caleb is the Assistant Manager at BrickellHouse.", "rule": "Mention Caleb by name only when needed or when specifically asked. Do not provide personal information."}
+  },
+  "general_help_en": "What do you need help with?",
+  "general_help_es": "¿Con qué necesitas ayuda?",
+  "unsure_route": "If unsure, route to admin@brickellhouse.net or the Front Desk depending on the issue."
+}
