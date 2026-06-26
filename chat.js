@@ -64,7 +64,27 @@ if (chatWidget) {
     while (conversation.length > maxConversationMessages) conversation.shift();
   }
 
-  launcher.addEventListener("click", () => setChatOpen(!chatWidget.classList.contains("open")));
+  function isLauncherClick(event) {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest("#chatLauncher")) return true;
+    if (target && panel.contains(target)) return false;
+    const rect = launcher.getBoundingClientRect();
+    const buffer = window.matchMedia("(max-width: 700px)").matches ? 8 : 24;
+    return event.clientX >= rect.left - buffer
+      && event.clientX <= rect.right + buffer
+      && event.clientY >= rect.top - buffer
+      && event.clientY <= rect.bottom + buffer;
+  }
+
+  function toggleChatFromLauncher(event) {
+    event.preventDefault();
+    setChatOpen(!chatWidget.classList.contains("open"));
+  }
+
+  document.addEventListener("click", event => {
+    if (!isLauncherClick(event)) return;
+    toggleChatFromLauncher(event);
+  }, true);
   teaser?.addEventListener("click", () => setChatOpen(true));
   closeButton.addEventListener("click", () => setChatOpen(false));
 
