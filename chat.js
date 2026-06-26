@@ -1,6 +1,8 @@
-const chatWidget = document.querySelector("#residentChat");
+function initResidentChat() {
+  const chatWidget = document.querySelector("#residentChat");
+  if (!chatWidget || chatWidget.dataset.chatReady === "true") return;
+  chatWidget.dataset.chatReady = "true";
 
-if (chatWidget) {
   const launcher = chatWidget.querySelector("#chatLauncher");
   const panel = chatWidget.querySelector("#chatPanel");
   const closeButton = chatWidget.querySelector("#chatClose");
@@ -16,6 +18,8 @@ if (chatWidget) {
   const conversation = [];
   const maxConversationMessages = 10;
   let promptHideTimer;
+
+  if (!launcher || !panel || !closeButton || !form || !input || !messages || !sendButton) return;
 
   function setChatOpen(open) {
     chatWidget.classList.toggle("open", open);
@@ -64,28 +68,13 @@ if (chatWidget) {
     while (conversation.length > maxConversationMessages) conversation.shift();
   }
 
-  function isLauncherClick(event) {
-    const target = event.target instanceof Element ? event.target : null;
-    if (target?.closest("#chatLauncher")) return true;
-    if (target && panel.contains(target)) return false;
-    const rect = launcher.getBoundingClientRect();
-    const buffer = window.matchMedia("(max-width: 700px)").matches ? 8 : 24;
-    return event.clientX >= rect.left - buffer
-      && event.clientX <= rect.right + buffer
-      && event.clientY >= rect.top - buffer
-      && event.clientY <= rect.bottom + buffer;
-  }
-
-  function toggleChatFromLauncher(event) {
+  function openChat(event) {
     event.preventDefault();
-    setChatOpen(!chatWidget.classList.contains("open"));
+    setChatOpen(true);
   }
 
-  document.addEventListener("click", event => {
-    if (!isLauncherClick(event)) return;
-    toggleChatFromLauncher(event);
-  }, true);
-  teaser?.addEventListener("click", () => setChatOpen(true));
+  launcher.addEventListener("click", openChat);
+  teaser?.addEventListener("click", openChat);
   closeButton.addEventListener("click", () => setChatOpen(false));
 
   if (!sessionStorage.getItem(promptStorageKey)) {
@@ -128,4 +117,10 @@ if (chatWidget) {
       input.focus();
     }
   });
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initResidentChat);
+} else {
+  initResidentChat();
 }
