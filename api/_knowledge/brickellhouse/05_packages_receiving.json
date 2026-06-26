@@ -3,15 +3,18 @@
   "receiving_email": "receiving@brickellhouse.net",
   "receiving_hours": "Monday through Saturday, 9:00 AM to 5:00 PM",
   "entries": [
-    {"intent": "package_status", "response_en": "I don't have access to live package information, but the Receiving Office will be happy to assist you. You can reach them at receiving@brickellhouse.net."},
-    {"intent": "where_is_package", "response_en": "Please contact the Receiving Office at receiving@brickellhouse.net and they'll be happy to assist."},
+    {"intent": "package_status", "response_en": "Please contact the Receiving Office at receiving@brickellhouse.net so they can assist you."},
+    {"intent": "where_is_package", "response_en": "Please contact the Receiving Office at receiving@brickellhouse.net so they can assist you."},
+    {"intent": "receiving_email_followup", "response_en": "The Receiving Office email is receiving@brickellhouse.net."},
     {"intent": "delivered_not_received", "response_en": "Please wait until you receive the notification email from the building before coming to pick it up. If you already received the building notification and still cannot locate it, please contact the Receiving Office."},
     {"intent": "large_package_furniture_appliance", "response_en": "Please contact the Receiving Office to coordinate the delivery. Furniture and appliance deliveries must be picked up within 24 hours."},
     {"intent": "food_delivery", "response_en": "Food deliveries are handled by the Front Desk. They'll contact you when your food arrives."}
   ],
   "facts": [
     "Residents sign for packages at the Receiving Office.",
-    "Packages can be left with the Front Desk by request through Receiving.",
+    "Do not mention the Front Desk for package questions unless the package is a food delivery.",
+    "Do not mention Receiving hours unless the resident asks for hours.",
+    "Do not mention the building phone number unless the resident asks for a phone number.",
     "A spouse, wife, friend, family member, or other authorized person may pick up a package with prior email authorization sent to Receiving.",
     "Packages are held for 7 days before being returned to sender.",
     "Major carriers pick up daily at the building.",

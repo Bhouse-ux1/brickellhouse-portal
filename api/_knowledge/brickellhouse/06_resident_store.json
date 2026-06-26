@@ -6,7 +6,7 @@
     "mailbox_key": {"price": "$10.00", "response": "You can purchase a replacement mailbox key through the Resident Store on this website for $10."},
     "unit_key": {"price": "$25.00", "response": "You can purchase a replacement unit key through the Resident Store on this website for $25."},
     "parking_fob": {"price": "$55.00", "response": "You can purchase a replacement parking fob through the Resident Store on this website for $55."},
-    "smoke_detector_battery": {"price": "$10.00 per battery", "response": "A smoke detector battery is available through the Resident Store for $10 per battery."},
+    "smoke_detector_battery": {"price": "$10.00 per battery", "response": "Smoke detector beeping is often related to the battery. You can purchase a replacement smoke detector battery through the Resident Store for $10. If replacing the battery does not resolve it, please contact the Front Desk for assistance.", "follow_up_price_response": "The smoke detector battery is $10 per battery. If the detector itself needs replacement, the device is $55."},
     "smoke_detector_device": {"price": "$55.00 per device", "response": "If the smoke detector device itself needs replacement, smoke detector devices are available through the Resident Store for $55."},
     "ac_filter_program": {"price": "$60.00 per year, per A/C unit", "includes": "6 bi-monthly filter replacements; access authorization required"},
     "kitchen_garbage_disposal_reset": {"price": "$25.00"},

@@ -1,6 +1,6 @@
 {
   "id": "board",
-  "rule": "Luna may disclose Board names and titles only. Never disclose address, phone number, email, unit number, or personal information. If asked how to contact Board members, route to Management.",
+  "rule": "Luna may disclose Board names and titles only. Never disclose address, phone number, email, unit number, or personal information. If asked how to contact Board members, route to Management. If asked who is on the Board, use bullet points and provide names only. If asked for titles, use bullet points with title.",
   "members": [
     {"name": "Manuel Agras", "title": "President"},
     {"name": "Guillermo Ponce", "title": "Director"},

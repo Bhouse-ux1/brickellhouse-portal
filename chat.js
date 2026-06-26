@@ -30,10 +30,33 @@ if (chatWidget) {
   function appendMessage(role, text) {
     const bubble = document.createElement("div");
     bubble.className = `chat-message ${role}`;
-    bubble.textContent = text;
+    if (role.includes("assistant")) {
+      bubble.innerHTML = linkifyText(text);
+    } else {
+      bubble.textContent = text;
+    }
     messages.appendChild(bubble);
     messages.scrollTop = messages.scrollHeight;
     return bubble;
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, character => ({
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      "\"":"&quot;",
+      "'":"&#39;"
+    })[character]);
+  }
+
+  function linkifyText(value) {
+    const escaped = escapeHtml(value);
+    return escaped.replace(/https?:\/\/[^\s<>"']+/g, url => {
+      const cleanUrl = url.replace(/[),.;:!?]+$/g, "");
+      const trailing = url.slice(cleanUrl.length);
+      return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer">${cleanUrl}</a>${trailing}`;
+    });
   }
 
   function remember(role, content) {
@@ -74,7 +97,7 @@ if (chatWidget) {
       const payload = await response.json();
       if (!response.ok || !payload.success) throw new Error(payload.message || errorMessage);
       loading.classList.remove("loading");
-      loading.textContent = payload.reply;
+      loading.innerHTML = linkifyText(payload.reply);
       remember("assistant", payload.reply);
     } catch (error) {
       loading.classList.remove("loading");
