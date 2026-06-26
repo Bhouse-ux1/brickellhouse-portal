@@ -18,5 +18,8 @@
     "Motorcycle parking is not available.",
     "Bicycle parking is not available.",
     "Vehicle washing and vehicle repairs are not permitted."
-  ]
+  ],
+  "aliases_es": ["estacionamiento", "valet", "APS", "garaje", "vehículo", "carro", "fob de estacionamiento", "llavero de estacionamiento"],
+  "examples_es": ["Perdí mi fob de estacionamiento.", "Mi carro no baja del garaje.", "¿Hay carga para vehículos eléctricos?"],
+  "response_es": "Responde en español y dirige asuntos de APS, valet o garaje al encargado de estacionamiento o al Front Desk según corresponda."
 }

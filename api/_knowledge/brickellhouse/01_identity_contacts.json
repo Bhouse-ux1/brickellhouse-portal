@@ -15,5 +15,8 @@
   },
   "general_help_en": "What do you need help with?",
   "general_help_es": "¿Con qué necesitas ayuda?",
-  "unsure_route": "If unsure, route to admin@brickellhouse.net or the Front Desk depending on the issue."
+  "unsure_route": "If unsure, route to admin@brickellhouse.net or the Front Desk depending on the issue.",
+  "aliases_es": ["quién eres", "quien eres", "contacto", "teléfono", "extensión", "correo de management", "front desk", "receiving"],
+  "examples_es": ["¿Quién eres?", "¿Cuál es el correo de Management?", "Necesito ayuda."],
+  "response_es": "Responde en español con el contacto exacto solicitado y no agregues departamentos que no fueron pedidos."
 }

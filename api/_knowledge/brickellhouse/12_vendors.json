@@ -1,6 +1,9 @@
 {
   "id": "vendors",
   "rule": "Provide vendor recommendations only when asked. Always give only the relevant category unless the resident asks for all vendors. Use bullet points. In English, always include: These vendors are provided as a courtesy based on the Association's vendor list. You may choose any licensed vendor you prefer. In Spanish, always include: Estos proveedores se comparten como cortesía según la lista de proveedores de la Asociación. Puedes elegir cualquier proveedor con licencia que prefieras. Do not mix English and Spanish disclaimers.",
+  "aliases_es": ["plomero", "electricista", "aire acondicionado", "técnico", "proveedor", "cerrajero", "reparación", "cortinas", "persianas", "mudanza"],
+  "examples_es": ["Necesito un plomero.", "Necesito reparar mi aire acondicionado.", "¿Tienen un cerrajero recomendado?"],
+  "response_es": "Responde completamente en español. Usa bullets. No uses frases o disclaimers en inglés.",
   "electricians": ["Orion Electric: 305-521-9091", "Switchgear: 305-596-1500"],
   "hvac_ac": ["Raircon: 786-367-6386", "Cam Seer Service: 305-934-6929"],
   "locksmith": ["Caraballo Locksmith: 305-858-6860", "AAA Miami Locksmith: 305-576-9320", "Brickell Locksmith: 786-565-3400", "Locksmith in Miami: 305-224-1980"],

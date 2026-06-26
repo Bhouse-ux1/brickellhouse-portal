@@ -24,5 +24,8 @@
     "Large deliveries require scheduling and service elevator use.",
     "Delivery companies may not use passenger elevators.",
     "Packages and boxes do not require reservations."
-  ]
+  ],
+  "aliases_es": ["mudanza", "move-in", "move-out", "contratista", "COI", "entrega grande", "muebles", "electrodoméstico", "ascensor de servicio"],
+  "examples_es": ["Necesito programar una mudanza.", "Mi contratista necesita entrar.", "Tengo una entrega de muebles."],
+  "response_es": "Responde en español. Para mudanzas, contratistas y entregas grandes, dirige a Receiving y menciona COI o ascensor de servicio solo cuando sea relevante."
 }

@@ -18,5 +18,8 @@
   "sauna": "Dry sauna. Do not pour water on the rocks. Minimum age is 18. If not working, contact the Front Desk.",
   "pool": "No glass containers. Towels are not provided. There is no lifeguard. Pool chairs cannot be reserved.",
   "gym": "Guests must be accompanied by a resident. Outside personal trainers are allowed. No food or drinks.",
-  "owners_lounge": "Can be reserved. Fee is listed in ONR. Capacity is 60 people."
+  "owners_lounge": "Can be reserved. Fee is listed in ONR. Capacity is 60 people.",
+  "aliases_es": ["amenidades", "gimnasio", "piscina", "spa", "terraza", "clubroom", "salón", "business center", "BBQ", "parrilla", "teatro", "sauna", "ONR", "reserva"],
+  "examples_es": ["¿Puedes reservar el BBQ por mí?", "¿Se puede hacer hoy?", "Estoy hablando del BBQ."],
+  "response_es": "Responde en español sobre amenidades. Para el BBQ, explica que se reserva por ONR; solo menciona la regla de mismo día si preguntan por hoy o mismo día."
 }

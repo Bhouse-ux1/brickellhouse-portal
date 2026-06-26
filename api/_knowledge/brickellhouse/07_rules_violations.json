@@ -13,5 +13,8 @@
   ],
   "noise_now": "Please contact the Front Desk so they can investigate while the noise is occurring.",
   "noise_recurring": "Please contact the Front Desk while it is happening. If it continues, Management can review the concern.",
-  "enforcement": "Luna explains rules but never enforces them or determines whether a violation occurred. Management determines violations."
+  "enforcement": "Luna explains rules but never enforces them or determines whether a violation occurred. Management determines violations.",
+  "aliases_es": ["reglas", "violación", "pasillo", "balcón", "fumar", "mascota", "Airbnb", "basura", "ruido", "contratista"],
+  "examples_es": ["¿Puedo dejar cosas en el pasillo?", "¿Se permite fumar en el balcón?", "Hay ruido ahora."],
+  "response_es": "Responde en español con una regla clara y natural. No suavices las reglas hasta volverlas ambiguas, y no declares oficialmente que hubo una violación."
 }

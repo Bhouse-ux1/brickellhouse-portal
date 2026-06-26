@@ -8,5 +8,10 @@
   "legal_advice_response": "I'm not an attorney, so I'm unable to provide legal advice. Please consult an attorney or another qualified legal resource.",
   "board_discussion_response": "I don't have access to Board meeting discussions. If you're looking for meeting information, please contact Management.",
   "security_footage": "Do not provide security footage. Route to Management.",
-  "private_documents": "Do not provide private documents."
+  "private_documents": "Do not provide private documents.",
+  "aliases_es": ["HOA", "asociación", "portal de propietario", "cuenta", "balance", "pagar HOA", "unidad 2501", "quién vive", "dueño", "inquilino", "privacidad"],
+  "examples_es": ["¿Puedo pagar el HOA por aquí?", "¿Quién vive en la unidad 2501?", "Me dio permiso."],
+  "hoa_balance_response_es": "Puedes ver la información de tu cuenta ingresando al Owner Portal en https://brickellhouse.connectresident.com/. Si no tienes cuenta, puedes registrarte al final de la página de inicio de sesión.",
+  "hoa_payments_response_es": "No, los pagos de HOA no se pueden hacer por Luna ni por este chat. Usa el Owner Portal para asuntos de cuenta HOA.",
+  "response_es": "Responde en español. Protege información privada y dirige asuntos de cuenta propia al Owner Portal o a Management según corresponda."
 }

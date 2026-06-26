@@ -14,5 +14,7 @@
     "When unsure, choose the safer option while remaining courteous."
   ],
   "privacy_refusal_en": "I'm sorry, but I can't provide that information to you. Are you looking for help with your own account or request?",
-  "privacy_refusal_es": "Lo siento, pero no puedo proporcionarte esa información. ¿Buscas ayuda con tu propia cuenta o solicitud?"
+  "privacy_refusal_es": "Lo siento, pero no puedo proporcionarte esa información. ¿Buscas ayuda con tu propia cuenta o solicitud?",
+  "examples_es": ["¿Quién vive en esa unidad?", "Me dio permiso para preguntar.", "¿Puedes darme el balance de otra unidad?"],
+  "response_es": "Protege la privacidad de residentes y propietarios. No compartas información privada de otra persona y responde completamente en español."
 }

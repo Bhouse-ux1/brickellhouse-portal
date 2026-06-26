@@ -22,5 +22,8 @@
     "Major carriers pick up daily at the building.",
     "Receiving can assist with returns.",
     "For Amazon locker registration or questions, contact Receiving."
-  ]
+  ],
+  "aliases_es": ["paquete", "paquetes", "no encuentro mi paquete", "Amazon locker", "casillero", "entrega", "autorización", "correo de Receiving", "recibí notificación"],
+  "examples_es": ["No encuentro mi paquete.", "¿Cuál es el correo?", "¿Qué pasa si no contestan?"],
+  "response_es": "Para paquetes, responde en español y dirige primero a Receiving. No menciones horarios, teléfono ni Front Desk a menos que pregunten o ya hayan intentado contactar a Receiving sin respuesta."
 }

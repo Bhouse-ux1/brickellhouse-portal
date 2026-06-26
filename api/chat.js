@@ -1,7 +1,7 @@
 const OPENAI_MODEL = "gpt-5.4-mini";
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const MAX_MESSAGE_LENGTH = 1500;
-const MAX_HISTORY_MESSAGES = 10;
+const MAX_HISTORY_MESSAGES = 16;
 const MAX_HISTORY_MESSAGE_LENGTH = 900;
 const SAFE_ERROR_MESSAGE = "Sorry, I could not respond right now. Please try again.";
 const KNOWLEDGE = {
@@ -36,7 +36,7 @@ const SYSTEM_INSTRUCTIONS = [
   "For ordinary smoke alarm or smoke detector beeping/chirping, use the Resident Store battery response calmly. Mention 911 only if the resident says there is smoke, fire, burning smell, sparks, immediate danger, or an emergency.",
   "When recent context clearly identifies an item, answer confidently. Do not say \"if you mean\", \"assuming you mean\", or \"I think you mean\".",
   "When listing Board members, use bullets. If asked generally who is on the Board, list names only. Include titles only if the resident asks for titles or a specific role.",
-  "Use recent chat context only to resolve follow-up wording like their, that, next steps, cost, where, who do I contact, yes, and okay.",
+  "Use recent chat context only to resolve follow-up wording like their, that, next steps, cost, where, who do I contact, today, now, yes, and okay.",
   "Stay focused on the question asked. Do not add hours, phone numbers, same-day rules, multiple departments, or extra policy details unless the resident asks for them or the approved knowledge requires them.",
   "If the resident says they already tried, already emailed, already called, no one answered, or no one responded, do not repeat the same instruction. Acknowledge that they tried it and provide the next approved escalation step.",
   "For vendor recommendations, use bullets and only the relevant vendor category. Use this English disclaimer: \"These vendors are provided as a courtesy based on the Association's vendor list. You may choose any licensed vendor you prefer.\" Use this Spanish disclaimer for Spanish replies: \"Estos proveedores se comparten como cortesía según la lista de proveedores de la Asociación. Puedes elegir cualquier proveedor con licencia que prefieras.\"",
@@ -55,7 +55,7 @@ const SYSTEM_INSTRUCTIONS = [
 const MODULE_RULES = [
   {module:"emergencyUrgent", keywords:["911","fire","incendio","fuego","smoke coming","smell smoke","burning smell","sparks","medical","medica","médica","ambulance","ambulancia","police","policia","policía","hurt myself","hurt someone","suicide","danger","peligro","emergency","emergencia","leak","leaking","gotera","filtración","filtracion","fuga","agua","water coming","ceiling","techo","wall","pared","elevator","elevador","ascensor","stuck in the elevator","atrapado","atorado","car is stuck","carro atascado","carro atorado","vehículo atorado","vehiculo atorado","vehicle stuck","power outage","noise","ruido","security concern","ac not cooling","a/c not cooling","ac is not cooling","a/c is not cooling","ac isn't cooling","a/c isn't cooling","aire no enfria","aire no enfría"]},
   {module:"vendors", keywords:["recommend","recommendation","vendor","vendors","technician","company","repair company","contractor for repair","plumber","plomero","electrician","electricista","hvac","a/c repair","ac repair","a/c technician","ac technician","ac vendor","aire acondicionado","aire","técnico","tecnico","proveedor","recomiendas","recomendar","reparación","reparacion","locksmith","cerrajero","appliance repair","electrodoméstico","electrodomestico","shower door","sliding door","curtains","cortinas","blinds","persianas","handyman","mover","mudanza","moving company","storage","trash pick-up","trash pickup"]},
-  {module:"residentStore", keywords:["resident store","mailbox key","llave del buzón","llave del buzon","unit key","llave de la unidad","parking fob","access fob","smoke detector","smoke alarm","chirping","beeping","detector de humo","battery","batería","bateria","a/c filter","ac filter","garbage disposal","drain","unclogging","how much","price","cost","buy","purchase","cuanto","cuánto","precio","comprar"]},
+  {module:"residentStore", keywords:["resident store","mailbox key","llave del buzón","llave del buzon","llave de buzón","llave de buzon","llave del correo","llave de correo","unit key","llave de la unidad","llave del apartamento","llave de mi apartamento","parking fob","fob de estacionamiento","llavero de estacionamiento","control de estacionamiento","access fob","smoke detector","smoke alarm","chirping","beeping","detector de humo","alarma de humo","mi detector pita","battery","batería","bateria","a/c filter","ac filter","garbage disposal","drain","unclogging","how much","price","cost","buy","purchase","cuanto","cuánto","precio","comprar","perdí mi llave","perdi mi llave","no abre mi buzón","no abre mi buzon"]},
   {module:"packagesReceiving", keywords:["package","packages","paquete","paquetes","receiving","recepción de paquetes","recepcion de paquetes","delivery","delivered","entrega","entregado","amazon","fedex","ups","usps","locker","food delivery","furniture delivery","appliance delivery","returns","can't find my package","cant find my package","missing package","not found","wife pick up","friend pick up","authorization","notification","damaged package","wrong package","email again"]},
   {module:"parkingAps", keywords:["parking","estacionamiento","aps","valet","vehicle","car","carro","vehículo","vehiculo","garage","garaje","retrieval","bay","parking fob","parking credential","ev charging","motorcycle","bicycle","parking attendant"]},
   {module:"movesContractorsDeliveries", keywords:["move","move-in","move out","move-out","moving","contractor","contratista","kitchen cabinets","cabinets","coi","delivery","deliveries","service elevator","couch","sofa","furniture","appliance","mueble","mudanza"]},
@@ -70,6 +70,10 @@ const MODULE_RULES = [
 
 function normalizeText(value) {
   return String(value || "").toLowerCase();
+}
+
+function foldText(value) {
+  return normalizeText(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
 function validateHistory(history) {
@@ -94,7 +98,7 @@ function selectKnowledge(message, history = []) {
   for (const rule of MODULE_RULES) {
     if (rule.keywords.some(keyword => normalized.includes(keyword))) selected.add(rule.module);
   }
-  if (["what's their email","whats their email","their email","what is their email","who do i contact","where do i go","next steps","how much does that cost","can i do that today","yes","okay","ok"].some(keyword => current.includes(keyword))) {
+  if (["what's their email","whats their email","their email","what is their email","who do i contact","where do i go","next steps","how much does that cost","how much is that","can i do that today","today","what about now","yes","okay","ok","cuál es el correo","cual es el correo","cuanto cuesta","cuánto cuesta","se puede hacer hoy","estoy hablando","i'm talking about","i mean","me refiero"].some(keyword => current.includes(keyword))) {
     for (const item of history.slice(-4)) {
       const content = normalizeText(item.content);
       for (const rule of MODULE_RULES) {
@@ -117,7 +121,7 @@ function buildInstructions(message, history) {
 function isSpanish(message) {
   const text = normalizeText(message);
   return /[¿¡ñáéíóúü]/i.test(message)
-    || /\b(necesito|puedes|puedo|reservar|paquete|plomero|contesta|contestan|unidad|quien|quién|vive|hoy|proveedor|proveedores|gracias|hola|no encuentro)\b/.test(text);
+    || /\b(necesito|puedes|puedo|reservar|paquete|plomero|contesta|contestan|unidad|quien|quién|vive|hoy|proveedor|proveedores|gracias|hola|no encuentro|perdí|perdi|llave|correo|buzón|buzon|se puede|hablando)\b/.test(text);
 }
 
 function hasPackageContext(message, history) {
@@ -154,52 +158,171 @@ function alreadyTried(message) {
   ].some(phrase => text.includes(phrase));
 }
 
+function inferTopic(message, history = []) {
+  const samples = [{role:"user", content:message}, ...history.slice(-8).reverse()];
+  for (const item of samples) {
+    const text = foldText(item.content);
+    if (/\b(bbq|barbecue|parrilla)\b/.test(text)) return "bbq";
+    if (/\b(onr)\b/.test(text)) return "onr";
+    if (/\b(package|packages|paquete|paquetes|receiving|amazon|locker|no encuentro mi paquete)\b/.test(text)) return "package";
+    if (/\b(mailbox key|llave del buzón|llave del buzon|llave de buzón|llave de buzon|llave del correo|llave de correo|buzón|buzon)\b/.test(text)) return "mailbox_key";
+    if (/\b(unit key|apartment key|llave de la unidad|llave del apartamento|llave de mi apartamento|perdí mi llave|perdi mi llave)\b/.test(text)) return "unit_key";
+    if (/\b(parking fob|fob de estacionamiento|llavero de estacionamiento|control de estacionamiento|perdí mi fob|perdi mi fob)\b/.test(text)) return "parking_fob";
+    if (/\b(smoke detector|smoke alarm|detector de humo|alarma de humo|mi detector pita|chirping|beeping|pitando|sonando)\b/.test(text)) return "smoke_detector";
+    if (/\b(plumber|plomero|air conditioner|aire acondicionado|vendor|proveedor|proveedores|electrician|electricista)\b/.test(text)) return "vendor";
+    if (/\b(hoa|owner portal|portal|cuenta|balance)\b/.test(text)) return "hoa";
+    if (privateInfoRequest(text)) return "privacy";
+    if (/\b(board|junta|president|presidente)\b/.test(text)) return "board";
+    if (/\b(move|move-in|mudanza)\b/.test(text)) return "move_in";
+    if (/\b(contractor|contratista|coi)\b/.test(text)) return "contractor";
+    if (/\b(delivery|deliveries|entrega|mueble|furniture|appliance)\b/.test(text)) return "delivery";
+    if (/\b(parking|estacionamiento|aps|valet|garage|garaje)\b/.test(text)) return "parking";
+    if (/\b(amenity|amenities|amenidad|amenidades|gym|pool|piscina|sauna|theater|teatro)\b/.test(text)) return "amenity";
+  }
+  return null;
+}
+
+function topicFollowUpReply(message, history) {
+  const text = normalizeText(message);
+  const topic = inferTopic(message, history);
+  const spanish = isSpanish(message) || history.slice(-4).some(item => isSpanish(item.content));
+  const asksToday = /\b(today|same day|same-day|now|hoy|mismo día|mismo dia|ahora)\b/.test(text) || text.includes("se puede hacer hoy");
+  const bbqCorrection = text.includes("talking about the bbq") || text.includes("estoy hablando del bbq") || text.includes("hablando del bbq");
+  if (topic === "bbq" && (asksToday || bbqCorrection)) {
+    if (spanish) {
+      return bbqCorrection
+        ? "Entendido — para el BBQ, no se permiten reservas para el mismo día. Puedes reservar fechas futuras a través de ONR."
+        : "Para el BBQ, no se permiten reservas para el mismo día. Puedes reservar fechas futuras a través de ONR.";
+    }
+    return bbqCorrection
+      ? "Got it — for the BBQ, same-day reservations are not available. You can reserve future dates through ONR."
+      : "For the BBQ, same-day reservations are not available. You can reserve future dates through ONR.";
+  }
+  const asksCost = /\b(how much|cost|price|cuánto|cuanto|precio|cuesta)\b/.test(text);
+  if (asksCost) {
+    if (topic === "mailbox_key") return spanish ? "La llave de reemplazo para el buzón cuesta $10." : "The replacement mailbox key is $10.";
+    if (topic === "unit_key") return spanish ? "La llave de reemplazo para tu unidad cuesta $25." : "The replacement unit key is $25.";
+    if (topic === "parking_fob") return spanish ? "El fob de reemplazo para estacionamiento cuesta $55." : "The replacement parking fob is $55.";
+    if (topic === "smoke_detector") return spanish ? "La batería del detector de humo cuesta $10. Si el detector completo necesita reemplazo, cuesta $55." : "The smoke detector battery is $10. If the detector itself needs replacement, the device is $55.";
+  }
+  return null;
+}
+
 function privateInfoRequest(message) {
   const text = normalizeText(message);
   return /\b(who lives|who owns|owner of|tenant in|resident in|unit 2501|unidad 2501|quien vive|quién vive|quien es el dueño|quién es el dueño|información de otro residente|informacion de otro residente)\b/.test(text);
 }
 
 function privacyContextPushback(message, history) {
-  const text = normalizeText(message);
+  const text = foldText(message);
   const hasPrivacyContext = history.some(item => {
-    const content = normalizeText(item.content);
+    const content = foldText(item.content);
     return content.includes("private information")
       || content.includes("resident privacy")
+      || content.includes("another resident")
       || content.includes("información privada")
       || content.includes("informacion privada")
+      || content.includes("otro residente")
       || content.includes("privacidad");
   });
   if (!hasPrivacyContext) return false;
+  if ((text.includes("soy el") || text.includes("soy la")) && text.includes("due")) return true;
   return [
     "but i need",
     "i need to know",
     "tell me anyway",
+    "i have permission",
+    "they gave me permission",
+    "i am the owner",
+    "i'm the owner",
     "pero necesito",
     "necesito saber",
+    "soy su amigo",
+    "me dio permiso",
+    "soy el dueño",
+    "soy el dueno",
+    "soy la dueña",
+    "soy la duena",
     "dime de todas formas",
     "dímelo de todas formas"
   ].some(phrase => text.includes(phrase));
 }
 
 function privacyReply(message, history) {
-  const spanish = isSpanish(message);
+  const spanish = isSpanish(message) || history.slice(-4).some(item => isSpanish(item.content));
   const priorRefusals = history.filter(item => {
     const text = normalizeText(item.content);
-    return text.includes("resident privacy") || text.includes("private information") || text.includes("privacidad") || text.includes("información privada") || text.includes("informacion privada");
+    return text.includes("resident privacy")
+      || text.includes("private information")
+      || text.includes("another resident")
+      || text.includes("privacidad")
+      || text.includes("información privada")
+      || text.includes("informacion privada")
+      || text.includes("otro residente");
   }).length;
   const english = [
     "I'm sorry, but I can't share another resident's private information.",
-    "To protect resident privacy, I'm unable to provide that information.",
-    "I can't disclose information about another resident.",
-    "Resident privacy is important, so I'm unable to share those details."
+    "To protect resident privacy, I'm unable to provide those details.",
+    "I understand, but I still can't disclose information about another resident.",
+    "Even with permission claims, I'm not able to share another resident's information through chat.",
+    "For privacy reasons, I can only help with your own account or request."
   ];
   const spanishReplies = [
     "Lo siento, pero no puedo compartir información privada de otro residente.",
-    "Para proteger la privacidad de los residentes, no puedo proporcionar esa información.",
-    "No puedo divulgar información sobre otro residente.",
-    "La privacidad de los residentes es importante, por eso no puedo compartir esos detalles."
+    "Para proteger la privacidad de los residentes, no puedo proporcionar esos datos.",
+    "Entiendo, pero no puedo divulgar información sobre otro residente.",
+    "Aunque indiques que tienes permiso, no puedo compartir información de otro residente por este chat.",
+    "Por privacidad, solo puedo ayudarte con tu propia cuenta o solicitud."
   ];
-  return (spanish ? spanishReplies : english)[priorRefusals % 4];
+  return (spanish ? spanishReplies : english)[priorRefusals % 5];
+}
+
+function residentStoreReply(message, history) {
+  const text = foldText(message);
+  const topic = inferTopic(message, history);
+  const spanish = isSpanish(message) || history.slice(-4).some(item => isSpanish(item.content));
+  const mailbox = topic === "mailbox_key"
+    || (text.includes("llave") && text.includes("buz"))
+    || text.includes("mailbox key")
+    || text.includes("llave del buzon")
+    || text.includes("llave del buzon")
+    || text.includes("llave de buzon")
+    || text.includes("llave de buzon")
+    || text.includes("llave del correo")
+    || text.includes("llave de correo")
+    || text.includes("perdi mi llave del correo")
+    || text.includes("perdi mi llave del correo")
+    || text.includes("perdi mi llave del buzon")
+    || text.includes("perdi mi llave del buzon")
+    || text.includes("no abre mi buzon")
+    || text.includes("no abre mi buzon")
+    || text.includes("necesito llave del buzon")
+    || text.includes("necesito llave del buzon");
+  const unitKey = topic === "unit_key" || /\b(unit key|apartment key|llave de la unidad|llave del apartamento|llave de mi apartamento|perdí mi llave|perdi mi llave)\b/.test(text);
+  const parkingFob = topic === "parking_fob" || /\b(parking fob|fob de estacionamiento|llavero de estacionamiento|control de estacionamiento|perdí mi fob|perdi mi fob)\b/.test(text);
+  const smokeBattery = topic === "smoke_detector" || /\b(smoke detector|smoke alarm|detector de humo|alarma de humo|batería del detector de humo|bateria del detector de humo|detector de humo sonando|alarma de humo sonando|mi detector pita|chirping|beeping|pitando|sonando)\b/.test(text);
+
+  if (mailbox) {
+    return spanish
+      ? "Puedes comprar una llave de reemplazo para el buzón en la Tienda de Residentes de este sitio web por $10."
+      : "You can purchase a replacement mailbox key through the Resident Store on this website for $10.";
+  }
+  if (unitKey) {
+    return spanish
+      ? "Puedes comprar una llave de reemplazo para tu unidad en la Tienda de Residentes de este sitio web por $25."
+      : "You can purchase a replacement unit key through the Resident Store on this website for $25.";
+  }
+  if (parkingFob) {
+    return spanish
+      ? "Puedes comprar un fob de reemplazo para estacionamiento en la Tienda de Residentes de este sitio web por $55."
+      : "You can purchase a replacement parking fob through the Resident Store on this website for $55.";
+  }
+  if (smokeBattery) {
+    return spanish
+      ? "Cuando el detector de humo está sonando o pitando, muchas veces es por la batería. Puedes comprar una batería de reemplazo en la Tienda de Residentes por $10."
+      : "Smoke detector beeping is often related to the battery. You can purchase a replacement smoke detector battery through the Resident Store for $10.";
+  }
+  return null;
 }
 
 function vendorReply(message) {
@@ -210,11 +333,12 @@ function vendorReply(message) {
     : "These vendors are provided as a courtesy based on the Association's vendor list. You may choose any licensed vendor you prefer.";
 
   if (/\b(plumber|plumbing|plomero|plomería|plomeria)\b/.test(text)) {
-    const title = spanish ? "Proveedores de plomería recomendados:" : "Recommended plumbing vendors:";
-    return `${title}\n\n* Raircon — 786-367-6386 / 305-885-4422\n* Island Plumbing — 305-361-2929\n* US Contracting — 305-667-4036\n* Bay Plumbing — 305-446-8141\n\n${disclaimer}`;
+    const title = spanish ? "Claro, aquí tienes algunos plomeros de la lista de proveedores de la Asociación:" : "Recommended plumbing vendors:";
+    const raircon = spanish ? "* Raircon — 786-367-6386 o 305-885-4422" : "* Raircon — 786-367-6386 / 305-885-4422";
+    return `${title}\n\n${raircon}\n* Island Plumbing — 305-361-2929\n* US Contracting — 305-667-4036\n* Bay Plumbing — 305-446-8141\n\n${disclaimer}`;
   }
   if (/\b(air conditioner|a\/c|ac repair|hvac|aire acondicionado|aire|acondicionado)\b/.test(text)) {
-    const title = spanish ? "Proveedores de aire acondicionado recomendados:" : "Recommended A/C vendors:";
+    const title = spanish ? "Claro, aquí tienes algunos proveedores de aire acondicionado de la lista de proveedores de la Asociación:" : "Recommended A/C vendors:";
     return `${title}\n\n* Raircon — 786-367-6386\n* Cam Seer Service — 305-934-6929\n\n${disclaimer}`;
   }
   return null;
@@ -273,7 +397,9 @@ function packageReply(message, history) {
 
 function deterministicReply(message, history) {
   if (privateInfoRequest(message) || privacyContextPushback(message, history)) return privacyReply(message, history);
-  return bbqReply(message)
+  return topicFollowUpReply(message, history)
+    || residentStoreReply(message, history)
+    || bbqReply(message)
     || vendorReply(message)
     || packageReply(message, history);
 }

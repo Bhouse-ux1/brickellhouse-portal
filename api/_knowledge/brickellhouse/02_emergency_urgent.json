@@ -10,5 +10,8 @@
     {"intent": "noise_now", "response_en": "Please contact the Front Desk while the noise is occurring so they can look into it."},
     {"intent": "security_concern", "response_en": "Please contact the Front Desk immediately so they can assist."}
   ],
-  "urgent_rule": "For urgent issues, route through the Front Desk, never Maintenance."
+  "urgent_rule": "For urgent issues, route through the Front Desk, never Maintenance.",
+  "aliases_es": ["emergencia", "incendio", "fuego", "humo", "olor a quemado", "fuga", "gotera", "agua", "ascensor", "ruido", "seguridad", "aire no enfría"],
+  "examples_es": ["Hay humo en mi unidad.", "Tengo una fuga activa.", "Estoy atrapado en el ascensor."],
+  "response_es": "Para emergencias, responde completamente en español. Indica llamar al 911 cuando hay fuego, humo, peligro médico o seguridad inmediata; para asuntos urgentes del edificio, dirige al Front Desk."
 }
