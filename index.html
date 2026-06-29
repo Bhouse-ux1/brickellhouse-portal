@@ -255,12 +255,16 @@
         <button class="icon-button" id="chatClose" type="button" aria-label="Close assistant">×</button>
       </div>
       <div class="chat-messages" id="chatMessages" aria-live="polite">
-        <div class="chat-message assistant">Ready when you are.</div>
+        <div class="chat-message assistant chat-welcome">
+          <strong>Hi! I'm Luna, BrickellHouse's virtual concierge.</strong>
+          <span>I can help with amenities, parking, packages, resident services, and much more.</span>
+        </div>
       </div>
       <form class="chat-form" id="chatForm">
         <input id="chatInput" name="message" maxlength="1500" autocomplete="off" placeholder="Ask a question" aria-label="Message the AI Assistant">
         <button class="primary-button" id="chatSend" type="submit">Send</button>
       </form>
+      <p class="chat-disclaimer">Luna can make mistakes. Check important information with Management.</p>
     </div>
   </section>
   <script src="legal.js?v=20260615-legal1"></script>

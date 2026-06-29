@@ -187,3 +187,8 @@ footer{padding:65px 5vw;background:#181c1c;color:#fff;display:grid;grid-template
 .chat-teaser{z-index:2}
 .resident-chat{pointer-events:none}
 .chat-launcher,.chat-teaser,.resident-chat.open .chat-panel{pointer-events:auto}
+.chat-welcome{animation:chatWelcomeIn .85s ease both}
+.chat-welcome strong,.chat-welcome span{display:block}
+.chat-welcome strong{font-weight:600;margin-bottom:4px}
+.chat-disclaimer{margin:0;padding:0 16px 14px;text-align:center;font-size:11.5px;line-height:1.35;color:#8a908e;background:#fff}
+@keyframes chatWelcomeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
