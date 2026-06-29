@@ -74,8 +74,69 @@ function normalizeText(value) {
   return String(value || "").toLowerCase();
 }
 
+function normalizeAliases(text) {
+  const replacements = [
+    [/\b(amenitie|amenites|amenitys|amenitis|ammenity|amenety|amenetys|amenit|amen)\b/g, "amenity"],
+    [/\b(amenidade|amenida|ameniad)\b/g, "amenidad"],
+    [/\b(pol|poool|plol|pooll)\b/g, "pool"],
+    [/\b(piscna|picina|piscinaa)\b/g, "piscina"],
+    [/\b(gim|gymm|gymn)\b/g, "gym"],
+    [/\b(gimnacio|gimansio|jimnasio|gimnasioo)\b/g, "gimnasio"],
+    [/\b(souna|suna|saunna)\b/g, "sauna"],
+    [/\b(steem|steamm)\b/g, "steam"],
+    [/\b(vapoor|bapor)\b/g, "vapor"],
+    [/\b(massge|masage|massagee)\b/g, "massage"],
+    [/\b(masajesa|masje)\b/g, "masaje"],
+    [/\b(bbqq|barbeque|barbecue)\b/g, "bbq"],
+    [/\b(pakage|packagee|packge|pacakge|paket)\b/g, "package"],
+    [/\b(paqute|pakete|paquetee|paqete)\b/g, "paquete"],
+    [/\b(recieving|receving|receivin|receivng)\b/g, "receiving"],
+    [/\b(reciviendo|recibiendo|recepcion paquetes)\b/g, "receiving"],
+    [/\b(parkng|parkin|parcking)\b/g, "parking"],
+    [/\b(garag|garadge)\b/g, "garage"],
+    [/\b(elevater|elevtor|elevatorr)\b/g, "elevator"],
+    [/\b(fridge|frig|refridgerator|refrigator|refrigerater|refridger|refridg)\b/g, "refrigerator"],
+    [/\b(refri|refrigerado|refrijerador)\b/g, "refrigerador"],
+    [/\bdish\s+washer\b/g, "dishwasher"],
+    [/\b(dishwahser|dishwaser)\b/g, "dishwasher"],
+    [/\b(ac|a\/c|air conditioning|airconditioner|air cond|aircon)\b/g, "air conditioner"],
+    [/\b(my air|air broke)\b/g, "my air conditioner"],
+    [/\b(airee|aire malo)\b/g, "aire"],
+    [/\b(maint|maintanance|maintenence|maintnance)\b/g, "maintenance"],
+    [/\b(theatree)\b/g, "theater"],
+    [/\b(loungee|owner lounge)\b/g, "owners lounge"],
+    [/\b(clubroom|clubrm)\b/g, "club room"],
+    [/\b(paqute|pakete|paqete)\b/g, "paquete"],
+    [/\b(yave|labe|llabe|yavee)\b/g, "llave"],
+    [/\b(buson)\b/g, "buzon"],
+    [/\b(correoo|coreo)\b/g, "correo"],
+    [/\b(unidadd|uniddad)\b/g, "unidad"],
+    [/\b(lavadra|labadora)\b/g, "lavadora"],
+    [/\b(secadoda|secadoraa)\b/g, "secadora"],
+    [/\b(plomer)\b/g, "plomeria"],
+    [/\b(electrisidad|electricida)\b/g, "electricidad"],
+    [/\b(administracion|admin)\b/g, "administrador"],
+    [/\b(resepcion)\b/g, "recepcion"],
+    [/\b(fridge broke|my fridge)\b/g, "refrigerator not working"],
+    [/\b(dishwasher broke|washer broke|dryer broke)\b/g, "$1 not working"],
+    [/\b(my ac|my air conditioner|air conditioner broke)\b/g, "my air conditioner"],
+    [/\blost key\b/g, "key"],
+    [/\bmail key\b/g, "mailbox key"],
+    [/\b(garage remote|parking remote|garage clicker|parking clicker)\b/g, "parking fob"],
+    [/\b(mail room|package room|package locker|amazon locker)\b/g, "receiving package locker"],
+    [/\b(se dano|se daño|no sirve|no prende|se rompio|se rompió)\b/g, "no funciona"],
+    [/\b(no enfria|no enfría)\b/g, "no enfria"],
+    [/\b(perdi la llave|perdí la llave)\b/g, "perdi mi llave"],
+    [/\b(llave correo)\b/g, "llave del correo"],
+    [/\b(llave buzon|llave buzón)\b/g, "llave del buzon"],
+    [/\b(llave apartamento)\b/g, "llave del apartamento"],
+    [/\b(paquete amazon|locker amazon)\b/g, "amazon locker package"]
+  ];
+  return replacements.reduce((result, [pattern, replacement]) => result.replace(pattern, replacement), text);
+}
+
 function foldText(value) {
-  return normalizeText(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return normalizeAliases(normalizeText(value).normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
 }
 
 function validateHistory(history) {
@@ -94,17 +155,17 @@ function buildContextText(message, history) {
 }
 
 function selectKnowledge(message, history = []) {
-  const normalized = normalizeText(buildContextText(message, history));
-  const current = normalizeText(message);
+  const normalized = foldText(buildContextText(message, history));
+  const current = foldText(message);
   const selected = new Set(["constitution", "identityContacts", "conversationStyle"]);
   for (const rule of MODULE_RULES) {
-    if (rule.keywords.some(keyword => normalized.includes(keyword))) selected.add(rule.module);
+    if (rule.keywords.some(keyword => normalized.includes(foldText(keyword)))) selected.add(rule.module);
   }
   if (["what's their email","whats their email","their email","what is their email","who do i contact","where do i go","next steps","how much does that cost","how much is that","can i do that today","today","what about now","yes","okay","ok","cuál es el correo","cual es el correo","cuanto cuesta","cuánto cuesta","se puede hacer hoy","estoy hablando","i'm talking about","i mean","me refiero"].some(keyword => current.includes(keyword))) {
     for (const item of history.slice(-4)) {
       const content = normalizeText(item.content);
       for (const rule of MODULE_RULES) {
-        if (rule.keywords.some(keyword => content.includes(keyword))) selected.add(rule.module);
+        if (rule.keywords.some(keyword => foldText(content).includes(foldText(keyword)))) selected.add(rule.module);
       }
     }
   }
@@ -123,7 +184,7 @@ function buildInstructions(message, history) {
 function isSpanish(message) {
   const text = normalizeText(message);
   return /[¿¡ñáéíóúü]/i.test(message)
-    || /\b(necesito|puedes|puedo|reservar|paquete|plomero|contesta|contestan|unidad|quien|quién|vive|hoy|proveedor|proveedores|gracias|hola|no encuentro|perdí|perdi|llave|correo|buzón|buzon|se puede|hablando|jefe|modelo|administra|junta|gimnasio|dime|soy|presidente|monto|saldo|cuenta|aceite|alfombra|recepción|recepcion|administrador|aire|enfria|enfría|lavadora|secadora|nevera|refrigerador|lavaplatos|horno|microondas|plomeria|plomería)\b/.test(text);
+    || /\b(necesito|puedes|puedo|reservar|paquete|plomero|contesta|contestan|unidad|quien|quién|vive|hoy|proveedor|proveedores|gracias|hola|no encuentro|perdí|perdi|llave|correo|buzón|buzon|se puede|hablando|jefe|modelo|administra|junta|gimnasio|dime|soy|presidente|monto|saldo|cuenta|aceite|alfombra|recepción|recepcion|administrador|aire|enfria|enfría|lavadora|secadora|nevera|refrigerador|refri|lavaplatos|horno|microondas|plomeria|plomería|sirve|prende|daño|dano|rompio|rompió)\b/.test(text);
 }
 
 function preferredLanguage(message, history = []) {
@@ -634,7 +695,7 @@ function unitMaintenanceIssueReply(message, history) {
   if (asksForVendorRecommendation(message)) return null;
   const text = foldText(message);
   const spanish = shouldReplyInSpanish(message, history);
-  const issueWords = /\b(broken|not working|isn'?t working|stopped working|not cooling|isn'?t cooling|leaking|clogged|backed up|issue|problem|repair|fix|no funciona|no sirve|no enfria|no enfría|se rompio|se rompió|problema|arreglar|reparar|gotea|tapado|atascado)\b/.test(text);
+  const issueWords = /\b(broke|broken|not working|isn'?t working|stopped working|not cooling|isn'?t cooling|leaking|clogged|backed up|issue|problem|repair|fix|no funciona|no sirve|no enfria|no enfría|se rompio|se rompió|problema|arreglar|reparar|gotea|tapado|atascado)\b/.test(text);
   const unitItem = /\b(air conditioner|a\/c|ac|aire|aire acondicionado|refrigerator|fridge|nevera|refrigerador|dishwasher|lavaplatos|oven|horno|microwave|microondas|washer|lavadora|dryer|secadora|garbage disposal|disposal|triturador|water heater|calentador|plumbing|plomeria|plomería|sink|toilet|electrical|electricidad|outlet|breaker)\b/.test(text);
   if (!unitItem || !issueWords) return null;
   if (spanish) {
@@ -859,7 +920,7 @@ function vendorReply(message, history = []) {
     const title = spanish ? "Como cortesía, estos son algunos proveedores de aire acondicionado incluidos en la lista de proveedores de la Asociación:" : "Recommended A/C vendors:";
     return `${title}\n\n* Raircon — 786-367-6386\n* Cam Seer Service — 305-934-6929\n\n${disclaimer}`;
   }
-  if (/\b(appliance repair|electrodoméstico|electrodomestico|refrigerator|fridge|nevera|refrigerador|dishwasher|lavaplatos|oven|horno|microwave|microondas|washer|lavadora|dryer|secadora)\b/.test(text) || (asksForVendorRecommendation(message) && vendorCategory === "appliance")) {
+  if (asksForVendorRecommendation(message) && vendorCategory === "appliance") {
     const title = spanish ? "Como cortesía, este es un proveedor de reparación de electrodomésticos incluido en la lista de proveedores de la Asociación:" : "Recommended appliance repair vendor:";
     return `${title}\n\n* AJ Appliance & Refrigeration — 305-244-0114\n\n${disclaimer}`;
   }
