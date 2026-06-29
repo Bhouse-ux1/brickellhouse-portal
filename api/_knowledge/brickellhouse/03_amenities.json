@@ -19,7 +19,10 @@
   "pool": "No glass containers. Towels are not provided. There is no lifeguard. Pool chairs cannot be reserved.",
   "gym": "Guests must be accompanied by a resident. Outside personal trainers are allowed. No food or drinks.",
   "owners_lounge": "Can be reserved. Fee is listed in ONR. Capacity is 60 people.",
+  "reservation_intent_rule": "When the resident is asking about reservations, answer only whether that amenity can be reserved. Do not add hours, rules, restrictions, or instructions unless asked.",
+  "reservable_amenities": ["BBQ", "Owners Lounge", "Theatre", "Club Room"],
+  "non_reservable_amenities": ["Pool", "Rooftop Pool", "Fitness Center / Gym", "Sauna", "Steam Room", "Massage Room"],
   "aliases_es": ["amenidades", "gimnasio", "piscina", "spa", "terraza", "clubroom", "salón", "business center", "BBQ", "parrilla", "teatro", "sauna", "ONR", "reserva"],
-  "examples_es": ["¿Puedes reservar el BBQ por mí?", "¿Se puede hacer hoy?", "Estoy hablando del BBQ."],
-  "response_es": "Responde en español sobre amenidades. Para el BBQ, explica que se reserva por ONR; solo menciona la regla de mismo día si preguntan por hoy o mismo día."
+  "examples_es": ["¿Puedes reservar el BBQ por mí?", "¿Se puede hacer hoy?", "Estoy hablando del BBQ.", "Piscina.", "Gimnasio.", "Sauna."],
+  "response_es": "Responde en español sobre amenidades. Si el contexto es reserva, responde solo si la amenidad se puede reservar. No agregues horarios ni reglas salvo que lo pidan."
 }

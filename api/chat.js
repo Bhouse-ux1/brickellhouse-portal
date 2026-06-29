@@ -498,6 +498,68 @@ function unitPurchaseReply(message, history) {
   return null;
 }
 
+function amenityReservationContext(message, history = []) {
+  const text = foldText(`${message}\n${history.slice(-6).map(item => item.content).join("\n")}`);
+  return /\b(reserve|reservation|reservar|reserva|reservacion|reservación|book|booking)\b/.test(text)
+    && /\b(amenity|amenities|amenidad|amenidades|bbq|barbecue|parrilla|pool|piscina|rooftop pool|gym|fitness|gimnasio|sauna|steam room|steam|massage room|massage|owners lounge|owner lounge|lounge|theatre|theater|teatro|club room|clubroom)\b/.test(text);
+}
+
+function amenityInfoRequest(message) {
+  const text = foldText(message);
+  return /\b(hours|hour|rules|rule|tell me about|what are the|is there|horario|horarios|reglas|hablame de|háblame de|cuentame|cuéntame|hay)\b/.test(text);
+}
+
+function amenityReservationReply(message, history) {
+  if (amenityInfoRequest(message)) return null;
+  const text = foldText(message);
+  const spanish = shouldReplyInSpanish(message, history);
+  const reservationWords = /\b(reserve|reservation|reservar|reserva|reservacion|reservación|book|booking)\b/.test(text);
+  const genericAmenity = /\b(amenity|amenities|amenidad|amenidades)\b/.test(text);
+  if (reservationWords && genericAmenity && !/\b(bbq|barbecue|parrilla|pool|piscina|gym|fitness|gimnasio|sauna|steam|massage|owners lounge|owner lounge|lounge|theatre|theater|teatro|club room|clubroom)\b/.test(text)) {
+    return spanish ? "Claro. ¿Qué amenidad te gustaría reservar?" : "Of course! Which amenity would you like to reserve?";
+  }
+  if (!amenityReservationContext(message, history)) return null;
+
+  if (/\b(pool|piscina|rooftop pool)\b/.test(text)) {
+    return spanish
+      ? "La piscina no se puede reservar. Está disponible por orden de llegada."
+      : "The pool cannot be reserved. It is available on a first-come, first-served basis.";
+  }
+  if (/\b(gym|fitness|fitness center|gimnasio)\b/.test(text)) {
+    return spanish
+      ? "El gimnasio no se puede reservar. Está disponible por orden de llegada."
+      : "The Fitness Center cannot be reserved. It is available on a first-come, first-served basis.";
+  }
+  if (/\b(sauna)\b/.test(text)) {
+    return spanish
+      ? "El sauna no se puede reservar. Está disponible por orden de llegada."
+      : "The sauna cannot be reserved. It is available on a first-come, first-served basis.";
+  }
+  if (/\b(steam room|steam|vapor)\b/.test(text)) {
+    return spanish
+      ? "El steam room no se puede reservar. Está disponible por orden de llegada."
+      : "The steam room cannot be reserved. It is available on a first-come, first-served basis.";
+  }
+  if (/\b(massage room|massage|masaje)\b/.test(text)) {
+    return spanish
+      ? "El massage room no se puede reservar. Está disponible por orden de llegada."
+      : "The massage room cannot be reserved. It is available on a first-come, first-served basis.";
+  }
+  if (/\b(bbq|barbecue|parrilla)\b/.test(text)) {
+    return spanish ? "El área de BBQ se puede reservar a través de ONR." : "The BBQ area can be reserved through ONR.";
+  }
+  if (/\b(owners lounge|owner lounge|owners' lounge|lounge)\b/.test(text)) {
+    return spanish ? "El Owners Lounge se puede reservar a través de ONR." : "The Owners Lounge can be reserved through ONR.";
+  }
+  if (/\b(theatre|theater|teatro)\b/.test(text)) {
+    return spanish ? "El Theatre se puede reservar a través de ONR." : "The Theatre can be reserved through ONR.";
+  }
+  if (/\b(club room|clubroom|club room)\b/.test(text)) {
+    return spanish ? "El Club Room se puede reservar a través de ONR." : "The Club Room can be reserved through ONR.";
+  }
+  return null;
+}
+
 function inferTopic(message, history = []) {
   const currentTopic = detectTopic(message);
   if (currentTopic) return currentTopic;
@@ -864,6 +926,8 @@ function deterministicReply(message, history) {
   if (directCorrection) return directCorrection;
   const boardInfo = boardInfoReply(message, history);
   if (boardInfo) return boardInfo;
+  const amenityReservation = amenityReservationReply(message, history);
+  if (amenityReservation) return amenityReservation;
   const keyClarification = keyClarificationReply(message, history);
   if (keyClarification) return keyClarification;
   const staff = managementStaffReply(message);
