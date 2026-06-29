@@ -40,7 +40,8 @@ const SYSTEM_INSTRUCTIONS = [
   "Before answering, silently classify the request as a new question, a follow-up, a repeated request, an authority claim, a private-information request, an account-information request, or a correction. Use the shortest safe answer and vary wording if the same safe boundary was already given.",
   "Stay focused on the question asked. Do not add hours, phone numbers, same-day rules, multiple departments, or extra policy details unless the resident asks for them or the approved knowledge requires them.",
   "If the resident says they already tried, already emailed, already called, no one answered, or no one responded, do not repeat the same instruction. Acknowledge that they tried it and provide the next approved escalation step.",
-  "For vendor recommendations, use bullets and only the relevant vendor category. Use this English disclaimer: \"These vendors are provided as a courtesy based on the Association's vendor list. You may choose any licensed vendor you prefer.\" Use this Spanish disclaimer for Spanish replies: \"Estos proveedores se comparten como cortesía según la lista de proveedores de la Asociación. Puedes elegir cualquier proveedor con licencia que prefieras.\"",
+  "For appliance or unit maintenance issues, do not route residents directly to Maintenance or vendors. Explain that, as a courtesy, the Association's maintenance staff can visit the unit to help identify the issue; ask the resident to email admin@brickellhouse.net to coordinate the courtesy inspection; mention they may use their own licensed vendor if preferred. Only provide vendor recommendations when the resident specifically asks for a vendor or recommendation.",
+  "For vendor recommendations, use bullets and only the relevant vendor category. Use this English disclaimer: \"These recommendations are provided as a courtesy based on the Association's vendor list. You're welcome to use any licensed vendor you prefer.\" Use this Spanish disclaimer for Spanish replies: \"Estas recomendaciones se ofrecen únicamente como cortesía y están basadas en la lista de proveedores de la Asociación. Puedes contratar cualquier proveedor con licencia de tu preferencia.\"",
   "Recent context must never override privacy, safety, payment, prompt-protection, or no-guessing rules.",
   "Use this routing priority: safety and self-harm; emergency; prompt/system protection; payment info in chat; privacy; urgent building issue; vendor recommendation; Resident Store/pricing; packages/Receiving; parking/APS/garage; moves/contractors/deliveries/COI; amenities/ONR; rules/violations; HOA/Owner Portal/Management; FAQ/general; fallback.",
   "Do not route to Maintenance as a generic fallback. Only provide Maintenance contact information when the resident specifically asks for the Maintenance email or the approved knowledge explicitly requires it.",
@@ -122,7 +123,34 @@ function buildInstructions(message, history) {
 function isSpanish(message) {
   const text = normalizeText(message);
   return /[¿¡ñáéíóúü]/i.test(message)
-    || /\b(necesito|puedes|puedo|reservar|paquete|plomero|contesta|contestan|unidad|quien|quién|vive|hoy|proveedor|proveedores|gracias|hola|no encuentro|perdí|perdi|llave|correo|buzón|buzon|se puede|hablando|jefe|modelo|administra|junta|gimnasio|dime|soy|presidente|monto|saldo|cuenta|aceite|alfombra|recepción|recepcion|administrador)\b/.test(text);
+    || /\b(necesito|puedes|puedo|reservar|paquete|plomero|contesta|contestan|unidad|quien|quién|vive|hoy|proveedor|proveedores|gracias|hola|no encuentro|perdí|perdi|llave|correo|buzón|buzon|se puede|hablando|jefe|modelo|administra|junta|gimnasio|dime|soy|presidente|monto|saldo|cuenta|aceite|alfombra|recepción|recepcion|administrador|aire|enfria|enfría|lavadora|secadora|nevera|refrigerador|lavaplatos|horno|microondas|plomeria|plomería)\b/.test(text);
+}
+
+function preferredLanguage(message, history = []) {
+  const current = foldText(message);
+  if (/\b(let'?s continue in english|please answer in english|answer in english|speak english|english please)\b/.test(current)) return "en";
+  if (/\b(solo hablo espanol|solo hablo español|solo hablo espa.ol|hablame en espanol|háblame en español|prefiero espanol|prefiero español|en espanol por favor|en español por favor)\b/.test(current)) return "es";
+  for (const item of history.slice().reverse()) {
+    if (item.role !== "user") continue;
+    const text = foldText(item.content);
+    if (/\b(let'?s continue in english|please answer in english|answer in english|speak english|english please)\b/.test(text)) return "en";
+    if (/\b(solo hablo espanol|solo hablo español|solo hablo espa.ol|hablame en espanol|háblame en español|prefiero espanol|prefiero español|en espanol por favor|en español por favor)\b/.test(text)) return "es";
+  }
+  return null;
+}
+
+function shouldReplyInSpanish(message, history = []) {
+  const preference = preferredLanguage(message, history);
+  if (preference === "es") return true;
+  if (preference === "en") return false;
+  return isSpanish(message) || history.slice(-4).some(item => isSpanish(item.content));
+}
+
+function languagePreferenceReply(message) {
+  const preference = preferredLanguage(message, []);
+  if (preference === "es") return "Claro, seguimos en español.";
+  if (preference === "en") return "Of course, we can continue in English.";
+  return null;
 }
 
 function hasPackageContext(message, history) {
@@ -294,7 +322,7 @@ function boardContactRequest(message, history) {
 
 function boardInfoReply(message, history) {
   const text = foldText(message);
-  const spanish = isSpanish(message) || history.slice(-4).some(item => isSpanish(item.content));
+  const spanish = shouldReplyInSpanish(message, history);
   const asksBoardMembers = /\b(who are the board members|who is on the board|board members|quienes son los miembros de la junta|quien esta en la junta|miembros de la junta)\b/.test(text);
   const asksConfirmation = hasBoardContext(message, history) && /\b(are these the board members|are they the board members|son los miembros de la junta|estos son los miembros de la junta|son ellos los miembros)\b/.test(text);
   const asksTitles = /\b(title|titles|role|roles|cargo|cargos|president|presidente|treasurer|tesorero|vice president|vp)\b/.test(text);
@@ -530,8 +558,27 @@ function inferVendorCategory(message, history = []) {
     if (/\b(plumber|plumbing|plomero|plomeria)\b/.test(text)) return "plumber";
     if (/\b(air conditioner|a\/c|ac repair|hvac|aire acondicionado|aire|acondicionado)\b/.test(text)) return "hvac";
     if (/\b(electrician|electricista)\b/.test(text)) return "electrician";
+    if (/\b(refrigerator|fridge|nevera|refrigerador|dishwasher|lavaplatos|oven|horno|microwave|microondas|washer|lavadora|dryer|secadora|appliance|electrodomestico|electrodoméstico)\b/.test(text)) return "appliance";
   }
   return null;
+}
+
+function asksForVendorRecommendation(message) {
+  const text = foldText(message);
+  return /\b(recommend|recommendation|vendor|vendors|technician|company|repair company|who can i call|plumber|electrician|hvac|a\/c technician|ac technician|proveedor|proveedores|recomiendas|recomendacion|recomendación|tecnico|técnico|plomero|electricista)\b/.test(text);
+}
+
+function unitMaintenanceIssueReply(message, history) {
+  if (asksForVendorRecommendation(message)) return null;
+  const text = foldText(message);
+  const spanish = shouldReplyInSpanish(message, history);
+  const issueWords = /\b(broken|not working|isn'?t working|stopped working|not cooling|isn'?t cooling|leaking|clogged|backed up|issue|problem|repair|fix|no funciona|no sirve|no enfria|no enfría|se rompio|se rompió|problema|arreglar|reparar|gotea|tapado|atascado)\b/.test(text);
+  const unitItem = /\b(air conditioner|a\/c|ac|aire|aire acondicionado|refrigerator|fridge|nevera|refrigerador|dishwasher|lavaplatos|oven|horno|microwave|microondas|washer|lavadora|dryer|secadora|garbage disposal|disposal|triturador|water heater|calentador|plumbing|plomeria|plomería|sink|toilet|electrical|electricidad|outlet|breaker)\b/.test(text);
+  if (!unitItem || !issueWords) return null;
+  if (spanish) {
+    return "Lamento escuchar eso. Como cortesía, el personal de mantenimiento de la Asociación puede visitar tu unidad para ayudar a identificar el problema. Por favor envía un correo a admin@brickellhouse.net y con gusto coordinarán una revisión.\n\nSi lo prefieres, también puedes contactar a tu propio proveedor con licencia. Si deseas recomendaciones, con gusto puedo compartir la lista de proveedores de cortesía de la Asociación.";
+  }
+  return "I'm sorry to hear that. As a courtesy, the Association's maintenance staff can visit your unit to help identify the issue. Please email admin@brickellhouse.net and they'll be happy to help coordinate a courtesy inspection.\n\nIf you prefer, you're also welcome to contact your own licensed vendor. If you'd like, I can also recommend vendors from the Association's courtesy vendor list.";
 }
 
 function assistantIdentityReply(message, history) {
@@ -733,21 +780,26 @@ function residentStoreReply(message, history) {
   return null;
 }
 
-function vendorReply(message) {
+function vendorReply(message, history = []) {
   const text = normalizeText(message);
-  const spanish = isSpanish(message);
+  const spanish = shouldReplyInSpanish(message, history);
+  const vendorCategory = inferVendorCategory(message, history);
   const disclaimer = spanish
-    ? "Estos proveedores se comparten como cortesía según la lista de proveedores de la Asociación. Puedes elegir cualquier proveedor con licencia que prefieras."
-    : "These vendors are provided as a courtesy based on the Association's vendor list. You may choose any licensed vendor you prefer.";
+    ? "Estas recomendaciones se ofrecen únicamente como cortesía y están basadas en la lista de proveedores de la Asociación. Puedes contratar cualquier proveedor con licencia de tu preferencia."
+    : "These recommendations are provided as a courtesy based on the Association's vendor list. You're welcome to use any licensed vendor you prefer.";
 
-  if (/\b(plumber|plumbing|plomero|plomería|plomeria)\b/.test(text)) {
-    const title = spanish ? "Claro, aquí tienes algunos plomeros de la lista de proveedores de la Asociación:" : "Recommended plumbing vendors:";
+  if (/\b(plumber|plumbing|plomero|plomería|plomeria)\b/.test(text) || (asksForVendorRecommendation(message) && vendorCategory === "plumber")) {
+    const title = spanish ? "Como cortesía, estos son algunos plomeros incluidos en la lista de proveedores de la Asociación:" : "Recommended plumbing vendors:";
     const raircon = spanish ? "* Raircon — 786-367-6386 o 305-885-4422" : "* Raircon — 786-367-6386 / 305-885-4422";
     return `${title}\n\n${raircon}\n* Island Plumbing — 305-361-2929\n* US Contracting — 305-667-4036\n* Bay Plumbing — 305-446-8141\n\n${disclaimer}`;
   }
-  if (/\b(air conditioner|a\/c|ac repair|hvac|aire acondicionado|aire|acondicionado)\b/.test(text)) {
-    const title = spanish ? "Claro, aquí tienes algunos proveedores de aire acondicionado de la lista de proveedores de la Asociación:" : "Recommended A/C vendors:";
+  if (/\b(air conditioner|a\/c|ac repair|hvac|aire acondicionado|aire|acondicionado)\b/.test(text) || (asksForVendorRecommendation(message) && vendorCategory === "hvac")) {
+    const title = spanish ? "Como cortesía, estos son algunos proveedores de aire acondicionado incluidos en la lista de proveedores de la Asociación:" : "Recommended A/C vendors:";
     return `${title}\n\n* Raircon — 786-367-6386\n* Cam Seer Service — 305-934-6929\n\n${disclaimer}`;
+  }
+  if (/\b(appliance repair|electrodoméstico|electrodomestico|refrigerator|fridge|nevera|refrigerador|dishwasher|lavaplatos|oven|horno|microwave|microondas|washer|lavadora|dryer|secadora)\b/.test(text) || (asksForVendorRecommendation(message) && vendorCategory === "appliance")) {
+    const title = spanish ? "Como cortesía, este es un proveedor de reparación de electrodomésticos incluido en la lista de proveedores de la Asociación:" : "Recommended appliance repair vendor:";
+    return `${title}\n\n* AJ Appliance & Refrigeration — 305-244-0114\n\n${disclaimer}`;
   }
   return null;
 }
@@ -804,6 +856,8 @@ function packageReply(message, history) {
 }
 
 function deterministicReply(message, history) {
+  const languagePreference = languagePreferenceReply(message);
+  if (languagePreference) return languagePreference;
   const unitPurchase = unitPurchaseReply(message, history);
   if (unitPurchase) return unitPurchase;
   const directCorrection = correctionReply(message, history);
@@ -818,6 +872,8 @@ function deterministicReply(message, history) {
   if (spill) return spill;
   const identity = assistantIdentityReply(message, history);
   if (identity) return identity;
+  const unitMaintenance = unitMaintenanceIssueReply(message, history);
+  if (unitMaintenance) return unitMaintenance;
   const boardContact = boardContactReply(message, history);
   if (boardContact) return boardContact;
   const hoaBalance = hoaBalanceReply(message, history);
@@ -826,7 +882,7 @@ function deterministicReply(message, history) {
   return topicFollowUpReply(message, history)
     || residentStoreReply(message, history)
     || bbqReply(message)
-    || vendorReply(message)
+    || vendorReply(message, history)
     || packageReply(message, history);
 }
 

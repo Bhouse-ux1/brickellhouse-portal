@@ -6,7 +6,7 @@
     {"intent": "elevator_emergency", "response_en": "Please contact the Front Desk immediately so they can assist you as quickly as possible.", "response_es": "Por favor contacta a la recepción de inmediato para que puedan ayudarte lo antes posible."},
     {"intent": "garage_vehicle_stuck", "response_en": "Please contact the parking attendant for assistance. If the attendant is unavailable, the Front Desk will be happy to help.", "response_es": "Por favor contacta al encargado de estacionamiento para asistencia. Si no está disponible, la recepción podrá ayudarte."},
     {"intent": "power_outage", "response_en": "Please contact the Front Desk first. If the building has power and only your unit is affected, the issue may need to be reported to FPL."},
-    {"intent": "ac_not_cooling", "response_en": "Please contact an A/C technician so they can inspect the unit."},
+    {"intent": "ac_not_cooling", "response_en": "As a courtesy, the Association's maintenance staff can visit your unit to help identify the issue. Please email admin@brickellhouse.net to coordinate a courtesy inspection. You may also contact your own licensed vendor if you prefer.", "response_es": "Como cortesía, el personal de mantenimiento de la Asociación puede visitar tu unidad para ayudar a identificar el problema. Por favor envía un correo a admin@brickellhouse.net para coordinar una revisión. También puedes contactar a tu propio proveedor con licencia si lo prefieres."},
     {"intent": "noise_now", "response_en": "Please contact the Front Desk while the noise is occurring so they can look into it."},
     {"intent": "security_concern", "response_en": "Please contact the Front Desk immediately so they can assist."}
   ],
