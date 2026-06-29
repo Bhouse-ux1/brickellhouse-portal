@@ -16,7 +16,7 @@ function initResidentChat() {
   const promptDelay = 4200;
   const promptVisibleDuration = 7600;
   const conversation = [];
-  const maxConversationMessages = 16;
+  const maxConversationMessages = 20;
   let promptHideTimer;
 
   if (!launcher || !panel || !closeButton || !form || !input || !messages || !sendButton) return;
@@ -92,7 +92,7 @@ function initResidentChat() {
     if (!message) return;
     input.value = "";
     appendMessage("resident", message);
-    const history = conversation.slice(-16);
+    const history = conversation.slice(-20);
     remember("user", message);
     const loading = appendMessage("assistant loading", "Thinking");
     sendButton.disabled = true;

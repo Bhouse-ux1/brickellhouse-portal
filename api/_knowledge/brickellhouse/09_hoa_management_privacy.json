@@ -3,6 +3,12 @@
   "owner_portal": "https://brickellhouse.connectresident.com/",
   "management_email": "admin@brickellhouse.net",
   "hoa_balance_response": "You can view your account information by logging into the Owner Portal at https://brickellhouse.connectresident.com/. If you don't have an account, you can sign up by scrolling to the bottom of the login page.",
+  "hoa_balance_variations_en": [
+    "You can view your account information securely through the Owner Portal: https://brickellhouse.connectresident.com/.",
+    "I understand you're asking for the amount directly, but I can't provide HOA balances or account details in chat. Please use the Owner Portal to view that securely.",
+    "For privacy and security, HOA account details need to be viewed through the Owner Portal.",
+    "You're asking for account-specific information, which I can't provide in chat. The Owner Portal is the secure place to check that."
+  ],
   "hoa_payments_response": "No, HOA payments cannot be made through Luna or this website. Please use the Owner Portal for HOA account matters.",
   "route_to_management": ["payment ledger", "estoppel", "selling unit", "condo questionnaire", "insurance information", "meeting minutes", "incident report availability"],
   "legal_advice_response": "I'm not an attorney, so I'm unable to provide legal advice. Please consult an attorney or another qualified legal resource.",
@@ -12,6 +18,12 @@
   "aliases_es": ["HOA", "asociación", "portal de propietario", "cuenta", "balance", "pagar HOA", "unidad 2501", "quién vive", "dueño", "inquilino", "privacidad"],
   "examples_es": ["¿Puedo pagar el HOA por aquí?", "¿Quién vive en la unidad 2501?", "Me dio permiso."],
   "hoa_balance_response_es": "Puedes ver la información de tu cuenta ingresando al Owner Portal en https://brickellhouse.connectresident.com/. Si no tienes cuenta, puedes registrarte al final de la página de inicio de sesión.",
+  "hoa_balance_variations_es": [
+    "Puedes ver la información de tu cuenta de forma segura en el Owner Portal: https://brickellhouse.connectresident.com/.",
+    "Entiendo que estás pidiendo el monto directamente, pero no puedo proporcionar saldos o detalles de cuenta de la HOA por chat. Puedes revisarlo de forma segura en el Owner Portal.",
+    "Por privacidad y seguridad, los detalles de cuenta de la HOA deben revisarse en el Owner Portal.",
+    "Estás pidiendo información específica de una cuenta, y no puedo proporcionarla por chat. El Owner Portal es el lugar seguro para revisarla."
+  ],
   "hoa_payments_response_es": "No, los pagos de HOA no se pueden hacer por Luna ni por este chat. Usa el Owner Portal para asuntos de cuenta HOA.",
   "response_es": "Responde en español. Protege información privada y dirige asuntos de cuenta propia al Owner Portal o a Management según corresponda."
 }
