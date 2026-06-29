@@ -122,7 +122,7 @@ function buildInstructions(message, history) {
 function isSpanish(message) {
   const text = normalizeText(message);
   return /[¿¡ñáéíóúü]/i.test(message)
-    || /\b(necesito|puedes|puedo|reservar|paquete|plomero|contesta|contestan|unidad|quien|quién|vive|hoy|proveedor|proveedores|gracias|hola|no encuentro|perdí|perdi|llave|correo|buzón|buzon|se puede|hablando|jefe|modelo|administra|junta|gimnasio|dime|soy|presidente|monto|saldo|cuenta)\b/.test(text);
+    || /\b(necesito|puedes|puedo|reservar|paquete|plomero|contesta|contestan|unidad|quien|quién|vive|hoy|proveedor|proveedores|gracias|hola|no encuentro|perdí|perdi|llave|correo|buzón|buzon|se puede|hablando|jefe|modelo|administra|junta|gimnasio|dime|soy|presidente|monto|saldo|cuenta|aceite|alfombra|recepción|recepcion|administrador)\b/.test(text);
 }
 
 function hasPackageContext(message, history) {
@@ -161,6 +161,7 @@ function alreadyTried(message) {
 
 function detectTopic(value) {
   const text = foldText(value);
+  if (/\b(buy a unit|buy an apartment|purchase a unit|purchase an apartment|comprar una unidad|comprar apartamento|comprar un apartamento)\b/.test(text)) return "unit_purchase";
   if (/\b(bbq|barbecue|parrilla)\b/.test(text)) return "bbq";
   if (/\b(onr)\b/.test(text)) return "onr";
   if (/\b(package|packages|paquete|paquetes|receiving|amazon|locker|no encuentro mi paquete)\b/.test(text)) return "package";
@@ -184,12 +185,12 @@ function isStandaloneIntent(message) {
   const text = foldText(message);
   return [
     /\b(who are you|what can you help me with|who is your boss|who programmed you|who built you|what model are you|what model do you use|what api do you use)\b/,
-    /\b(who manages the building|who is the manager|who is caleb|building manager)\b/,
-    /\b(who is on the board|who are the board members|who is the president|president of the board)\b/,
+    /\b(who manages the building|who is the manager|who is the general manager|general manager|who is caleb|building manager)\b/,
+    /\b(who is on the board|who are the board members|who are the board members|are these the board members|who is the president|president of the board)\b/,
     /\b(i need a plumber|need a plumber|i need an electrician|need an electrician)\b/,
     /\b(what are the gym hours|gym hours|how do i register for onr|register for onr)\b/,
     /\b(quien eres|como te llamas|como se llama tu jefe|se llama tu jefe|quien es tu jefe|tu jefe|quien te programo|que modelo usas)\b/,
-    /\b(quien administra el edificio|quien es el manager|quien es caleb|quien esta en la junta|quienes son los miembros de la junta|quien es el presidente)\b/,
+    /\b(quien administra el edificio|quien es el manager|quien es el general manager|general manager|como se llama el admin|quien es el admin|quien es caleb|quien esta en la junta|quienes son los miembros de la junta|quien es el presidente)\b/,
     /\b(necesito un plomero|necesito un electricista|cual es el horario del gimnasio|como me registro en onr)\b/
   ].some(pattern => pattern.test(text));
 }
@@ -201,7 +202,7 @@ function isAmbiguousFollowUp(message) {
     /\b(what'?s their email|what is their email|email again|their email|cual es el correo|correo)\b/,
     /\b(can i do it today|do it today|possible to get it done by today|today|same day|same-day|now|se puede hacer hoy|hoy|manana|mañana|ahora)\b/,
     /\b(what'?s next|what are the next steps|where do i go|que sigue|a donde voy)\b/,
-    /\b(the first one|first one|phone number|phone|telefono|teléfono|primer one|el primero|la primera)\b/,
+    /\b(the first one|first one|phone number|phone|telefono|teléfono|primer one|el primero|la primera|de reemplazo)\b/,
     /\b(i meant|i mean|i'?m talking about|me refiero|estoy hablando|hablando del)\b/
   ].some(pattern => pattern.test(text));
 }
@@ -287,8 +288,42 @@ function boardContactRequest(message, history) {
   const text = foldText(message);
   const boardContext = hasBoardContext(message, history);
   const asksContact = /\b(email|correo|phone|telefono|teléfono|address|direccion|dirección|contact|contacto|private contact|personal contact)\b/.test(text);
-  const pressure = containsAny(text, ["can you just tell me", "just tell me", "tell me", "dime", "solo dime"]);
+  const pressure = containsAny(text, ["can you just tell me", "just tell me", "tell me their", "tell me the email", "dime el correo", "dime su correo", "solo dime el correo"]);
   return (boardContext && asksContact) || (boardContext && hasAuthorityClaim(message)) || (boardContext && pressure);
+}
+
+function boardInfoReply(message, history) {
+  const text = foldText(message);
+  const spanish = isSpanish(message) || history.slice(-4).some(item => isSpanish(item.content));
+  const asksBoardMembers = /\b(who are the board members|who is on the board|board members|quienes son los miembros de la junta|quien esta en la junta|miembros de la junta)\b/.test(text);
+  const asksConfirmation = hasBoardContext(message, history) && /\b(are these the board members|are they the board members|son los miembros de la junta|estos son los miembros de la junta|son ellos los miembros)\b/.test(text);
+  const asksTitles = /\b(title|titles|role|roles|cargo|cargos|president|presidente|treasurer|tesorero|vice president|vp)\b/.test(text);
+  if (asksConfirmation) return spanish ? "Sí, ellos son los miembros de la Junta." : "Yes, they are the Board members.";
+  if (!asksBoardMembers) return null;
+  if (asksTitles) {
+    return [
+      "* Manuel Agras — President",
+      "* Guillermo Ponce — Director",
+      "* Walter Colatosi — Director",
+      "* Juan Carlos Ahmad — Treasurer",
+      "* Marco Cevenini — Director",
+      "* Manuel Cervera — VP",
+      "* Luis Garino — Director",
+      "* Ricardo De Olivera — Director",
+      "* Victoriia Agapitov — Director"
+    ].join("\n");
+  }
+  return [
+    "* Manuel Agras",
+    "* Guillermo Ponce",
+    "* Walter Colatosi",
+    "* Juan Carlos Ahmad",
+    "* Marco Cevenini",
+    "* Manuel Cervera",
+    "* Luis Garino",
+    "* Ricardo De Olivera",
+    "* Victoriia Agapitov"
+  ].join("\n");
 }
 
 function boardContactReply(message, history) {
@@ -360,6 +395,78 @@ function hoaBalanceReply(message, history) {
     "You're asking for account-specific information, which I can't provide in chat. The Owner Portal is the secure place to check that: https://brickellhouse.connectresident.com/."
   ];
   return replies[Math.min(priorHoaReplies, replies.length - 1)];
+}
+
+function ambiguousKeyRequest(message) {
+  const text = foldText(message);
+  const hasKey = /\b(key|llave)\b/.test(text);
+  if (!hasKey) return false;
+  const specific = /\b(mailbox|buzon|correo|unit key|apartment key|llave de la unidad|llave del apartamento|llave de mi apartamento|parking fob|fob)\b/.test(text);
+  const buyingUnit = /\b(buy a unit|buy an apartment|purchase a unit|purchase an apartment|comprar una unidad|comprar apartamento)\b/.test(text);
+  return !specific && !buyingUnit;
+}
+
+function keyClarificationReply(message, history) {
+  const text = foldText(message);
+  const spanish = isSpanish(message) || history.slice(-4).some(item => isSpanish(item.content));
+  const keyContext = history.slice(-4).some(item => ambiguousKeyRequest(item.content));
+  if (ambiguousKeyRequest(message)) {
+    return spanish
+      ? "Claro — ¿te refieres a una llave del buzón o a una llave de la unidad?"
+      : "Sure — do you mean a mailbox key or a unit key?";
+  }
+  if (keyContext && /\b(replacement|reemplazo|de reemplazo)\b/.test(text)) {
+    return spanish
+      ? "Claro, ¿el reemplazo es para la llave del buzón o la llave de la unidad?"
+      : "Sure, is the replacement for a mailbox key or a unit key?";
+  }
+  return null;
+}
+
+function managementStaffReply(message) {
+  const text = foldText(message);
+  const spanish = isSpanish(message);
+  if (/\b(who is the general manager|general manager|quien es el general manager|y el general manager)\b/.test(text)) {
+    return spanish ? "Buriel Noel es el General Manager." : "Buriel Noel is the General Manager.";
+  }
+  if (/\b(como se llama el admin|quien es el admin|administrador)\b/.test(text)) {
+    return spanish ? "Buriel Noel es el General Manager." : "Buriel Noel is the General Manager.";
+  }
+  return null;
+}
+
+function commonAreaSpillReply(message, history) {
+  const text = foldText(message);
+  const spanish = isSpanish(message) || history.slice(-4).some(item => isSpanish(item.content));
+  const spillContext = history.slice(-4).some(item => /\b(spill|spilled|aceite|alfombra|carpet|oil)\b/.test(foldText(item.content)));
+  const isSpill = /\b(spill|spilled|dropped|aceite|derrame|derrame aceite|derrame de aceite|se me cayo aceite|cayo aceite|alfombra|carpet|oil)\b/.test(text);
+  if (!isSpill && !(spillContext && /\b(pero es aceite|but it is oil|but its oil|but it's oil)\b/.test(text))) return null;
+  if (spillContext && /\b(pero es aceite|but it is oil|but its oil|but it's oil)\b/.test(text)) {
+    return spanish
+      ? "Entiendo. Precisamente por eso es mejor avisar a la recepción para que puedan atenderlo lo antes posible."
+      : "I understand. That's exactly why it's best to notify the Front Desk so they can address it as soon as possible.";
+  }
+  return spanish
+    ? "Gracias por avisar. Por favor contacta a la recepción para que puedan revisar el área y coordinar la limpieza."
+    : "Thank you for letting me know. Please contact the Front Desk so they can check the area and coordinate cleanup.";
+}
+
+function unitPurchaseReply(message, history) {
+  const text = foldText(message);
+  const spanish = isSpanish(message) || history.slice(-4).some(item => isSpanish(item.content));
+  const corrected = /\b(a unit not a key|unit not a key|not a key|una unidad no una llave|no una llave)\b/.test(text);
+  const buyingUnit = /\b(i need to buy a unit|buy a unit|buy an apartment|purchase a unit|purchase an apartment|comprar una unidad|comprar apartamento|comprar un apartamento)\b/.test(text);
+  if (corrected) {
+    return spanish
+      ? "Tienes razón — entendí mal. Si preguntas por comprar una unidad, contacta a Management en admin@brickellhouse.net para que puedan orientarte."
+      : "You're right — I misunderstood. If you're asking about purchasing a unit, please contact Management at admin@brickellhouse.net.";
+  }
+  if (buyingUnit) {
+    return spanish
+      ? "Si estás interesado en comprar una unidad, contacta a Management en admin@brickellhouse.net para que puedan orientarte."
+      : "If you're interested in purchasing a unit, please contact Management at admin@brickellhouse.net so they can point you in the right direction.";
+  }
+  return null;
 }
 
 function inferTopic(message, history = []) {
@@ -468,6 +575,9 @@ function correctionReply(message, history) {
   const spanish = isSpanish(message) || history.slice(-4).some(item => isSpanish(item.content));
   const previousUser = history.slice().reverse().find(item => item.role === "user" && !isCorrectionOnly(item.content));
   const previous = foldText(previousUser?.content || "");
+  if (/\b(a unit not a key|unit not a key|not a key|una unidad no una llave|no una llave)\b/.test(foldText(message))) {
+    return unitPurchaseReply(message, history);
+  }
   if (hasHoaContext(message, history)) {
     return spanish
       ? "Tienes razón — entendí mal. Si estás pidiendo el monto exacto, no puedo proporcionar saldos de la HOA por chat, pero puedes revisarlo de forma segura en el Owner Portal: https://brickellhouse.connectresident.com/."
@@ -681,8 +791,18 @@ function packageReply(message, history) {
 }
 
 function deterministicReply(message, history) {
+  const unitPurchase = unitPurchaseReply(message, history);
+  if (unitPurchase) return unitPurchase;
   const directCorrection = correctionReply(message, history);
   if (directCorrection) return directCorrection;
+  const boardInfo = boardInfoReply(message, history);
+  if (boardInfo) return boardInfo;
+  const keyClarification = keyClarificationReply(message, history);
+  if (keyClarification) return keyClarification;
+  const staff = managementStaffReply(message);
+  if (staff) return staff;
+  const spill = commonAreaSpillReply(message, history);
+  if (spill) return spill;
   const identity = assistantIdentityReply(message, history);
   if (identity) return identity;
   const boardContact = boardContactReply(message, history);

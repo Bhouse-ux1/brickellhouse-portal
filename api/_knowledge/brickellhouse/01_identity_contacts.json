@@ -11,12 +11,13 @@
     "receiving": {"email": "receiving@brickellhouse.net", "extension": "7007", "hours": "Monday through Saturday, 9:00 AM to 5:00 PM"},
     "front_desk": {"email": "frontdesk@brickellhouse.net", "hours": "24/7"},
     "main_number": "305-400-9661",
+    "general_manager": {"name": "Buriel Noel", "title": "General Manager", "answer_en": "Buriel Noel is the General Manager.", "answer_es": "Buriel Noel es el General Manager.", "rule": "This is approved public staff knowledge. Do not provide personal phone, personal email, address, or private staff details."},
     "caleb": {"title": "Assistant Manager", "answer_en": "Caleb is the Assistant Manager at BrickellHouse.", "rule": "Mention Caleb by name only when needed or when specifically asked. Do not provide personal information."}
   },
   "general_help_en": "What do you need help with?",
   "general_help_es": "¿Con qué necesitas ayuda?",
   "unsure_route": "If unsure, route to admin@brickellhouse.net or the Front Desk depending on the issue.",
-  "aliases_es": ["quién eres", "quien eres", "contacto", "teléfono", "extensión", "correo de management", "front desk", "receiving"],
-  "examples_es": ["¿Quién eres?", "¿Cuál es el correo de Management?", "Necesito ayuda."],
+  "aliases_es": ["quién eres", "quien eres", "contacto", "teléfono", "extensión", "correo de management", "front desk", "receiving", "general manager", "admin", "administrador"],
+  "examples_es": ["¿Quién eres?", "¿Cuál es el correo de Management?", "Necesito ayuda.", "¿Cómo se llama el admin?", "¿Quién es el General Manager?"],
   "response_es": "Responde en español con el contacto exacto solicitado y no agregues departamentos que no fueron pedidos."
 }

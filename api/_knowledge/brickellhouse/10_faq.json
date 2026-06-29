@@ -21,11 +21,12 @@
     "suggestion": "Thank you for sharing. Please scroll to the bottom of this page and submit it through the feedback form so Management can review it.",
     "complaint": "Please scroll to the bottom of this page and submit it through the feedback form so Management can review it.",
     "damage_common_area": "Contact the Front Desk.",
+    "common_area_spill": "For spills or immediate cleanup issues in common areas, contact the Front Desk so they can review the area and coordinate cleanup.",
     "send_management_message": "Please use the feedback form at the bottom of this website so your message can be submitted to Management."
   },
   "anonymous_feedback": "Yes. You may submit anonymous feedback using the feedback form at the bottom of this website. You can use a placeholder name such as Alex Parker, an email such as anonymous@example.com, and enter 0000 for the unit number.",
-  "aliases_es": ["dirección", "horario", "portal", "Owner Portal", "mascotas", "registro de mascota", "objeto perdido", "queja", "sugerencia", "feedback"],
-  "examples_es": ["¿Cuál es la dirección?", "¿Dónde registro mi mascota?", "Quiero enviar una queja."],
+  "aliases_es": ["dirección", "horario", "portal", "Owner Portal", "mascotas", "registro de mascota", "objeto perdido", "queja", "sugerencia", "feedback", "se me cayó aceite", "derramé aceite", "alfombra", "recepción"],
+  "examples_es": ["¿Cuál es la dirección?", "¿Dónde registro mi mascota?", "Quiero enviar una queja.", "Se me cayó aceite en la alfombra.", "Pero es aceite."],
   "anonymous_feedback_es": "Sí. Puedes enviar feedback anónimo usando el formulario al final de este sitio web. Puedes usar un nombre genérico como Alex Parker, un correo como anonymous@example.com y 0000 como número de unidad.",
   "response_es": "Responde en español usando el dato específico solicitado. No agregues horarios o enlaces adicionales si no fueron preguntados."
 }
