@@ -170,6 +170,49 @@ footer{padding:65px 5vw;background:#181c1c;color:#fff;display:grid;grid-template
 .site-header.mobile-menu-open .mobile-menu{opacity:1;visibility:visible;pointer-events:auto;transform:none;transition-delay:0s}.site-header.mobile-menu-open .mobile-menu-toggle span:nth-child(1){transform:translateY(6px) rotate(45deg)}.site-header.mobile-menu-open .mobile-menu-toggle span:nth-child(2){opacity:0}.site-header.mobile-menu-open .mobile-menu-toggle span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
 @media(max-width:1000px){.feedback-record-toggle{grid-template-columns:90px 1fr 1fr}.feedback-record-detail{grid-template-columns:1fr}}
 @media(max-width:700px){.site-header:not(.admin-sidebar){padding-left:18px}.site-header:not(.admin-sidebar) .mobile-menu-toggle{display:flex}.site-header:not(.admin-sidebar) .mobile-menu{display:block}.feedback-record-toggle{grid-template-columns:1fr 1fr;padding:16px}.feedback-record-body{padding:16px}.lifestyle-hero{min-height:100svh;padding:110px 18px 48px}.lifestyle-hero-content{text-shadow:0 3px 28px rgba(0,0,0,.78)}.lifestyle-hero-content img{width:min(270px,72vw)}.lifestyle-hero-content p:not(.eyebrow){font-size:17px}}
+
+body.management-page{background:#eef0ec}
+.management-page .admin-shell{background:linear-gradient(135deg,#f7f7f3 0%,#eef1ed 48%,#e7ebe5 100%)}
+.management-page .admin-sidebar{background:linear-gradient(180deg,#18201f,#252b2a);box-shadow:18px 0 55px rgba(28,34,32,.12)}
+.management-page .admin-sidebar .footer-brand{padding:4px 0 8px}
+.management-page .admin-sidebar nav{gap:8px}
+.management-page .admin-sidebar nav button,.management-page .admin-exit{border-radius:16px;text-decoration:none;transition:background .2s,color .2s,transform .2s}
+.management-page .admin-sidebar nav button:hover,.management-page .admin-sidebar nav button.active{background:rgba(255,255,255,.11);color:#fff;transform:translateX(2px)}
+.management-page .admin-main{padding:0 clamp(22px,4vw,58px) 58px}
+.management-page .admin-main>header{height:auto;min-height:118px;margin-bottom:4px;border-bottom:0}
+.management-page .admin-main>header::after{content:"";position:absolute;left:clamp(22px,4vw,58px);right:clamp(22px,4vw,58px);bottom:0;height:1px;background:linear-gradient(90deg,transparent,#d7dbd4,transparent)}
+.management-page .admin-main>header{position:relative}
+.management-page .admin-user{background:rgba(255,255,255,.72);border:1px solid rgba(216,219,214,.9);border-radius:999px;padding:8px 10px 8px 16px;box-shadow:0 16px 45px rgba(31,38,35,.08)}
+.management-page .admin-user b{background:linear-gradient(135deg,#2c3331,#6c735f);box-shadow:0 8px 24px rgba(32,37,36,.18)}
+.management-page .metric,.management-page .admin-panel,.management-page .settings-card,.management-page .table-wrap,.management-page .feedback-record,.management-page .product-form-card,.management-page .feedback-filters{border:1px solid rgba(213,216,210,.9);border-radius:24px;box-shadow:0 20px 60px rgba(32,38,35,.08);background:rgba(255,255,255,.88)}
+.management-page .metric{min-height:138px;display:flex;flex-direction:column;justify-content:space-between}
+.management-page .metric strong{color:#202624}
+.management-page .metric-button{border:1px solid rgba(213,216,210,.9)}
+.management-page .admin-panel,.management-page .settings-card{padding:28px}
+.management-page .admin-toolbar{background:rgba(255,255,255,.72);border:1px solid rgba(216,219,214,.75);border-radius:22px;padding:18px 20px;box-shadow:0 12px 35px rgba(31,38,35,.05)}
+.management-page .admin-toolbar p{margin:0;line-height:1.6}
+.management-page .primary-button,.management-page .outline-button,.management-page .table-action{border-radius:999px}
+.management-page .primary-button{box-shadow:0 14px 28px rgba(32,37,36,.14)}
+.management-page .outline-button{background:#fff;border-color:#c8ccc5}
+.management-page .table-wrap{overflow:hidden}
+.management-page table{border-collapse:separate;border-spacing:0}
+.management-page th{background:#f1f3ef;color:#59605d;padding:15px 18px}
+.management-page td{font-size:11px;padding:17px 18px}
+.management-page tr:last-child td{border-bottom:0}
+.management-page tbody tr{transition:background .18s}
+.management-page tbody tr:hover{background:#fafbf8}
+.management-page .status,.management-page .payment-pill,.management-page .status-pill{border-radius:999px;font-weight:600}
+.management-page .feedback-record-toggle{border-radius:24px}
+.management-page .feedback-record.expanded .feedback-record-toggle{background:#f9faf6}
+.management-page .feedback-record-body{background:#fff}
+.management-page input,.management-page select,.management-page textarea,.auth-page input{border-radius:14px;border-color:#d5d9d2;background:#fff}
+.management-page input:focus,.management-page select:focus,.management-page textarea:focus,.auth-page input:focus{outline:2px solid rgba(141,122,88,.24);border-color:#b8a273}
+.auth-page{background:linear-gradient(135deg,#f6f6f2,#e8ece7)}
+.auth-card{background:rgba(255,255,255,.86);border:1px solid rgba(216,219,214,.85);border-radius:28px;padding:34px;box-shadow:0 24px 70px rgba(31,38,35,.12)}
+.auth-brand-panel{box-shadow:inset -80px 0 120px rgba(0,0,0,.16)}
+.auth-message{border-radius:16px}
+@media(max-width:1000px){.management-page .admin-main{padding:0 22px 44px}.management-page .admin-toolbar{align-items:flex-start;gap:14px;flex-direction:column}.management-page .table-wrap{border-radius:18px}}
+@media(max-width:700px){.management-page .admin-sidebar{border-radius:0 0 22px 22px;box-shadow:0 16px 42px rgba(28,34,32,.16)}.management-page .admin-sidebar nav button{white-space:nowrap}.management-page .admin-main>header{display:grid;gap:16px;padding:22px 0}.management-page .admin-user{justify-content:space-between;border-radius:18px}.management-page .metric-grid{grid-template-columns:1fr}.auth-card{padding:28px 22px;border-radius:24px}}
 .cta-arrow{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto;transition:transform .22s ease-out}.primary-button:hover .cta-arrow,.concierge-card a:hover .cta-arrow{transform:translateX(3px)}
 .feedback-entry-card{display:flex;flex-direction:column;justify-content:center;background:linear-gradient(145deg,#fff,#f4f1e9)}.feedback-entry-card .feedback-open-button{align-self:flex-start;margin-top:18px}
 .feedback-modal-card{width:min(680px,100%);padding:46px}.feedback-view h2{font-size:clamp(36px,6vw,52px)}.feedback-view-copy{color:var(--muted);line-height:1.7;margin:18px 0 26px}.feedback-type-list{display:grid;gap:10px}.feedback-type-list button{width:100%;border:1px solid #d9dcd8;background:#fafaf8;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;text-align:left;font-family:var(--serif);font-size:19px;transition:border-color .2s ease-out,background .2s ease-out,transform .2s ease-out}.feedback-type-list button:hover,.feedback-type-list button:focus-visible{border-color:#8e938f;background:#fff;transform:translateY(-1px)}.feedback-type-list svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}.feedback-back-button{border:0;background:transparent;padding:0 0 20px;color:#6f7472;font-size:10px;text-transform:uppercase;letter-spacing:.1em;text-decoration:underline}.feedback-form-view .field-grid{margin-top:8px}.feedback-thanks{text-align:center;padding:26px 0 10px}.feedback-thanks .eyebrow{margin-top:22px}.feedback-thanks>p:not(.eyebrow){color:var(--muted);font-size:15px;line-height:1.8;max-width:490px;margin:18px auto 28px}.feedback-success-icon{width:58px;height:58px;border-radius:50%;background:#e8efe8;color:#4c6d52;display:grid;place-items:center;margin:auto}.feedback-success-icon svg{width:27px;height:27px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.feedback-confirmation{margin-bottom:18px}

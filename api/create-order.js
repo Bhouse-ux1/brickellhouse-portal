@@ -1,4 +1,4 @@
-const {products} = require("./_catalog");
+const {getTrustedProductCatalog} = require("./_catalog");
 const {supabaseRequest} = require("./_supabase");
 
 function send(response, status, payload) {
@@ -35,10 +35,16 @@ module.exports = async function handler(request, response) {
 
   let subtotalCents = 0;
   const accounting = [];
+  let products;
+  try {
+    products = await getTrustedProductCatalog();
+  } catch (error) {
+    return send(response, error.status || 503, {success:false,message:"Product catalog is not available. Please try again."});
+  }
   for (const item of items) {
     const product = products[item.id];
     const quantity = Number(item.quantity);
-    if (!product || !Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
+    if (!product || !product.active || !Number.isInteger(quantity) || quantity < 1 || quantity > 99 || quantity > Number(product.inventory || 0)) {
       return send(response, 400, {success:false,message:"The order contains an invalid product or quantity"});
     }
     subtotalCents += product.priceCents * quantity;

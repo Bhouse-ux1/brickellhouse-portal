@@ -54,6 +54,15 @@ const $$ = selector => [...document.querySelectorAll(selector)];
 const isManagementPage = document.body.classList.contains("management-page");
 const PRODUCT_IMAGE_VERSION = "20260624-product-images1";
 const money = value => new Intl.NumberFormat("en-US", {style:"currency",currency:"USD"}).format(value);
+function normalizeProduct(product) {
+  return {
+    ...product,
+    price:Number(product.price || 0),
+    inventory:Number(product.inventory || 0),
+    active:Boolean(product.active),
+    internalName:product.internalName || `${product.name} - GL ${product.glCode || ""}`
+  };
+}
 function productImageSrc(image) {
   const source = image || "product-documents.webp";
   if (/^(https?:|data:|blob:)/i.test(source) || source.includes("?")) return source;
@@ -89,6 +98,17 @@ function persist() {
   localStorage.setItem("bh_cart", JSON.stringify(cart));
   localStorage.setItem("bh_fee_settings", JSON.stringify(feeSettings));
   localStorage.setItem("bh_catalog_version", CATALOG_VERSION);
+}
+
+function reconcileCartWithCatalog() {
+  cart = cart
+    .map(item => {
+      const product = products.find(candidate => candidate.id === item.id && candidate.active);
+      if (!product) return null;
+      const quantity = Math.min(Number(item.quantity || 0), Number(product.inventory || 0));
+      return quantity > 0 ? {id:item.id, quantity} : null;
+    })
+    .filter(Boolean);
 }
 
 function cartSubtotal() {
@@ -173,6 +193,32 @@ function renderProducts() {
   ).join("");
   $("#emptyState").classList.toggle("hidden", filtered.length > 0);
   $$("[data-add]").forEach(button => button.onclick = () => addToCart(button.dataset.add));
+}
+
+async function loadPublicProductCatalog() {
+  if (isManagementPage) return;
+  try {
+    const response = await fetch("/api/products", {headers:{"Accept":"application/json"}});
+    const payload = await response.json();
+    if (!response.ok || !payload.success || !Array.isArray(payload.products)) return;
+    const existingById = new Map(products.map(product => [product.id, product]));
+    products = payload.products.map(product => {
+      const existing = existingById.get(product.id) || {};
+      return normalizeProduct({
+        ...existing,
+        ...product,
+        description:product.description || existing.description || "",
+        image:product.image || existing.image || ""
+      });
+    });
+    reconcileCartWithCatalog();
+    persist();
+    renderTabs();
+    renderProducts();
+    renderCart();
+  } catch (error) {
+    console.warn("Using local product catalog fallback", error);
+  }
 }
 
 function addToCart(id) {
@@ -883,3 +929,4 @@ renderProducts();
 renderCart();
 renderLegalNotice();
 updateParallax();
+loadPublicProductCatalog();

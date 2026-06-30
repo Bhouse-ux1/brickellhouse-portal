@@ -1,4 +1,4 @@
-const {products} = require("./_catalog");
+const {getTrustedProductCatalog} = require("./_catalog");
 const {supabaseRequest, assertSupabaseStorageReady} = require("./_supabase");
 const {sendOrderEmails} = require("./order-emails");
 
@@ -24,7 +24,7 @@ function squareItemName(product) {
   return `${product.name} | GL: ${product.glCode}`.slice(0, 255);
 }
 
-function paymentNote(accounting) {
+function paymentNote(accounting, products) {
   return accounting
     .map(item => `${products[item.productId].name} | GL: ${item.glCode}${item.quantity > 1 ? ` x${item.quantity}` : ""}`)
     .join("; ")
@@ -70,10 +70,16 @@ module.exports = async function handler(request, response) {
 
   let subtotalCents = 0;
   const accounting = [];
+  let products;
+  try {
+    products = await getTrustedProductCatalog();
+  } catch (error) {
+    return send(response, error.status || 503, {success:false,message:"Product catalog is not available. Please try again."});
+  }
   for (const item of items) {
     const product = products[item.id];
     const quantity = Number(item.quantity);
-    if (!product || !Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
+    if (!product || !product.active || !Number.isInteger(quantity) || quantity < 1 || quantity > 99 || quantity > Number(product.inventory || 0)) {
       return send(response, 400, {success:false,message:"The order contains an invalid product or quantity"});
     }
     subtotalCents += product.priceCents * quantity;
@@ -148,7 +154,7 @@ module.exports = async function handler(request, response) {
         location_id:locationId,
         order_id:squareOrder.id,
         reference_id:String(orderNumber).slice(0, 40),
-        note:paymentNote(accounting),
+        note:paymentNote(accounting, products),
         buyer_email_address:String(resident.email).trim().toLowerCase(),
         buyer_phone_number:phone,
         autocomplete:true

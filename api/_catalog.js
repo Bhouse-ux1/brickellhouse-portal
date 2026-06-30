@@ -16,4 +16,63 @@ const products = {
   svc15:{name:"Premium Resident Care Plan",internalName:"Premium Resident Care Plan - GL 4093-CARE-PLAN",glCode:"4093-CARE-PLAN",priceCents:96000}
 };
 
-module.exports = {products};
+function centsToDollars(value) {
+  return +(Number(value || 0) / 100).toFixed(2);
+}
+
+function normalizeProductRow(row) {
+  return {
+    name:row.resident_name,
+    internalName:row.internal_name,
+    glCode:row.gl_code,
+    description:row.description,
+    category:row.category,
+    priceCents:Number(row.price_cents || 0),
+    inventory:Number(row.inventory || 0),
+    image:row.image_url || "",
+    active:Boolean(row.active)
+  };
+}
+
+async function loadSupabaseProductRows() {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return [];
+  const {supabaseRequest} = require("./_supabase");
+  const rows = await supabaseRequest("products?select=id,resident_name,internal_name,gl_code,description,category,price_cents,inventory,image_url,active", {
+    method:"GET",
+    prefer:""
+  });
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function getTrustedProductCatalog() {
+  const catalog = {};
+  for (const [id, product] of Object.entries(products)) {
+    catalog[id] = {...product, inventory:99, active:true};
+  }
+  const rows = await loadSupabaseProductRows();
+  for (const row of rows) {
+    catalog[row.id] = {
+      ...(catalog[row.id] || {}),
+      ...normalizeProductRow(row)
+    };
+  }
+  return catalog;
+}
+
+async function getPublicProductCatalog() {
+  const catalog = await getTrustedProductCatalog();
+  return Object.entries(catalog)
+    .filter(([, product]) => product.active && product.inventory > 0)
+    .map(([id, product]) => ({
+      id,
+      name:product.name,
+      category:product.category || "Maintenance Services",
+      description:product.description || "",
+      price:centsToDollars(product.priceCents),
+      inventory:product.inventory,
+      image:product.image || "",
+      active:true
+    }));
+}
+
+module.exports = {products,getTrustedProductCatalog,getPublicProductCatalog};
