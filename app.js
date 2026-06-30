@@ -37,6 +37,7 @@ let feeSettings = JSON.parse(localStorage.getItem("bh_fee_settings") || "null") 
 let activeCategory = "All";
 let orderSearchField = "unit";
 let orderSearchQuery = "";
+let revenueChartYear = String(new Date().getFullYear());
 
 products.forEach(product => {
   product.internalName ||= `${product.name} - GL ${product.glCode}`;
@@ -173,6 +174,96 @@ function processingFee(subtotal) {
 
 function revenueFor(list) {
   return list.reduce((sum, order) => sum + order.price * order.quantity + (+order.processingFee || 0), 0);
+}
+
+function orderProductRevenue(order) {
+  return Number(order.price || 0) * Number(order.quantity || 0);
+}
+
+function monthKeyLabel(key, options = {}) {
+  const [year, month] = String(key || "").split("-");
+  const date = new Date(Number(year), Number(month) - 1, 1);
+  if (Number.isNaN(date.getTime())) return key || "";
+  return date.toLocaleDateString("en-US", {month:options.short ? "short" : "long", year:options.year ? "numeric" : undefined});
+}
+
+function revenueYears() {
+  const years = new Set([String(new Date().getFullYear())]);
+  orders.forEach(order => {
+    const year = String(order.date || "").slice(0, 4);
+    if (/^\d{4}$/.test(year)) years.add(year);
+  });
+  return [...years].sort((a, b) => b.localeCompare(a));
+}
+
+function monthlyRevenueSeries(year) {
+  return Array.from({length:12}, (_, index) => {
+    const month = String(index + 1).padStart(2, "0");
+    const key = `${year}-${month}`;
+    const monthOrders = orders.filter(order => String(order.date || "").startsWith(key));
+    return {
+      key,
+      label:monthKeyLabel(key, {short:true}),
+      fullLabel:monthKeyLabel(key, {year:true}),
+      revenue:revenueFor(monthOrders),
+      orderCount:new Set(monthOrders.map(order => order.number)).size,
+      lineCount:monthOrders.length
+    };
+  });
+}
+
+function productBreakdownForMonth(key) {
+  const groups = new Map();
+  orders
+    .filter(order => String(order.date || "").startsWith(key))
+    .forEach(order => {
+      const product = displayText(order.product, "Unnamed product");
+      if (!groups.has(product)) groups.set(product, {product, quantity:0, revenue:0, orders:new Set()});
+      const group = groups.get(product);
+      group.quantity += Number(order.quantity || 0);
+      group.revenue += orderProductRevenue(order);
+      if (order.number) group.orders.add(order.number);
+    });
+  return [...groups.values()]
+    .map(group => ({...group, orderCount:group.orders.size}))
+    .sort((a, b) => b.revenue - a.revenue || a.product.localeCompare(b.product));
+}
+
+function revenueChartMarkup(year) {
+  const series = monthlyRevenueSeries(year);
+  const maxRevenue = Math.max(1, ...series.map(month => month.revenue));
+  const yearTotal = series.reduce((sum, month) => sum + month.revenue, 0);
+  const orderTotal = series.reduce((sum, month) => sum + month.orderCount, 0);
+  const years = revenueYears();
+  return `
+    <div class="admin-panel revenue-chart-panel">
+      <div class="revenue-chart-head">
+        <div>
+          <p class="eyebrow">Revenue intelligence</p>
+          <h3>Monthly revenue</h3>
+          <p>Review earned revenue by month and open a product-level breakdown for any period.</p>
+        </div>
+        <div class="revenue-chart-controls">
+          <label><span>Year</span><select id="revenueChartYear">${years.map(option => `<option value="${option}" ${option === year ? "selected" : ""}>${option}</option>`).join("")}</select></label>
+          <div class="revenue-chart-total"><span>${year} total</span><strong>${money(yearTotal)}</strong><small>${orderTotal} order${orderTotal === 1 ? "" : "s"}</small></div>
+        </div>
+      </div>
+      <div class="revenue-chart" id="revenueChart">
+        ${series.map((month, index) => {
+          const height = month.revenue > 0 ? Math.max(8, month.revenue / maxRevenue * 100) : 3;
+          return `<button class="revenue-bar-button ${month.revenue > 0 ? "has-revenue" : "is-empty"}" type="button" data-revenue-month="${month.key}" style="--bar-height:${height}%;--bar-delay:${index * .035}s" aria-label="${month.fullLabel}: ${money(month.revenue)} from ${month.orderCount} orders">
+            <span class="revenue-bar-tooltip"><strong>${month.fullLabel}</strong><span>Revenue: ${money(month.revenue)}</span><span>Orders: ${month.orderCount}</span></span>
+            <span class="revenue-bar-track"><span class="revenue-bar-fill"></span></span>
+            <span class="revenue-bar-label">${month.label}</span>
+          </button>`;
+        }).join("")}
+      </div>
+      <div class="revenue-detail-panel" id="revenueMonthDetail">
+        <p class="eyebrow">Month detail</p>
+        <h4>Select a month to view products sold.</h4>
+        <p>Click any bar above to see product quantities and revenue for that month.</p>
+      </div>
+    </div>`;
 }
 
 function centsToDollars(value) {
@@ -405,13 +496,8 @@ function renderAdmin() {
   const units = new Set(orders.map(order => order.unit)).size;
   const lowProducts = products.filter(product => product.active && product.inventory <= 15);
   const lowInventory = lowProducts.length;
-  const monthly = {};
-  orders.forEach(order => {
-    const key = order.date.slice(0, 7);
-    monthly[key] = (monthly[key] || 0) + order.price * order.quantity + (+order.processingFee || 0);
-  });
-  const monthRows = Object.entries(monthly).sort(([a], [b]) => b.localeCompare(a)).slice(0, 12);
-  const largestMonth = Math.max(1, ...monthRows.map(([, value]) => value));
+  const years = revenueYears();
+  if (!years.includes(revenueChartYear)) revenueChartYear = years[0];
 
   $("#adminOverview").innerHTML = `
     <div class="metric-grid">
@@ -426,22 +512,7 @@ function renderAdmin() {
         `<tr><td><strong>${product.name}</strong></td><td>${product.category}</td><td><span class="inventory-count">${product.inventory}</span></td><td>${product.price === 0 ? "Free" : money(product.price)}</td><td><button class="table-action" data-low-edit="${product.id}">Edit inventory</button></td></tr>`
       ).join("")}</tbody></table></div>` : `<div class="inventory-ok">All active products have more than 15 items available.</div>`}
     </div>
-    <div class="admin-panel">
-      <h3>Revenue by period</h3>
-      <div class="report-controls">
-        <label><span>View by</span><select id="revenuePeriod"><option value="all">All time</option><option value="day">Day</option><option value="month">Month</option><option value="year">Year</option></select></label>
-        <label id="revenueValueLabel" class="hidden"><span>Period</span><input id="revenueValue"></label>
-        <button class="outline-button" id="applyRevenueFilter">Apply</button>
-      </div>
-      <div class="metric"><span id="filteredRevenueLabel">All-time revenue</span><strong id="filteredRevenue">${money(revenue)}</strong></div>
-    </div>
-    <div class="admin-panel">
-      <h3>Monthly revenue</h3>
-      <div class="monthly-bars">${monthRows.length ? monthRows.map(([key, value]) => {
-        const [year, month] = key.split("-");
-        return `<div class="monthly-row"><span>${month}/${year}</span><div class="monthly-track"><div class="monthly-fill" style="width:${value / largestMonth * 100}%"></div></div><strong>${money(value)}</strong></div>`;
-      }).join("") : "<p>No revenue yet.</p>"}</div>
-    </div>
+    ${revenueChartMarkup(revenueChartYear)}
     <div class="admin-panel">
       <h3>Recent resident orders</h3>
       <div class="table-wrap">${orders.length ? `<table><thead><tr><th>Order</th><th>Resident</th><th>Product</th><th>Total</th><th>Date</th></tr></thead><tbody>${orders.slice(-5).reverse().map(order =>
@@ -547,35 +618,44 @@ function bindOrderSearch() {
 }
 
 function bindRevenueControls() {
-  const period = $("#revenuePeriod");
-  const label = $("#revenueValueLabel");
-  const input = $("#revenueValue");
-  if (!period) return;
-  period.onchange = () => {
-    const type = period.value;
-    label.classList.toggle("hidden", type === "all");
-    if (type === "day") { input.type = "date"; input.value = todayISO(); }
-    if (type === "month") { input.type = "month"; input.value = todayISO().slice(0, 7); }
-    if (type === "year") { input.type = "number"; input.min = "2000"; input.max = "2100"; input.value = new Date().getFullYear(); }
+  const yearSelect = $("#revenueChartYear");
+  if (!yearSelect) return;
+  yearSelect.onchange = () => {
+    revenueChartYear = yearSelect.value;
+    renderAdmin();
   };
-  $("#applyRevenueFilter").onclick = () => {
-    const type = period.value;
-    const value = input.value;
-    const filtered = orders.filter(order =>
-      type === "all" ||
-      type === "day" && order.date === value ||
-      type === "month" && order.date.startsWith(value) ||
-      type === "year" && order.date.startsWith(`${value}-`)
-    );
-    const labels = {
-      all:"All-time revenue",
-      day:`Revenue for ${formatDate(value)}`,
-      month:`Revenue for ${value ? `${value.slice(5, 7)}/${value.slice(0, 4)}` : ""}`,
-      year:`Revenue for ${value}`
+  $$("[data-revenue-month]").forEach(button => {
+    button.onclick = () => {
+      $$("[data-revenue-month]").forEach(candidate => candidate.classList.toggle("active", candidate === button));
+      renderRevenueMonthDetail(button.dataset.revenueMonth);
     };
-    $("#filteredRevenueLabel").textContent = labels[type];
-    $("#filteredRevenue").textContent = money(revenueFor(filtered));
-  };
+  });
+}
+
+function renderRevenueMonthDetail(key) {
+  const panel = $("#revenueMonthDetail");
+  if (!panel) return;
+  const breakdown = productBreakdownForMonth(key);
+  const monthOrders = orders.filter(order => String(order.date || "").startsWith(key));
+  const monthRevenue = revenueFor(monthOrders);
+  const orderCount = new Set(monthOrders.map(order => order.number)).size;
+  auditManagement("report_access", "management_report", `revenue_${key}`);
+  panel.innerHTML = `
+    <div class="revenue-detail-head">
+      <div>
+        <p class="eyebrow">Product detail</p>
+        <h4>Products sold in ${monthKeyLabel(key, {year:true})}</h4>
+      </div>
+      <div class="revenue-detail-total"><span>Total revenue</span><strong>${money(monthRevenue)}</strong><small>${orderCount} order${orderCount === 1 ? "" : "s"}</small></div>
+    </div>
+    ${breakdown.length ? `<div class="revenue-product-list">${breakdown.map(item => `
+      <div class="revenue-product-row">
+        <strong>${escapeAdminHtml(item.product)}</strong>
+        <span>${item.quantity} sold</span>
+        <span>${item.orderCount} order${item.orderCount === 1 ? "" : "s"}</span>
+        <b>${money(item.revenue)}</b>
+      </div>`).join("")}</div>` : `<div class="inventory-ok">No products were sold during this period.</div>`}
+  `;
 }
 
 function populateFeeSettings() {
