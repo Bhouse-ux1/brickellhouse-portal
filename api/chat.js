@@ -1,5 +1,6 @@
 const OPENAI_MODEL = "gpt-5.4-mini";
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
+const {supabaseRequest} = require("./_supabase");
 const MAX_MESSAGE_LENGTH = 1500;
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_HISTORY_MESSAGE_LENGTH = 900;
@@ -69,6 +70,23 @@ const MODULE_RULES = [
   {module:"identityContacts", keywords:["who are you","quien eres","quién eres","caleb","management email","front desk","recepción","recepcion","maintenance email","receiving email","contact","phone","extension","i need help","help","ayuda"]},
   {module:"conversationStyle", keywords:["hi","hello","hola","thanks","thank you","bye","goodbye"]}
 ];
+
+const INSIGHT_CATEGORY_LABELS = {
+  emergencyUrgent:"Emergency / Urgent",
+  vendors:"Vendor Request",
+  residentStore:"Resident Store",
+  packagesReceiving:"Packages / Receiving",
+  parkingAps:"Parking / APS",
+  movesContractorsDeliveries:"Moves / Contractors / Deliveries",
+  amenities:"Amenities / Reservations",
+  rulesViolations:"Rules / Violations",
+  hoaManagementPrivacy:"HOA / Management / Privacy",
+  board:"Board",
+  faq:"FAQ",
+  identityContacts:"Contacts / Identity",
+  conversationStyle:"Conversation",
+  unknown:"Unknown"
+};
 
 function normalizeText(value) {
   return String(value || "").toLowerCase();
@@ -1011,6 +1029,115 @@ function deterministicReply(message, history) {
     || packageReply(message, history);
 }
 
+function insightLanguage(message, history = []) {
+  if (shouldReplyInSpanish(message, history)) return "es";
+  if (isSpanish(message)) return "es";
+  return "en";
+}
+
+function insightCategory(message, history = []) {
+  const text = foldText([...(history || []).map(item => item.content), message].join(" "));
+  const rule = MODULE_RULES.find(entry => entry.keywords.some(keyword => text.includes(foldText(keyword))));
+  return {
+    key:rule?.module || "unknown",
+    label:INSIGHT_CATEGORY_LABELS[rule?.module] || INSIGHT_CATEGORY_LABELS.unknown
+  };
+}
+
+function insightOutcome(reply, source) {
+  const text = normalizeText(reply);
+  if (source === "error" || text.includes(normalizeText(SAFE_ERROR_MESSAGE))) return "error";
+  if (text.includes("do not have approved information")
+    || text.includes("don't have approved information")
+    || text.includes("no tengo informacion aprobada")
+    || text.includes("no tengo información aprobada")
+    || text.includes("don't have that information available")
+    || text.includes("do not have that information available")) return "unknown";
+  if (text.includes("which amenity")
+    || text.includes("which product")
+    || text.includes("which service")
+    || text.includes("can you clarify")
+    || text.includes("please clarify")
+    || text.includes("could you clarify")
+    || text.includes("cual amenidad")
+    || text.includes("cuál amenidad")
+    || text.includes("puedes aclarar")) return "clarification";
+  if (text.includes("can't share")
+    || text.includes("cannot share")
+    || text.includes("can't provide")
+    || text.includes("cannot provide")
+    || text.includes("no puedo compartir")
+    || text.includes("no puedo proporcionar")) return "protected";
+  return "answered";
+}
+
+function insightConfidence(outcome, source, categoryKey) {
+  if (source === "error" || outcome === "error") return 10;
+  if (outcome === "unknown") return 25;
+  if (outcome === "clarification") return 45;
+  if (categoryKey === "unknown") return 50;
+  if (source === "deterministic") return 92;
+  return 74;
+}
+
+function redactInsightText(value) {
+  let text = String(value || "").replace(/\s+/g, " ").trim();
+  text = text.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]");
+  text = text.replace(/\b(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}\b/g, "[phone]");
+  text = text.replace(/\b(?:unit|apt|apartment|suite|#|unidad|apartamento)\s*[A-Z]?\d{2,6}[A-Z]?\b/gi, "[unit]");
+  text = text.replace(/\b(?:tracking|package|paquete|fedex|ups|usps|amazon|locker)\s*(?:number|id|#|número|numero)?\s*[:#-]?\s*[A-Z0-9-]{6,}\b/gi, "[package detail]");
+  text = text.replace(/\b(?:visa|mastercard|amex|discover|card|routing|account|ssn|social security|tarjeta|cuenta)\b[^.?!]{0,60}/gi, "[payment/account detail]");
+  text = text.replace(/\b(my name is|i am|i'm|soy|me llamo)\s+[a-záéíóúñ]+(?:\s+[a-záéíóúñ]+){0,3}/gi, "$1 [name]");
+  text = text.replace(/\b[A-Z0-9][A-Z0-9-]{7,}\b/g, "[tracking/id]");
+  text = text.replace(/\b\d{3,}\b/g, "[number]");
+  text = text.replace(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b/g, "[name]");
+  text = text.replace(/\s+/g, " ").trim();
+  return text.slice(0, 240);
+}
+
+function buildInsightRecord(message, history, reply, source) {
+  const category = insightCategory(message, history);
+  const outcome = insightOutcome(reply, source);
+  const confidence = insightConfidence(outcome, source, category.key);
+  const clarificationRequested = outcome === "clarification";
+  const shouldKeepSnippet = outcome === "unknown" || clarificationRequested || confidence < 60;
+  return {
+    detected_language:insightLanguage(message, history),
+    detected_topic:inferTopic(message, history) || category.key || "unknown",
+    category:category.label,
+    confidence,
+    clarification_requested:clarificationRequested,
+    outcome,
+    source,
+    redacted_question_snippet:shouldKeepSnippet ? redactInsightText(message) : null,
+    response_kind:outcome,
+    history_message_count:Array.isArray(history) ? history.length : 0,
+    privacy_redacted:true
+  };
+}
+
+async function purgeOldLunaInsights() {
+  const cutoff = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+  await supabaseRequest(`luna_insights?created_at=lt.${encodeURIComponent(cutoff)}`, {
+    method:"DELETE",
+    prefer:"return=minimal"
+  });
+}
+
+async function logLunaInsight(message, history, reply, source = "model") {
+  try {
+    const record = buildInsightRecord(message, history, reply, source);
+    await supabaseRequest("luna_insights", {
+      method:"POST",
+      body:record,
+      prefer:"return=minimal"
+    });
+    await purgeOldLunaInsights();
+  } catch (error) {
+    console.warn("Luna insights logging skipped", error?.message || "Error");
+  }
+}
+
 function send(response, status, payload) {
   response.setHeader("Cache-Control", "no-store");
   return response.status(status).json(payload);
@@ -1045,11 +1172,15 @@ module.exports = async function handler(request, response) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     console.error("OpenAI chat route is missing OPENAI_API_KEY.");
+    await logLunaInsight(message, history, SAFE_ERROR_MESSAGE, "error");
     return send(response, 503, {success:false,message:SAFE_ERROR_MESSAGE});
   }
 
   const directReply = deterministicReply(message, history);
-  if (directReply) return send(response, 200, {success:true,reply:directReply});
+  if (directReply) {
+    await logLunaInsight(message, history, directReply, "deterministic");
+    return send(response, 200, {success:true,reply:directReply});
+  }
 
   try {
     const openAiResponse = await fetch(OPENAI_RESPONSES_URL, {
@@ -1074,14 +1205,20 @@ module.exports = async function handler(request, response) {
         status:openAiResponse.status,
         type:payload?.error?.type || "unknown"
       });
+      await logLunaInsight(message, history, SAFE_ERROR_MESSAGE, "error");
       return send(response, 502, {success:false,message:SAFE_ERROR_MESSAGE});
     }
 
     const reply = extractAssistantText(payload);
-    if (!reply) return send(response, 502, {success:false,message:SAFE_ERROR_MESSAGE});
+    if (!reply) {
+      await logLunaInsight(message, history, SAFE_ERROR_MESSAGE, "error");
+      return send(response, 502, {success:false,message:SAFE_ERROR_MESSAGE});
+    }
+    await logLunaInsight(message, history, reply, "model");
     return send(response, 200, {success:true,reply});
   } catch (error) {
     console.error("OpenAI chat route failed", error?.name || "Error");
+    await logLunaInsight(message, history, SAFE_ERROR_MESSAGE, "error");
     return send(response, 500, {success:false,message:SAFE_ERROR_MESSAGE});
   }
 };

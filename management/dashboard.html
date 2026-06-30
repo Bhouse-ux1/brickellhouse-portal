@@ -9,14 +9,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../styles.css?v=20260630-revenue-chart2">
+  <link rel="stylesheet" href="../styles.css?v=20260630-luna-insights1">
 </head>
 <body class="management-page">
   <div class="admin-shell open" id="adminShell">
     <aside class="admin-sidebar">
       <div class="footer-brand"><img class="official-logo logo-on-dark" src="../bh-logo-transparent.png" alt="Brickell House"></div>
       <p>Management Portal</p>
-      <nav><button class="active" data-admin-view="overview">Overview</button><button data-admin-view="products">Products</button><button data-admin-view="orders">Orders</button><button data-admin-view="feedback">Feedback</button><button data-admin-view="settings">Settings</button></nav>
+      <nav><button class="active" data-admin-view="overview">Overview</button><button data-admin-view="products">Products</button><button data-admin-view="orders">Orders</button><button data-admin-view="feedback">Feedback</button><button data-admin-view="insights">Luna Insights</button><button data-admin-view="settings">Settings</button></nav>
       <a class="admin-exit" href="../#home">← Resident portal</a>
     </aside>
     <section class="admin-main">
@@ -45,6 +45,16 @@
           <label><span>Date</span><input id="feedbackDateFilter" type="date"></label>
         </div>
         <div class="feedback-admin-list" id="feedbackAdminList"></div>
+      </div>
+      <div class="admin-view hidden" id="adminInsights">
+        <div class="admin-toolbar"><p>Privacy-safe Luna usage trends and knowledge gaps. Raw conversations are not stored.</p><button class="outline-button" id="exportLunaInsights">↓ Export insights</button></div>
+        <div class="feedback-filters luna-insight-filters">
+          <label><span>Search redacted snippets</span><input id="lunaInsightSearch" type="search" placeholder="Unknown or low-confidence snippets only"></label>
+          <label><span>Period</span><select id="lunaInsightPeriod"><option value="week">Last 7 days</option><option value="month">Last 30 days</option><option value="year">Last 365 days</option><option value="all">All loaded</option></select></label>
+          <label><span>Language</span><select id="lunaInsightLanguage"><option value="all">All languages</option><option value="en">English</option><option value="es">Spanish</option><option value="unknown">Unknown</option></select></label>
+          <label><span>Outcome</span><select id="lunaInsightOutcome"><option value="all">All outcomes</option><option value="unknown">Unknown</option><option value="clarification">Clarifications</option><option value="low">Low confidence</option><option value="protected">Protected</option><option value="error">Errors</option></select></label>
+        </div>
+        <div id="lunaInsightsContent" class="luna-insights-content"><div class="inventory-ok">Loading Luna insights...</div></div>
       </div>
       <div class="admin-view hidden" id="adminSettings">
         <div class="settings-card">
@@ -87,7 +97,7 @@
   </div>
   <div class="toast" id="toast"></div>
   <script src="../legal.js?v=20260615-legal1"></script>
-  <script src="../app.js?v=20260630-revenue-chart2"></script>
+  <script src="../app.js?v=20260630-luna-insights1"></script>
   <script src="../roadmap.js?v=20260617-feedback-compact1"></script>
 </body>
 </html>

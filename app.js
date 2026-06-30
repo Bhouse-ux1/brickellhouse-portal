@@ -38,6 +38,9 @@ let activeCategory = "All";
 let orderSearchField = "unit";
 let orderSearchQuery = "";
 let revenueChartYear = String(new Date().getFullYear());
+let lunaInsights = [];
+let lunaInsightsError = "";
+let lunaInsightFilters = {period:"week",language:"all",outcome:"all",search:""};
 
 products.forEach(product => {
   product.internalName ||= `${product.name} - GL ${product.glCode}`;
@@ -560,8 +563,10 @@ function renderAdmin() {
   $("#productTable").innerHTML = products.map(productRowMarkup).join("");
 
   renderOrderTable();
+  renderLunaInsights();
 
   bindRevenueControls();
+  bindLunaInsightControls();
   populateFeeSettings();
   bindOrderSearch();
   const lowMetric = $("#lowInventoryMetric");
@@ -602,6 +607,169 @@ function renderAdmin() {
       }
     }
   });
+}
+
+function insightDate(row) {
+  const date = new Date(row.created_at);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function insightPeriodStart(period) {
+  const now = new Date();
+  if (period === "week") return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  if (period === "month") return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  if (period === "year") return new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+  return null;
+}
+
+function formatInsightDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  return new Intl.DateTimeFormat("en-US", {
+    month:"short",
+    day:"numeric",
+    year:"numeric",
+    hour:"numeric",
+    minute:"2-digit"
+  }).format(date);
+}
+
+function filteredLunaInsights() {
+  const start = insightPeriodStart(lunaInsightFilters.period);
+  const search = lunaInsightFilters.search.trim().toLowerCase();
+  return lunaInsights.filter(row => {
+    const date = insightDate(row);
+    if (start && (!date || date < start)) return false;
+    if (lunaInsightFilters.language !== "all" && row.detected_language !== lunaInsightFilters.language) return false;
+    if (lunaInsightFilters.outcome === "low" && Number(row.confidence || 0) >= 60) return false;
+    if (!["all","low"].includes(lunaInsightFilters.outcome) && row.outcome !== lunaInsightFilters.outcome) return false;
+    if (search) {
+      const haystack = [row.category,row.detected_topic,row.outcome,row.redacted_question_snippet].join(" ").toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  });
+}
+
+function countBy(rows, key) {
+  return rows.reduce((counts, row) => {
+    const value = row[key] || "Unknown";
+    counts[value] = (counts[value] || 0) + 1;
+    return counts;
+  }, {});
+}
+
+function insightMetric(label, value, helper = "") {
+  return `<div class="metric luna-insight-metric"><span>${label}</span><strong>${value}</strong>${helper ? `<small>${helper}</small>` : ""}</div>`;
+}
+
+function renderLunaInsights() {
+  const container = $("#lunaInsightsContent");
+  if (!container) return;
+  if (lunaInsightsError) {
+    container.innerHTML = `<div class="inventory-ok">${escapeAdminHtml(lunaInsightsError)}</div>`;
+    return;
+  }
+  const rows = filteredLunaInsights();
+  const now = Date.now();
+  const todayRows = lunaInsights.filter(row => {
+    const date = insightDate(row);
+    return date && new Date(date).toDateString() === new Date().toDateString();
+  });
+  const weekRows = lunaInsights.filter(row => {
+    const date = insightDate(row);
+    return date && now - date.getTime() <= 7 * 24 * 60 * 60 * 1000;
+  });
+  const monthRows = lunaInsights.filter(row => {
+    const date = insightDate(row);
+    return date && now - date.getTime() <= 30 * 24 * 60 * 60 * 1000;
+  });
+  const avgHistory = rows.length
+    ? (rows.reduce((total, row) => total + Number(row.history_message_count || 0) + 1, 0) / rows.length).toFixed(1)
+    : "0";
+  const unknownCount = rows.filter(row => row.outcome === "unknown").length;
+  const clarificationCount = rows.filter(row => row.clarification_requested).length;
+  const categoryCounts = Object.entries(countBy(weekRows, "category"))
+    .sort((a,b) => b[1] - a[1])
+    .slice(0, 6);
+  const unknownRows = rows
+    .filter(row => row.redacted_question_snippet)
+    .slice(0, 12);
+
+  container.innerHTML = `
+    <div class="metric-grid luna-insight-grid">
+      ${insightMetric("Today", todayRows.length, "anonymous events")}
+      ${insightMetric("Last 7 days", weekRows.length, "anonymous events")}
+      ${insightMetric("Last 30 days", monthRows.length, "anonymous events")}
+      ${insightMetric("Avg. context", avgHistory, "messages")}
+    </div>
+    <div class="luna-insight-panels">
+      <div class="admin-panel luna-insight-panel">
+        <div class="luna-insight-panel-head"><div><p class="eyebrow">Knowledge gaps</p><h3>Unknown and low-confidence questions</h3></div><span>${unknownCount} unknown · ${clarificationCount} clarifications</span></div>
+        ${unknownRows.length ? `<div class="luna-insight-list">${unknownRows.map(row => `
+          <article class="luna-insight-row">
+            <div><strong>${escapeAdminHtml(row.redacted_question_snippet || "Redacted snippet unavailable")}</strong><small>${escapeAdminHtml(row.category)} · ${escapeAdminHtml(row.detected_language || "unknown")} · ${formatInsightDate(row.created_at)}</small></div>
+            <span class="status-pill ${row.outcome === "unknown" || Number(row.confidence || 0) < 60 ? "new" : ""}">${escapeAdminHtml(row.outcome)}</span>
+          </article>`).join("")}</div>` : `<div class="inventory-ok">No redacted unknown or low-confidence snippets match this filter.</div>`}
+      </div>
+      <div class="admin-panel luna-insight-panel">
+        <div class="luna-insight-panel-head"><div><p class="eyebrow">Aggregate only</p><h3>Top categories this week</h3></div></div>
+        ${categoryCounts.length ? `<div class="luna-category-list">${categoryCounts.map(([category,count]) => `
+          <div><span>${escapeAdminHtml(category)}</span><strong>${count}</strong></div>`).join("")}</div>` : `<div class="inventory-ok">No Luna usage has been recorded this week.</div>`}
+      </div>
+    </div>
+    <div class="admin-panel luna-insight-table-panel">
+      <h3>Review log</h3>
+      <p>Rows show privacy-safe analytics only. Normal answered questions are aggregate-only and do not include snippets.</p>
+      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Category</th><th>Language</th><th>Outcome</th><th>Confidence</th><th>Snippet</th></tr></thead><tbody>
+        ${rows.length ? rows.slice(0, 80).map(row => `<tr><td>${formatInsightDate(row.created_at)}</td><td>${escapeAdminHtml(row.category)}</td><td>${escapeAdminHtml(row.detected_language || "unknown")}</td><td>${escapeAdminHtml(row.outcome)}</td><td>${Number(row.confidence || 0)}%</td><td>${row.redacted_question_snippet ? escapeAdminHtml(row.redacted_question_snippet) : "<em>Aggregate only</em>"}</td></tr>`).join("") : `<tr><td colspan="6">No insights match this filter.</td></tr>`}
+      </tbody></table></div>
+    </div>`;
+}
+
+function bindLunaInsightControls() {
+  const period = $("#lunaInsightPeriod");
+  const language = $("#lunaInsightLanguage");
+  const outcome = $("#lunaInsightOutcome");
+  const search = $("#lunaInsightSearch");
+  const exportButton = $("#exportLunaInsights");
+  if (period) {
+    period.value = lunaInsightFilters.period;
+    period.onchange = () => { lunaInsightFilters.period = period.value; renderLunaInsights(); };
+  }
+  if (language) {
+    language.value = lunaInsightFilters.language;
+    language.onchange = () => { lunaInsightFilters.language = language.value; renderLunaInsights(); };
+  }
+  if (outcome) {
+    outcome.value = lunaInsightFilters.outcome;
+    outcome.onchange = () => { lunaInsightFilters.outcome = outcome.value; renderLunaInsights(); };
+  }
+  if (search) {
+    search.value = lunaInsightFilters.search;
+    search.oninput = () => { lunaInsightFilters.search = search.value; renderLunaInsights(); };
+  }
+  if (exportButton) exportButton.onclick = exportLunaInsightsCsv;
+}
+
+function csvEscape(value) {
+  return `"${String(value ?? "").replace(/"/g, '""')}"`;
+}
+
+function exportLunaInsightsCsv() {
+  const rows = filteredLunaInsights();
+  const headers = ["created_at","category","detected_language","detected_topic","outcome","confidence","source","redacted_question_snippet","history_message_count"];
+  const csv = [
+    headers.join(","),
+    ...rows.map(row => headers.map(header => csvEscape(row[header] || "")).join(","))
+  ].join("\n");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `luna-insights-${new Date().toISOString().slice(0,10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+  auditManagement("export", "luna_insights", "redacted_csv");
 }
 
 function matchingOrders() {
@@ -710,7 +878,7 @@ function showAdminView(view) {
   auditManagement("report_access", "management_view", view);
   $$(".admin-view").forEach(element => element.classList.add("hidden"));
   $(`#admin${view[0].toUpperCase() + view.slice(1)}`).classList.remove("hidden");
-  $("#adminTitle").textContent = view[0].toUpperCase() + view.slice(1);
+  $("#adminTitle").textContent = view === "insights" ? "Luna Insights" : view[0].toUpperCase() + view.slice(1);
   $$("[data-admin-view]").forEach(button => button.classList.toggle("active", button.dataset.adminView === view));
 }
 
@@ -858,7 +1026,29 @@ async function loadManagementData() {
   products = mergeManagedProductCatalog(supabaseProducts);
   const feeSetting = (settingsResult.data || []).find(setting => setting.key === "processing_fee");
   if (feeSetting?.value) feeSettings = {...feeSettings, ...feeSetting.value};
+  await loadLunaInsights();
   managementDataLoaded = true;
+}
+
+async function loadLunaInsights() {
+  if (!managementAuthClient || !window.managementAccessGranted) return;
+  try {
+    const {data:{session}} = await managementAuthClient.auth.getSession();
+    if (!session?.access_token) throw new Error("Management login required.");
+    const response = await fetch("/api/luna-insights", {
+      headers:{
+        "Accept":"application/json",
+        "Authorization":`Bearer ${session.access_token}`
+      }
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.success) throw new Error(payload.message || "Luna insights are unavailable.");
+    lunaInsights = Array.isArray(payload.insights) ? payload.insights : [];
+    lunaInsightsError = "";
+  } catch (error) {
+    lunaInsights = [];
+    lunaInsightsError = error.message || "Luna insights are unavailable.";
+  }
 }
 
 async function saveOrderToSupabase(number, changes) {
