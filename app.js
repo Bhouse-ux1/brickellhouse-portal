@@ -54,6 +54,11 @@ const $$ = selector => [...document.querySelectorAll(selector)];
 const isManagementPage = document.body.classList.contains("management-page");
 const PRODUCT_IMAGE_VERSION = "20260624-product-images1";
 const money = value => new Intl.NumberFormat("en-US", {style:"currency",currency:"USD"}).format(value);
+function escapeAdminHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, character => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  })[character]);
+}
 function normalizeProduct(product) {
   return {
     ...product,
@@ -67,6 +72,48 @@ function productImageSrc(image) {
   const source = image || "product-documents.webp";
   if (/^(https?:|data:|blob:)/i.test(source) || source.includes("?")) return source;
   return `${source}?v=${PRODUCT_IMAGE_VERSION}`;
+}
+function displayText(value, fallback = "") {
+  const text = String(value ?? "").trim();
+  if (!text || /^(undefined|null)$/i.test(text)) return fallback;
+  return text;
+}
+function productThumbnail(product) {
+  const image = displayText(product.image);
+  if (!image) return `<div class="admin-product-thumb placeholder">BH</div>`;
+  return `<img class="admin-product-thumb" src="${escapeAdminHtml(productImageSrc(image))}" alt="${escapeAdminHtml(displayText(product.name, "Product"))}">`;
+}
+function productRowMarkup(product, index = 0) {
+  const name = displayText(product.name, "Unnamed product");
+  const description = displayText(product.description, "No description available.");
+  const internalName = displayText(product.internalName);
+  const category = displayText(product.category, "Uncategorized");
+  const glCode = displayText(product.glCode, "Not set");
+  const status = product.active ? "Active" : "Inactive";
+  return `<tr class="admin-product-row" style="animation-delay:${Math.min(index * .035, .35)}s">
+    <td>
+      <div class="admin-product-cell">
+        ${productThumbnail(product)}
+        <div>
+          <strong class="admin-product-name">${escapeAdminHtml(name)}</strong>
+          <span class="admin-product-description">${escapeAdminHtml(description)}</span>
+          ${internalName ? `<span class="admin-product-meta">${escapeAdminHtml(internalName)}</span>` : ""}
+        </div>
+      </div>
+    </td>
+    <td><span class="admin-category-pill">${escapeAdminHtml(category)}</span></td>
+    <td><span class="admin-gl-code">${escapeAdminHtml(glCode)}</span></td>
+    <td><strong class="admin-product-price">${product.price === 0 ? "Free" : money(product.price)}</strong></td>
+    <td><span class="admin-inventory-count">${Number(product.inventory || 0)}</span></td>
+    <td><span class="status admin-status ${product.active ? "" : "inactive"}">${status}</span></td>
+    <td>
+      <div class="admin-action-group">
+        <button class="admin-action primary" data-edit="${escapeAdminHtml(product.id)}">Edit</button>
+        <button class="admin-action secondary" data-toggle="${escapeAdminHtml(product.id)}">${product.active ? "Deactivate" : "Activate"}</button>
+        <button class="admin-action danger" data-delete="${escapeAdminHtml(product.id)}">Remove</button>
+      </div>
+    </td>
+  </tr>`;
 }
 const todayISO = () => {
   const date = new Date();
@@ -402,9 +449,7 @@ function renderAdmin() {
       ).join("")}</tbody></table>` : "<p>No orders yet.</p>"}</div>
     </div>`;
 
-  $("#productTable").innerHTML = products.map(product =>
-    `<tr><td><strong>${product.name}</strong><span>${product.internalName}</span><span>${product.description}</span></td><td>${product.category}</td><td>${product.glCode}</td><td>${money(product.price)}</td><td>${product.inventory}</td><td><span class="status ${product.active ? "" : "inactive"}">${product.active ? "Active" : "Inactive"}</span></td><td><button class="table-action" data-edit="${product.id}">Edit</button> | <button class="table-action" data-toggle="${product.id}">${product.active ? "Deactivate" : "Activate"}</button> | <button class="table-action" data-delete="${product.id}">Remove</button></td></tr>`
-  ).join("");
+  $("#productTable").innerHTML = products.map(productRowMarkup).join("");
 
   renderOrderTable();
 
