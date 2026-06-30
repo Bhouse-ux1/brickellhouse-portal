@@ -252,6 +252,62 @@ body.management-page{background:#eef0ec}
 @keyframes adminModalIn{from{opacity:0;transform:translateY(12px) scale(.975)}to{opacity:1;transform:none}}
 @media(max-width:700px){.management-page #adminProducts table{min-width:780px}.admin-product-cell{grid-template-columns:48px minmax(0,1fr)}.admin-product-thumb{width:48px;height:48px;border-radius:14px}.admin-action-group{justify-content:flex-start}.admin-action{padding:9px 11px}.management-page .product-form-card .field-grid{padding:12px}}
 @media(prefers-reduced-motion:reduce){.management-page #adminProducts tbody tr,.management-page .modal.open .product-form-card{animation:none!important}.management-page #adminProducts tbody tr:hover,.admin-action:hover{transform:none}}
+.management-page .admin-view{animation:adminSectionIn .32s ease both}
+.management-page .metric,.management-page .admin-panel,.management-page .settings-card,.management-page .feedback-record{transition:transform .2s ease,box-shadow .2s ease,background .2s ease,border-color .2s ease}
+.management-page .metric:hover,.management-page .admin-panel:hover,.management-page .settings-card:hover,.management-page .feedback-record:hover{transform:translateY(-2px);box-shadow:0 24px 68px rgba(32,38,35,.11);border-color:rgba(198,202,194,.95)}
+.management-page .metric-button{cursor:pointer;text-align:left;color:inherit}
+.management-page .metric-button small{display:inline-flex;width:max-content;margin-top:12px;border-radius:999px;background:#f1eee6;color:#7a653b;padding:7px 10px;font-size:9px;text-transform:uppercase;letter-spacing:.08em}
+.management-page .low-inventory-panel{animation:adminSectionIn .26s ease both}
+.management-page .inventory-ok{border:1px solid #dfe6dc;border-radius:18px;background:#f7faf5;color:#536059;padding:20px;line-height:1.6}
+.management-page .report-controls,.management-page .order-search,.management-page .feedback-filters{border:1px solid rgba(216,219,214,.9);border-radius:24px;background:rgba(255,255,255,.82);box-shadow:0 16px 42px rgba(31,38,35,.06)}
+.management-page .report-controls{padding:18px}
+.management-page .monthly-bars{gap:14px}
+.management-page .monthly-row{grid-template-columns:110px 1fr 110px;border:1px solid #e1e5de;border-radius:18px;background:#f9faf7;padding:14px 16px;font-size:11px}
+.management-page .monthly-row span{color:#59615d}
+.management-page .monthly-row strong{font-family:var(--serif);font-size:17px;font-weight:500;text-align:right;color:#242a28}
+.management-page .monthly-track{height:10px;border-radius:999px;overflow:hidden;background:#e7eae4}
+.management-page .monthly-fill{border-radius:999px;box-shadow:0 0 18px rgba(141,122,88,.25)}
+.management-page #adminOrders .table-wrap{background:transparent;border:0;box-shadow:none;overflow:auto}
+.management-page #adminOrders table{min-width:1160px;border-spacing:0 10px}
+.management-page #adminOrders thead th{background:transparent;border:0;padding:0 16px 4px;color:#7a817d}
+.management-page #adminOrders tbody tr{background:rgba(255,255,255,.9);box-shadow:0 12px 36px rgba(30,36,34,.06);transition:transform .2s ease,box-shadow .2s ease,background .2s ease}
+.management-page #adminOrders tbody tr:hover{background:#fff;transform:translateY(-1px);box-shadow:0 18px 48px rgba(30,36,34,.09)}
+.management-page #adminOrders td{border:0;border-top:1px solid rgba(220,224,218,.72);border-bottom:1px solid rgba(220,224,218,.72);vertical-align:top;line-height:1.55}
+.management-page #adminOrders td:first-child{border-left:1px solid rgba(220,224,218,.72);border-radius:20px 0 0 20px;font-weight:600;color:#252b29}
+.management-page #adminOrders td:last-child{border-right:1px solid rgba(220,224,218,.72);border-radius:0 20px 20px 0}
+.management-page #adminOrders td strong{font-family:var(--serif);font-size:15px;font-weight:500;margin-bottom:3px}
+.management-page #adminOrders small{color:#777f7b;line-height:1.5}
+.management-page .order-status-select{border-radius:999px;background:#f7f8f5;border:1px solid #d8ddd5;font-weight:600;min-width:145px}
+.management-page .order-notes{min-width:240px}
+.management-page .order-notes textarea{border-radius:14px;background:#fbfcfa;border-color:#dce0da;min-height:62px;margin-bottom:8px;resize:vertical}
+.management-page .table-action{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid #d5dbd2;background:#fff;color:#404946;padding:8px 12px;min-height:34px;text-decoration:none;cursor:pointer;transition:transform .18s ease,box-shadow .18s ease,background .18s ease,border-color .18s ease}
+.management-page .table-action:hover{background:#f7f8f5;border-color:#bdc5ba;transform:translateY(-1px);box-shadow:0 10px 24px rgba(31,38,35,.08)}
+.management-page .table-action:active{transform:translateY(0);box-shadow:none}
+.management-page #exportOrders,.management-page #exportFeedback,.management-page #clearOrderSearch,.management-page #applyRevenueFilter{display:inline-flex;align-items:center;justify-content:center}
+.management-page #adminFeedback .feedback-filters{padding:18px;margin-bottom:20px}
+.management-page #adminFeedback .feedback-admin-list{gap:16px}
+.management-page #adminFeedback .feedback-record{background:rgba(255,255,255,.9);box-shadow:0 16px 46px rgba(31,38,35,.07)}
+.management-page #adminFeedback .feedback-record-toggle{background:transparent;transition:background .18s ease}
+.management-page #adminFeedback .feedback-record-toggle:hover{background:#fafbf8}
+.management-page #adminFeedback .feedback-record-toggle strong{font-size:16px}
+.management-page #adminFeedback .feedback-record-body{border-top:1px solid #e6e9e2;background:linear-gradient(180deg,#fff,#f9faf7)}
+.management-page #adminFeedback .feedback-record-detail{border:1px solid #e1e5de;border-radius:18px;background:#f7f9f5;padding:16px}
+.management-page #adminFeedback .feedback-record-grid{background:#fff;border:1px solid #e4e7e1;border-radius:18px;padding:16px}
+.management-page .feedback-record-actions{gap:12px}
+.management-page .feedback-record-actions .table-action{color:#8c463a;border-color:#ead0ca;background:#fff6f4}
+.management-page #adminSettings .settings-card{max-width:900px}
+.management-page #adminSettings .settings-card>p:not(.eyebrow){max-width:680px}
+.management-page #adminSettings form{margin-top:22px}
+.management-page #adminSettings .field-grid{gap:16px;background:#f8f9f6;border:1px solid #e2e6df;border-radius:20px;padding:18px}
+.management-page #adminSettings .check-label{width:max-content;max-width:100%;border:1px solid #e0e4dd;border-radius:999px;background:#fff;padding:12px 16px;margin-top:18px;box-shadow:0 10px 28px rgba(31,38,35,.04)}
+.management-page input[type="checkbox"]{accent-color:#252b29}
+.auth-page .auth-card{animation:adminSectionIn .36s ease both}
+.auth-page .primary-button,.auth-page .outline-button{transition:transform .18s ease,box-shadow .18s ease,background .18s ease}
+.auth-page .primary-button:hover,.auth-page .outline-button:hover{transform:translateY(-1px);box-shadow:0 14px 32px rgba(31,38,35,.12)}
+@keyframes adminSectionIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media(max-width:1000px){.management-page #adminOrders table{min-width:1040px}.management-page .monthly-row{grid-template-columns:90px 1fr 100px}.management-page #adminSettings .check-label{width:100%}}
+@media(max-width:700px){.management-page .report-controls,.management-page .order-search,.management-page .feedback-filters{padding:14px;border-radius:18px}.management-page .monthly-row{grid-template-columns:1fr;gap:8px}.management-page .monthly-row strong{text-align:left}.management-page #adminFeedback .feedback-record-detail,.management-page #adminFeedback .feedback-record-grid{padding:14px}.management-page #adminSettings .field-grid{padding:14px}}
+@media(prefers-reduced-motion:reduce){.management-page .admin-view,.management-page .low-inventory-panel,.auth-page .auth-card{animation:none!important}.management-page .metric:hover,.management-page .admin-panel:hover,.management-page .settings-card:hover,.management-page .feedback-record:hover,.management-page #adminOrders tbody tr:hover,.management-page .table-action:hover,.auth-page .primary-button:hover,.auth-page .outline-button:hover{transform:none}}
 .cta-arrow{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto;transition:transform .22s ease-out}.primary-button:hover .cta-arrow,.concierge-card a:hover .cta-arrow{transform:translateX(3px)}
 .feedback-entry-card{display:flex;flex-direction:column;justify-content:center;background:linear-gradient(145deg,#fff,#f4f1e9)}.feedback-entry-card .feedback-open-button{align-self:flex-start;margin-top:18px}
 .feedback-modal-card{width:min(680px,100%);padding:46px}.feedback-view h2{font-size:clamp(36px,6vw,52px)}.feedback-view-copy{color:var(--muted);line-height:1.7;margin:18px 0 26px}.feedback-type-list{display:grid;gap:10px}.feedback-type-list button{width:100%;border:1px solid #d9dcd8;background:#fafaf8;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;text-align:left;font-family:var(--serif);font-size:19px;transition:border-color .2s ease-out,background .2s ease-out,transform .2s ease-out}.feedback-type-list button:hover,.feedback-type-list button:focus-visible{border-color:#8e938f;background:#fff;transform:translateY(-1px)}.feedback-type-list svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}.feedback-back-button{border:0;background:transparent;padding:0 0 20px;color:#6f7472;font-size:10px;text-transform:uppercase;letter-spacing:.1em;text-decoration:underline}.feedback-form-view .field-grid{margin-top:8px}.feedback-thanks{text-align:center;padding:26px 0 10px}.feedback-thanks .eyebrow{margin-top:22px}.feedback-thanks>p:not(.eyebrow){color:var(--muted);font-size:15px;line-height:1.8;max-width:490px;margin:18px auto 28px}.feedback-success-icon{width:58px;height:58px;border-radius:50%;background:#e8efe8;color:#4c6d52;display:grid;place-items:center;margin:auto}.feedback-success-icon svg{width:27px;height:27px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.feedback-confirmation{margin-bottom:18px}
