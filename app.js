@@ -229,9 +229,35 @@ function productBreakdownForMonth(key) {
     .sort((a, b) => b.revenue - a.revenue || a.product.localeCompare(b.product));
 }
 
+function niceChartStep(value) {
+  if (value <= 0) return 25;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(value)));
+  const normalized = value / magnitude;
+  const nice = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 2.5 ? 2.5 : normalized <= 5 ? 5 : 10;
+  return nice * magnitude;
+}
+
+function revenueAxisMax(maxRevenue) {
+  if (maxRevenue <= 0) return 100;
+  const step = niceChartStep(maxRevenue * 1.06 / 4);
+  return Math.max(step * 4, step);
+}
+
+function revenueAxisTicks(maxRevenue) {
+  const axisMax = revenueAxisMax(maxRevenue);
+  return Array.from({length:5}, (_, index) => axisMax - axisMax / 4 * index);
+}
+
+function revenueAxisLabel(value) {
+  return `$${Math.round(value).toLocaleString("en-US")}`;
+}
+
 function revenueChartMarkup(year) {
   const series = monthlyRevenueSeries(year);
-  const maxRevenue = Math.max(1, ...series.map(month => month.revenue));
+  const highestRevenue = Math.max(0, ...series.map(month => month.revenue));
+  const axisMax = revenueAxisMax(highestRevenue);
+  const leftTicks = revenueAxisTicks(highestRevenue);
+  const rightTicks = [100, 75, 50, 25, 0];
   const yearTotal = series.reduce((sum, month) => sum + month.revenue, 0);
   const orderTotal = series.reduce((sum, month) => sum + month.orderCount, 0);
   const years = revenueYears();
@@ -248,15 +274,26 @@ function revenueChartMarkup(year) {
           <div class="revenue-chart-total"><span>${year} total</span><strong>${money(yearTotal)}</strong><small>${orderTotal} order${orderTotal === 1 ? "" : "s"}</small></div>
         </div>
       </div>
-      <div class="revenue-chart" id="revenueChart">
-        ${series.map((month, index) => {
-          const height = month.revenue > 0 ? Math.max(8, month.revenue / maxRevenue * 100) : 3;
-          return `<button class="revenue-bar-button ${month.revenue > 0 ? "has-revenue" : "is-empty"}" type="button" data-revenue-month="${month.key}" style="--bar-height:${height}%;--bar-delay:${index * .035}s" aria-label="${month.fullLabel}: ${money(month.revenue)} from ${month.orderCount} orders">
-            <span class="revenue-bar-tooltip"><strong>${month.fullLabel}</strong><span>Revenue: ${money(month.revenue)}</span><span>Orders: ${month.orderCount}</span></span>
-            <span class="revenue-bar-track"><span class="revenue-bar-fill"></span></span>
-            <span class="revenue-bar-label">${month.label}</span>
-          </button>`;
-        }).join("")}
+      <div class="revenue-analytics-chart" id="revenueChart">
+        <div class="revenue-axis-title revenue-axis-title-left">Revenue</div>
+        <div class="revenue-axis-title revenue-axis-title-right">Profit Margin (%)</div>
+        <div class="revenue-axis revenue-axis-left">${leftTicks.map(tick => `<span>${revenueAxisLabel(tick)}</span>`).join("")}</div>
+        <div class="revenue-axis revenue-axis-right">${rightTicks.map(tick => `<span>${tick}%</span>`).join("")}</div>
+        <div class="revenue-plot" aria-label="Monthly revenue chart for ${year}">
+          <div class="revenue-grid" aria-hidden="true">${leftTicks.map(() => "<span></span>").join("")}</div>
+          <svg class="profit-margin-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+          <div class="revenue-bars">
+            ${series.map((month, index) => {
+              const height = month.revenue > 0 ? Math.max(3, month.revenue / axisMax * 100) : 0;
+              return `<button class="revenue-bar-button ${month.revenue > 0 ? "has-revenue" : "is-empty"}" type="button" data-revenue-month="${month.key}" style="--bar-height:${height}%;--bar-delay:${index * .035}s" aria-label="${month.fullLabel}: ${money(month.revenue)} from ${month.orderCount} orders">
+                <span class="revenue-bar-tooltip"><strong>${month.fullLabel}</strong><span>Revenue: ${money(month.revenue)}</span><span>Orders: ${month.orderCount}</span></span>
+                <span class="revenue-bar-fill"></span>
+                <span class="revenue-bar-label">${month.label}</span>
+              </button>`;
+            }).join("")}
+          </div>
+        </div>
+        <div class="profit-margin-note">Profit margin line will appear here when verified cost and margin data is available.</div>
       </div>
       <div class="revenue-detail-panel" id="revenueMonthDetail">
         <p class="eyebrow">Month detail</p>
