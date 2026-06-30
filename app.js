@@ -737,7 +737,6 @@ async function saveProductToSupabase(product) {
     category:product.category,
     price_cents:Math.round(Number(product.price || 0) * 100),
     inventory:Number(product.inventory || 0),
-    image_url:product.image || null,
     active:Boolean(product.active),
     updated_at:new Date().toISOString()
   };
@@ -844,13 +843,13 @@ if ($("#productForm")) $("#productForm").onsubmit = async event => {
   event.preventDefault();
   const form = event.target;
   const data = Object.fromEntries(new FormData(form));
+  const index = products.findIndex(candidate => candidate.id === (data.id || ""));
+  const before = index >= 0 ? {...products[index]} : null;
   const product = {
     id:data.id || `p${Date.now()}`,name:data.name,description:data.description,category:data.category,
     internalName:data.internalName,price:+data.price,inventory:+data.inventory,glCode:data.glCode,
-    image:data.image,active:form.elements.active.checked
+    image:before?.image || "",active:form.elements.active.checked
   };
-  const index = products.findIndex(candidate => candidate.id === product.id);
-  const before = index >= 0 ? {...products[index]} : null;
   try {
     await saveProductToSupabase(product);
     if (index >= 0) products[index] = product;
