@@ -68,7 +68,7 @@ function renderOrderTableRoadmap() {
     return `<tr>
       <td>${escapeHtml(order.number)}</td>
       <td><strong>${escapeHtml(order.name)}</strong>Unit ${escapeHtml(order.unit)}</td>
-      <td>${escapeHtml(order.product)}<br><small>${escapeHtml(order.internalName || `${order.product} - GL ${order.glCode}`)}</small></td>
+      <td>${escapeHtml(order.product)}<br><small>${escapeHtml(order.internalName || `${order.product} GL-${order.glCode}`)}</small></td>
       <td>${order.quantity}</td>
       <td>${money(subtotal + fee)}</td>
       <td>${payment}</td>
@@ -358,12 +358,12 @@ if ($("#exportFeedback")) $("#exportFeedback").onclick = () => {
 
 if ($("#exportOrders")) $("#exportOrders").onclick = () => {
   downloadCsv(`BrickellHouse-Orders-${fileDate()}.csv`, [
-    ["Order Number","Resident Name","Unit Number","Product","Internal / Square Name","Quantity","Unit Price","Subtotal","Processing Fee","Fee GL Code","Total","Hidden Product GL Code","Date","Order Status","Public Note","Internal Note","Payment Status","Payment Transaction ID","Payment Date/Time","Legal Notice Accepted","Acceptance Date/Time","Legal Notice Version","Terms Version","Privacy Policy Version"],
+    ["Order Number","Resident Name","Unit Number","Product","Internal / Stripe Name","Quantity","Unit Price","Subtotal","Processing Fee","Fee GL Code","Total","Hidden Product GL Code","Date","Order Status","Public Note","Internal Note","Payment Status","Payment Transaction ID","Payment Date/Time","Legal Notice Accepted","Acceptance Date/Time","Legal Notice Version","Terms Version","Privacy Policy Version"],
     ...orders.map(order => {
       const subtotal = order.price * order.quantity;
       const fee = +order.processingFee || 0;
       return [
-        order.number,order.name,order.unit,order.product,order.internalName || `${order.product} - GL ${order.glCode}`,
+        order.number,order.name,order.unit,order.product,order.internalName || `${order.product} GL-${order.glCode}`,
         order.quantity,order.price,subtotal,fee,order.feeGlCode || "",subtotal + fee,order.glCode,
         formatDate(order.date),order.status,order.publicNote,order.internalNote,order.paymentStatus,
         order.squareTransactionId,order.paymentDateTime || "",order.legalAccepted ? "Yes" : "Not recorded",

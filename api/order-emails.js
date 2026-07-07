@@ -73,6 +73,7 @@ function buildResidentEmail(order) {
 }
 
 function buildManagementEmail(order) {
+  const items = order.managementItems || order.items;
   const content = `
     <p style="line-height:1.7;">A new BrickellHouse store order has been placed.</p>
     <table style="width:100%;border-collapse:collapse;margin:24px 0;font-size:14px;">
@@ -87,14 +88,14 @@ function buildManagementEmail(order) {
     </table>
     <table style="width:100%;border-collapse:collapse;margin:24px 0;font-size:14px;">
       <thead><tr><th style="padding:10px 0;border-bottom:2px solid #252928;text-align:left;">Item</th><th style="padding:10px 0;border-bottom:2px solid #252928;">Qty</th><th style="padding:10px 0;border-bottom:2px solid #252928;text-align:right;">Amount</th></tr></thead>
-      <tbody>${itemRows(order.items)}</tbody>
+      <tbody>${itemRows(items)}</tbody>
     </table>
     <p style="text-align:right;font-size:18px;"><strong>Total paid: ${money(order.totalCents)}</strong></p>
     <p style="margin-top:28px;line-height:1.7;">Please review this order in the Management Dashboard.</p>`;
   return {
     from:SENDER,to:MANAGEMENT_RECIPIENT,subject:"New BrickellHouse Store Order",
     html:emailShell("New Store Order", content, "", "BrickellHouse Management Notification"),
-    text:`A new BrickellHouse store order has been placed.\n\nOrder Number: ${order.orderNumber}\nResident: ${order.residentName}\nUnit: ${order.unit}\nEmail: ${order.email}\nPhone: ${order.phone || "Not provided"}\nPayment Method: ${order.paymentMethod || "Square"}\nPayment Status: Paid\nDate/Time: ${dateTime(order.createdAt)}\n\nItems:\n${itemText(order.items)}\n\nTotal Paid: ${money(order.totalCents)}\n\nPlease review this order in the Management Dashboard.`
+    text:`A new BrickellHouse store order has been placed.\n\nOrder Number: ${order.orderNumber}\nResident: ${order.residentName}\nUnit: ${order.unit}\nEmail: ${order.email}\nPhone: ${order.phone || "Not provided"}\nPayment Method: ${order.paymentMethod || "Square"}\nPayment Status: Paid\nDate/Time: ${dateTime(order.createdAt)}\n\nItems:\n${itemText(items)}\n\nTotal Paid: ${money(order.totalCents)}\n\nPlease review this order in the Management Dashboard.`
   };
 }
 

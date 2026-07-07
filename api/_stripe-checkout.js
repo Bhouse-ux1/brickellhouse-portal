@@ -170,10 +170,11 @@ function appendMetadata(params, prefix, metadata) {
   });
 }
 
-function appendLineItem(params, index, name, unitAmount, quantity) {
+function appendLineItem(params, index, name, unitAmount, quantity, description = name) {
   params.append(`line_items[${index}][price_data][currency]`, "usd");
   params.append(`line_items[${index}][price_data][unit_amount]`, String(unitAmount));
   params.append(`line_items[${index}][price_data][product_data][name]`, String(name).slice(0, 255));
+  params.append(`line_items[${index}][price_data][product_data][description]`, String(description).slice(0, 1000));
   params.append(`line_items[${index}][quantity]`, String(quantity));
 }
 
@@ -187,7 +188,7 @@ async function createCheckoutSession(checkout, origin) {
   appendMetadata(params, "", metadata);
   appendMetadata(params, "payment_intent_data", metadata);
 
-  checkout.accounting.forEach((item, index) => appendLineItem(params, index, item.residentName, item.unitPriceCents, item.quantity));
+  checkout.accounting.forEach((item, index) => appendLineItem(params, index, item.internalName, item.unitPriceCents, item.quantity, item.internalName));
   if (checkout.processingFeeCents > 0) {
     appendLineItem(params, checkout.accounting.length, "Processing fee", checkout.processingFeeCents, 1);
   }
@@ -371,6 +372,11 @@ async function sendStripeOrderEmails(order, session, createdAt) {
       phone:order.phone,
       items:(order.order_items || []).map(item => ({
         name:item.resident_name_snapshot,
+        quantity:item.quantity,
+        unitPriceCents:item.unit_price_cents
+      })),
+      managementItems:(order.order_items || []).map(item => ({
+        name:item.internal_name_snapshot || `${item.resident_name_snapshot} GL-${item.gl_code_snapshot}`,
         quantity:item.quantity,
         unitPriceCents:item.unit_price_cents
       })),

@@ -8,21 +8,21 @@ let managementAccessPending = false;
 let managementDataLoaded = false;
 
 const seedProducts = [
-  {id:"svc1",name:"Mailbox Key Copy",category:"Keys & Access",description:"Replacement key for your assigned mailbox.",price:1,inventory:99,glCode:"4051-MAILBOX",image:"offer-mailbox-key.webp",active:true},
-  {id:"svc2",name:"Unit Key Copy",category:"Keys & Access",description:"Replacement of your unit door key.",price:30,inventory:99,glCode:"4051-UNIT",image:"offer-unit-key.webp",active:true},
-  {id:"svc3",name:"Smoke Detector Battery Replacement",category:"Maintenance Services",description:"Includes battery and labor.",price:25,inventory:99,glCode:"4083-SMOKE-BATT",image:"offer-smoke-battery.webp",active:true},
-  {id:"svc4",name:"AC Filter Replacement",category:"HVAC Services",description:"Includes filter and labor.",price:55,inventory:99,glCode:"4081-FILTER",image:"offer-filter-replacement.webp",active:true},
-  {id:"svc5",name:"Trash Compactor Replacement",category:"Maintenance Services",description:"Includes parts and labor.",price:200,inventory:99,glCode:"4084-COMPACTOR",image:"offer-trash-compactor.webp",active:true},
-  {id:"svc6",name:"Toilet or Sink Unclogged Service",category:"Maintenance Services",description:"Includes unclogging and labor for each individual sink or toilet.",price:30,inventory:99,glCode:"4085-UNCLOG",image:"offer-unclog-service.webp",active:true},
-  {id:"svc7",name:"Lockout Assistance",category:"Keys & Access",description:"Includes access and labor.",price:50,inventory:99,glCode:"4086-LOCKOUT",image:"offer-lockout.webp",active:true},
-  {id:"svc8",name:"Faucet Repair",category:"Maintenance Services",description:"Includes parts and labor.",price:125,inventory:99,glCode:"4087-FAUCET",image:"offer-faucet-repair.webp",active:true},
-  {id:"svc9",name:"Thermostat Reset or System Check",category:"HVAC Services",description:"Includes minor adjustments and labor.",price:40,inventory:99,glCode:"4088-THERMO-SVC",image:"offer-thermostat-check.webp",active:true},
-  {id:"svc10",name:"Portable AC Unit Rental",category:"HVAC Services",description:"$25.00 per day; requires a $300 refundable security deposit payable in advance.",price:300,inventory:10,glCode:"4091-AC-RENTAL",image:"offer-portable-ac.webp",active:true},
-  {id:"svc11",name:"Thermostat Replacement",category:"HVAC Services",description:"Thermostat replacement provided at no charge.",price:0,inventory:99,glCode:"4088-THERMO-REPL",image:"offer-thermostat-replacement.webp",active:true},
-  {id:"svc12",name:"Annual AC Filter Subscription",category:"Subscriptions & Plans",description:"Includes 12 scheduled AC filter replacements per year, one per month.",price:360,inventory:99,glCode:"4092-FILTER-SUB",image:"offer-annual-filter.webp",active:true},
-  {id:"svc13",name:"Valet Service Subscription",category:"Subscriptions & Plans",description:"Includes unlimited valet parking for one month for each registered vehicle per unit.",price:250,inventory:99,glCode:"4062-VALET-SUB",image:"offer-valet-subscription.webp",active:true},
-  {id:"svc14",name:"AC Drain Line Cleaning",category:"HVAC Services",description:"Includes cleaning and flushing the AC drain line to prevent overflow.",price:45,inventory:99,glCode:"4081-DRAIN",image:"offer-drain-cleaning.webp",active:true},
-  {id:"svc15",name:"Premium Resident Care Plan",category:"Subscriptions & Plans",description:"Billed annually. Covers basic in-unit maintenance labor, including light bulbs, AC maintenance, filters, thermostat checks, unclogging, minor touch-ups, and general inspections.",price:960,inventory:99,glCode:"4093-CARE-PLAN",image:"offer-resident-care.webp",active:true}
+  {id:"svc1",name:"Mailbox Key Copy",category:"Keys & Access",description:"Replacement key for your assigned mailbox.",price:1,inventory:99,glCode:"40090",image:"offer-mailbox-key.webp",active:true},
+  {id:"svc2",name:"Unit Key Copy",category:"Keys & Access",description:"Replacement of your unit door key.",price:30,inventory:99,glCode:"40090",image:"offer-unit-key.webp",active:true},
+  {id:"svc3",name:"Smoke Detector Battery Replacement",category:"Maintenance Services",description:"Includes battery and labor.",price:25,inventory:99,glCode:"40090",image:"offer-smoke-battery.webp",active:true},
+  {id:"svc4",name:"AC Filter Replacement",category:"HVAC Services",description:"Includes filter and labor.",price:55,inventory:99,glCode:"40090",image:"offer-filter-replacement.webp",active:true},
+  {id:"svc5",name:"Trash Compactor Replacement",category:"Maintenance Services",description:"Includes parts and labor.",price:200,inventory:99,glCode:"40090",image:"offer-trash-compactor.webp",active:true},
+  {id:"svc6",name:"Toilet or Sink Unclogged Service",category:"Maintenance Services",description:"Includes unclogging and labor for each individual sink or toilet.",price:30,inventory:99,glCode:"40090",image:"offer-unclog-service.webp",active:true},
+  {id:"svc7",name:"Lockout Assistance",category:"Keys & Access",description:"Includes access and labor.",price:50,inventory:99,glCode:"40090",image:"offer-lockout.webp",active:true},
+  {id:"svc8",name:"Faucet Repair",category:"Maintenance Services",description:"Includes parts and labor.",price:125,inventory:99,glCode:"40090",image:"offer-faucet-repair.webp",active:true},
+  {id:"svc9",name:"Thermostat Reset or System Check",category:"HVAC Services",description:"Includes minor adjustments and labor.",price:40,inventory:99,glCode:"40090",image:"offer-thermostat-check.webp",active:true},
+  {id:"svc10",name:"Portable AC Unit Rental",category:"HVAC Services",description:"$25.00 per day; requires a $300 refundable security deposit payable in advance.",price:300,inventory:10,glCode:"40090",image:"offer-portable-ac.webp",active:true},
+  {id:"svc11",name:"Thermostat Replacement",category:"HVAC Services",description:"Thermostat replacement provided at no charge.",price:0,inventory:99,glCode:"40090",image:"offer-thermostat-replacement.webp",active:true},
+  {id:"svc12",name:"Annual AC Filter Subscription",category:"Subscriptions & Plans",description:"Includes 12 scheduled AC filter replacements per year, one per month.",price:360,inventory:99,glCode:"40090",image:"offer-annual-filter.webp",active:true},
+  {id:"svc13",name:"Valet Service Subscription",category:"Subscriptions & Plans",description:"Includes unlimited valet parking for one month for each registered vehicle per unit.",price:250,inventory:99,glCode:"40033",image:"offer-valet-subscription.webp",active:true},
+  {id:"svc14",name:"AC Drain Line Cleaning",category:"HVAC Services",description:"Includes cleaning and flushing the AC drain line to prevent overflow.",price:45,inventory:99,glCode:"40090",image:"offer-drain-cleaning.webp",active:true},
+  {id:"svc15",name:"Premium Resident Care Plan",category:"Subscriptions & Plans",description:"Billed annually. Covers basic in-unit maintenance labor, including light bulbs, AC maintenance, filters, thermostat checks, unclogging, minor touch-ups, and general inspections.",price:960,inventory:99,glCode:"40090",image:"offer-resident-care.webp",active:true}
 ];
 
 const sampleOrders = [];
@@ -43,8 +43,16 @@ let lunaInsightsError = "";
 let lunaInsightFilters = {period:"month",language:"all",outcome:"all",search:""};
 let selectedLunaConversationId = "";
 
+function accountingGlCode(product) {
+  const label = `${product.id || ""} ${product.name || ""} ${product.internalName || ""}`.toLowerCase();
+  return label.includes("valet") ? "40033" : "40090";
+}
+function accountingName(product) {
+  return `${product.name} GL-${accountingGlCode(product)}`;
+}
 products.forEach(product => {
-  product.internalName ||= `${product.name} - GL ${product.glCode}`;
+  product.glCode = accountingGlCode(product);
+  product.internalName = accountingName(product);
 });
 orders.forEach(order => {
   order.status ||= "Received";
@@ -65,12 +73,16 @@ function escapeAdminHtml(value) {
   })[character]);
 }
 function normalizeProduct(product) {
-  return {
+  const normalized = {
     ...product,
     price:Number(product.price || 0),
     inventory:Number(product.inventory || 0),
-    active:Boolean(product.active),
-    internalName:product.internalName || `${product.name} - GL ${product.glCode || ""}`
+    active:Boolean(product.active)
+  };
+  normalized.glCode = accountingGlCode(normalized);
+  normalized.internalName = accountingName(normalized);
+  return {
+    ...normalized
   };
 }
 function productImageSrc(image) {
@@ -1150,7 +1162,7 @@ function mapSupabaseFeedbackRows(rows) {
 }
 
 function mapSupabaseProductRows(rows) {
-  return (rows || []).map(product => ({
+  return (rows || []).map(product => normalizeProduct({
     id:product.id,
     name:product.resident_name,
     internalName:product.internal_name,
@@ -1365,11 +1377,11 @@ if ($("#productForm")) $("#productForm").onsubmit = async event => {
   const data = Object.fromEntries(new FormData(form));
   const index = products.findIndex(candidate => candidate.id === (data.id || ""));
   const before = index >= 0 ? {...products[index]} : null;
-  const product = {
+  const product = normalizeProduct({
     id:data.id || `p${Date.now()}`,name:data.name,description:data.description,category:data.category,
     internalName:data.internalName,price:+data.price,inventory:+data.inventory,glCode:data.glCode,
     image:before?.image || "",active:form.elements.active.checked
-  };
+  });
   try {
     await saveProductToSupabase(product);
     if (index >= 0) products[index] = product;
