@@ -154,10 +154,13 @@ async function buildTrustedCheckout(rawBody) {
 }
 
 function stripeMetadata(checkout) {
+  const glCodeSet = new Set(checkout.accounting.map(item => item.glCode).filter(Boolean));
+  const glCodes = ["40090", "40033"].filter(code => glCodeSet.has(code));
   return {
     order_number:checkout.orderNumber.slice(0, 500),
     legal_notice_version:checkout.legal.noticeVersion.slice(0, 500),
     items_json:JSON.stringify(checkout.accounting.map(item => ({id:item.productId,q:item.quantity}))).slice(0, 500),
+    gl_code:glCodes.join(",").slice(0, 500),
     subtotal_cents:String(checkout.subtotalCents),
     processing_fee_cents:String(checkout.processingFeeCents),
     total_cents:String(checkout.totalCents)
@@ -188,7 +191,7 @@ async function createCheckoutSession(checkout, origin) {
   appendMetadata(params, "", metadata);
   appendMetadata(params, "payment_intent_data", metadata);
 
-  checkout.accounting.forEach((item, index) => appendLineItem(params, index, item.internalName, item.unitPriceCents, item.quantity, item.internalName));
+  checkout.accounting.forEach((item, index) => appendLineItem(params, index, item.residentName, item.unitPriceCents, item.quantity, item.residentName));
   if (checkout.processingFeeCents > 0) {
     appendLineItem(params, checkout.accounting.length, "Processing fee", checkout.processingFeeCents, 1);
   }
