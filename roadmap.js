@@ -401,6 +401,42 @@ function resetStripeCheckout() {
   $("#stripeCheckoutContainer")?.classList.add("hidden");
 }
 
+function paidCheckoutRequired() {
+  const subtotal = cartSubtotal();
+  return cart.length > 0 && subtotal + processingFee(subtotal) > 0;
+}
+
+function setCheckoutSubmitLabel(label) {
+  const submit = $("#checkoutSubmit");
+  if (submit) submit.innerHTML = `${label} <span>&rarr;</span>`;
+}
+
+function syncStripeCheckoutDisplay() {
+  const container = $("#stripeCheckoutContainer");
+  const embedded = $("#stripeEmbeddedCheckout");
+  if (!container || !embedded) return;
+
+  if (stripeEmbeddedCheckout) {
+    container.classList.remove("hidden");
+    setCheckoutSubmitLabel("Complete secure payment below");
+    return;
+  }
+
+  const shouldShowStripe = paidCheckoutRequired() && checkoutProvider === "stripe" && stripeConfig.enabled;
+  if (!shouldShowStripe) {
+    container.classList.add("hidden");
+    embedded.innerHTML = "";
+    setCheckoutSubmitLabel("Submit resident order");
+    return;
+  }
+
+  container.classList.remove("hidden");
+  if (!embedded.querySelector("[data-stripe-placeholder]")) {
+    embedded.innerHTML = `<div class="stripe-payment-placeholder" data-stripe-placeholder><strong>Stripe checkout ready</strong><span>Complete resident details and legal acceptance to open the secure payment form.</span></div>`;
+  }
+  setCheckoutSubmitLabel("Continue to secure payment");
+}
+
 async function initializePaymentProvider() {
   try {
     const response = await fetch("/api/stripe?action=config");
@@ -414,9 +450,15 @@ async function initializePaymentProvider() {
 
   hideApplePay();
   resetStripeCheckout();
-  if (checkoutProvider !== "stripe") return;
+  if (checkoutProvider !== "stripe") {
+    syncStripeCheckoutDisplay();
+    return;
+  }
 
-  if (!stripeConfig.enabled || !stripeConfig.publishableKey) return;
+  if (!stripeConfig.enabled || !stripeConfig.publishableKey) {
+    syncStripeCheckoutDisplay();
+    return;
+  }
   try {
     await loadStripeScript();
     stripeClient = window.Stripe(stripeConfig.publishableKey);
@@ -424,6 +466,7 @@ async function initializePaymentProvider() {
     stripeClient = null;
     stripeConfig = {...stripeConfig, enabled:false};
   }
+  syncStripeCheckoutDisplay();
 }
 
 async function createStripeCheckoutSession({number, resident, acceptedAt}) {
@@ -486,7 +529,10 @@ function showPaymentError(message) {
   element.classList.add("error");
 }
 
-if ($("#checkoutOpen")) $("#checkoutOpen").addEventListener("click", hideApplePay);
+if ($("#checkoutOpen")) $("#checkoutOpen").addEventListener("click", () => {
+  hideApplePay();
+  syncStripeCheckoutDisplay();
+});
 
 function createOrderRecords({number, resident, fee, acceptedAt, paymentStatus}) {
   return cart.map((cartItem, index) => {
@@ -584,7 +630,7 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
     message.classList.add("error");
     submit.disabled = false;
     paymentInProgress = false;
-    submit.innerHTML = `Submit resident order <span>â†’</span>`;
+    syncStripeCheckoutDisplay();
     return;
   }
   if (requiresPayment && checkoutProvider === "stripe" && (!stripeConfig.enabled || !stripeClient)) {
@@ -593,7 +639,7 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
     message.classList.add("error");
     submit.disabled = false;
     paymentInProgress = false;
-    submit.innerHTML = `Submit resident order <span>→</span>`;
+    syncStripeCheckoutDisplay();
     return;
   }
   const acceptedAt = new Date().toISOString();
@@ -644,7 +690,7 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
     submit.disabled = false;
   } finally {
     paymentInProgress = false;
-    submit.innerHTML = `Submit resident order <span>→</span>`;
+    syncStripeCheckoutDisplay();
   }
 };
 
