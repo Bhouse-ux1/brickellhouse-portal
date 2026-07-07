@@ -3,11 +3,6 @@ const FEEDBACK_STATUSES = ["New", "In Review", "Completed", "Closed"];
 const FEEDBACK_STORAGE_KEY = "bh_feedback";
 
 let feedbackRecords = [];
-let squareConfig = {enabled:false, environment:"demo"};
-let squareCard = null;
-let squarePayments = null;
-let squareApplePay = null;
-let applePayAmount = "";
 let checkoutProvider = "square";
 let stripeConfig = {enabled:false, provider:"square", publishableKey:""};
 let stripeClient = null;
@@ -380,7 +375,7 @@ if ($("#exportOrders")) $("#exportOrders").onclick = () => {
   auditRoadmapManagement("export_orders", "export", "orders", null, {rows:orders.length});
 };
 
-function loadSquareScript(url) {
+function loadExternalScript(url) {
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
     script.src = url;
@@ -391,68 +386,12 @@ function loadSquareScript(url) {
 }
 
 function hideApplePay() {
-  squareApplePay = null;
-  applePayAmount = "";
   $("#applePayOption")?.classList.add("hidden");
-}
-
-async function prepareApplePay() {
-  const total = cartSubtotal() + processingFee(cartSubtotal());
-  if (!squarePayments || total <= 0) {
-    hideApplePay();
-    return;
-  }
-
-  const amount = total.toFixed(2);
-  if (squareApplePay && applePayAmount === amount) {
-    $("#applePayOption")?.classList.remove("hidden");
-    return;
-  }
-
-  hideApplePay();
-  try {
-    const paymentRequest = squarePayments.paymentRequest({
-      countryCode:"US",
-      currencyCode:"USD",
-      total:{amount,label:"BrickellHouse"}
-    });
-    squareApplePay = await squarePayments.applePay(paymentRequest);
-    applePayAmount = amount;
-    $("#applePayOption")?.classList.remove("hidden");
-  } catch (_) {
-    hideApplePay();
-  }
-}
-
-async function initializeSquare() {
-  try {
-    const response = await fetch("/api/square-config");
-    if (!response.ok) throw new Error("Square API route is unavailable");
-    squareConfig = await response.json();
-    if (!squareConfig.enabled) throw new Error(squareConfig.message || "Square payment is not configured");
-    feeSettings = {
-      ...feeSettings,
-      enabled:true,
-      type:"percent",
-      amount:squareConfig.processingFeePercent
-    };
-    persist();
-    renderCart();
-    await loadSquareScript(squareConfig.sdkUrl);
-    squarePayments = window.Square.payments(squareConfig.applicationId, squareConfig.locationId);
-    squareCard = await squarePayments.card();
-    await squareCard.attach("#squareCard");
-    $("#squareCardContainer").classList.remove("hidden");
-  } catch (error) {
-    squareConfig = {enabled:false, environment:"demo"};
-    squarePayments = null;
-    hideApplePay();
-  }
 }
 
 async function loadStripeScript() {
   if (window.Stripe) return;
-  await loadSquareScript("https://js.stripe.com/v3/");
+  await loadExternalScript("https://js.stripe.com/v3/");
 }
 
 function resetStripeCheckout() {
@@ -464,7 +403,7 @@ function resetStripeCheckout() {
 
 async function initializePaymentProvider() {
   try {
-    const response = await fetch("/api/stripe-config");
+    const response = await fetch("/api/stripe?action=config");
     const config = response.ok ? await response.json() : {provider:"square", enabled:false};
     checkoutProvider = config.provider === "stripe" ? "stripe" : "square";
     stripeConfig = config;
@@ -473,16 +412,9 @@ async function initializePaymentProvider() {
     stripeConfig = {enabled:false, provider:"square", publishableKey:""};
   }
 
-  if (checkoutProvider !== "stripe") {
-    await initializeSquare();
-    return;
-  }
-
-  squareConfig = {enabled:false, environment:"disabled"};
-  squarePayments = null;
-  squareCard = null;
   hideApplePay();
-  $("#squareCardContainer")?.classList.add("hidden");
+  resetStripeCheckout();
+  if (checkoutProvider !== "stripe") return;
 
   if (!stripeConfig.enabled || !stripeConfig.publishableKey) return;
   try {
@@ -494,23 +426,8 @@ async function initializePaymentProvider() {
   }
 }
 
-async function createSquarePayment(sourceId, {number, resident, acceptedAt}) {
-  const response = await fetch("/api/create-payment", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      sourceId,idempotencyKey:number,orderNumber:number,resident,
-      items:cart.map(item => ({id:item.id,quantity:item.quantity})),
-      legalAccepted:true,legalNoticeVersion:LEGAL_NOTICE_VERSION,legalAcceptedAt:acceptedAt
-    })
-  });
-  const result = await response.json();
-  if (!response.ok || !result.success) throw new Error(result.message || "Square payment failed");
-  return {status:"Paid",id:result.payment.id,createdAt:formatResidentDateTime(result.payment.createdAt)};
-}
-
 async function createStripeCheckoutSession({number, resident, acceptedAt}) {
-  const response = await fetch("/api/create-stripe-checkout-session", {
+  const response = await fetch("/api/stripe?action=session", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
@@ -525,7 +442,7 @@ async function createStripeCheckoutSession({number, resident, acceptedAt}) {
 }
 
 async function confirmStripeOrder(sessionId) {
-  const response = await fetch("/api/confirm-stripe-order", {
+  const response = await fetch("/api/stripe?action=confirm", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({sessionId})
@@ -569,68 +486,7 @@ function showPaymentError(message) {
   element.classList.add("error");
 }
 
-function showSuccessfulOrder(records, payment, resident, number) {
-  finalizeSuccessfulOrder(records, payment);
-  $("#successName").textContent = resident.name.trim().split(" ")[0];
-  $("#successOrder").textContent = number;
-  $("#successPaymentNote").textContent = "Square confirmed the payment. Management can now process your request.";
-  $("#checkoutForm").reset();
-  closeModal("#checkoutModal");
-  openModal("#successModal");
-}
-
-async function handleApplePay() {
-  if (!squareApplePay || paymentInProgress) return;
-  const form = $("#checkoutForm");
-  const resident = Object.fromEntries(new FormData(form));
-  const validationMessage = checkoutValidationMessage(form, resident);
-  if (validationMessage) {
-    showPaymentError(validationMessage);
-    toast(validationMessage);
-    return;
-  }
-
-  resident.phone = normalizeUsPhone(resident.phone);
-  resident.unit = normalizeUnitNumber(resident.unit);
-  form.elements.phone.value = resident.phone;
-  form.elements.unit.value = resident.unit;
-  const button = $("#applePayButton");
-  const message = $("#paymentMessage");
-  paymentInProgress = true;
-  button.disabled = true;
-  $("#checkoutSubmit").disabled = true;
-  message.classList.add("hidden");
-  message.classList.remove("error");
-
-  const number = generateOrderNumber();
-  const acceptedAt = new Date().toISOString();
-  const fee = processingFee(cartSubtotal());
-  const records = createOrderRecords({number,resident,fee,acceptedAt,paymentStatus:"Pending"});
-
-  try {
-    const tokenResult = await squareApplePay.tokenize();
-    const tokenStatus = String(tokenResult.status || "").toUpperCase();
-    if (tokenStatus !== "OK") {
-      if (["CANCEL","CANCELED","CANCELLED"].includes(tokenStatus)) {
-        showPaymentError(PAYMENT_CANCELLED_MESSAGE);
-        return;
-      }
-      throw new Error(tokenResult.errors?.[0]?.message || "Apple Pay was canceled. You can continue using card payment.");
-    }
-    const payment = await createSquarePayment(tokenResult.token, {number,resident,acceptedAt});
-    showSuccessfulOrder(records, payment, resident, number);
-  } catch (error) {
-    console.error("Apple Pay payment failed", error);
-    showPaymentError(FRIENDLY_PAYMENT_ERROR);
-  } finally {
-    paymentInProgress = false;
-    button.disabled = false;
-    $("#checkoutSubmit").disabled = !$("#legalAcceptance").checked;
-  }
-}
-
-if ($("#applePayButton")) $("#applePayButton").addEventListener("click", handleApplePay);
-if ($("#checkoutOpen")) $("#checkoutOpen").addEventListener("click", prepareApplePay);
+if ($("#checkoutOpen")) $("#checkoutOpen").addEventListener("click", hideApplePay);
 
 function createOrderRecords({number, resident, fee, acceptedAt, paymentStatus}) {
   return cart.map((cartItem, index) => {
@@ -714,7 +570,7 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
   const message = $("#paymentMessage");
   submit.disabled = true;
   paymentInProgress = true;
-  submit.textContent = checkoutProvider === "stripe" ? "Preparing secure payment..." : squareConfig.enabled ? "Processing secure payment..." : "Recording demo order...";
+  submit.textContent = checkoutProvider === "stripe" ? "Preparing secure payment..." : "Recording demo order...";
   message.classList.add("hidden");
   message.classList.remove("error");
 
@@ -722,8 +578,8 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
   const subtotal = cartSubtotal();
   const fee = processingFee(subtotal);
   const requiresPayment = subtotal + fee > 0;
-  if (requiresPayment && checkoutProvider !== "stripe" && !squareConfig.enabled) {
-    message.textContent = "Square payment is currently unavailable. Please contact management.";
+  if (requiresPayment && checkoutProvider !== "stripe") {
+    message.textContent = "Online payment is currently unavailable. Please contact management.";
     message.classList.remove("hidden");
     message.classList.add("error");
     submit.disabled = false;
@@ -761,10 +617,6 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.message || "Order could not be saved");
       payment = {status:"No Payment Required",id:"",createdAt:acceptedAt};
-    } else if (squareConfig.enabled) {
-      const tokenResult = await squareCard.tokenize();
-      if (tokenResult.status !== "OK") throw new Error(tokenResult.errors?.[0]?.message || "Card tokenization failed");
-      payment = await createSquarePayment(tokenResult.token, {number,resident,acceptedAt});
     } else if (checkoutProvider === "stripe") {
       const session = await createStripeCheckoutSession({number,resident,acceptedAt});
       await mountStripeCheckout(session, records, resident, number);
@@ -778,7 +630,7 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
     $("#successOrder").textContent = number;
     $("#successPaymentNote").textContent = !requiresPayment
       ? "No payment was required. Management can now process your request."
-      : "Square confirmed the payment. Management can now process your request.";
+      : "Payment was confirmed. Management can now process your request.";
     form.reset();
     closeModal("#checkoutModal");
     openModal("#successModal");
