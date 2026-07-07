@@ -1176,13 +1176,10 @@ function redactReviewText(value) {
 }
 
 function reviewMessage(role, value, offset = 0) {
-  const redacted = redactReviewText(value);
   const order = Date.now() + offset;
   return {
     role,
-    redacted_text:redacted.omitted ? null : redacted.text,
-    omitted:Boolean(redacted.omitted),
-    omitted_reason:redacted.reason || null,
+    text:String(value || ""),
     message_order:order,
     created_at:new Date(order).toISOString()
   };

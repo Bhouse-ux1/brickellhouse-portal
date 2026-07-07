@@ -23,9 +23,11 @@ create table if not exists public.luna_conversation_reviews (
 );
 
 comment on table public.luna_conversation_reviews is
-  'Management-only 90-day redacted Luna conversation review queue. Luna never reads from this table and it is not training, memory, retrieval, or knowledge update data.';
+  'Management-only 90-day Luna conversation review queue using anonymous conversation IDs. Stores full raw conversation transcripts for Management review only. Luna never reads from this table and it is not training, memory, retrieval, or knowledge update data.';
 comment on column public.luna_conversation_reviews.messages is
-  'Array of redacted or omitted resident/Luna messages. No raw resident conversations, resident profiles, unit/email/phone identity, embeddings, or model-training data.';
+  'Array of full resident/Luna message transcript objects for the anonymous conversation. Do not extract resident profiles, identity columns, embeddings, model-training data, or any path back into Luna.';
+comment on column public.luna_conversation_reviews.conversation_id is
+  'Anonymous random ID used only to group messages from the same Luna chat session. Not tied to resident name, unit, email, phone, account, order, payment, IP address, user agent, or resident profile.';
 
 create index if not exists idx_luna_conversation_reviews_last_message
   on public.luna_conversation_reviews (last_message_at desc);
@@ -119,4 +121,3 @@ grant execute on function public.append_luna_conversation_review(uuid, text, tex
 grant execute on function public.purge_old_luna_conversation_reviews() to service_role;
 
 commit;
-

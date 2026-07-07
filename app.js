@@ -636,23 +636,6 @@ function formatInsightDate(value) {
   }).format(date);
 }
 
-function filteredLunaInsights() {
-  const start = insightPeriodStart(lunaInsightFilters.period);
-  const search = lunaInsightFilters.search.trim().toLowerCase();
-  return lunaInsights.filter(row => {
-    const date = insightDate(row);
-    if (start && (!date || date < start)) return false;
-    if (lunaInsightFilters.language !== "all" && row.detected_language !== lunaInsightFilters.language) return false;
-    if (lunaInsightFilters.outcome === "low" && Number(row.confidence || 0) >= 60) return false;
-    if (!["all","low"].includes(lunaInsightFilters.outcome) && row.outcome !== lunaInsightFilters.outcome) return false;
-    if (search) {
-      const haystack = [row.category,row.detected_topic,row.outcome,row.redacted_question_snippet].join(" ").toLowerCase();
-      if (!haystack.includes(search)) return false;
-    }
-    return true;
-  });
-}
-
 function countBy(rows, key) {
   return rows.reduce((counts, row) => {
     const value = row[key] || "Unknown";
@@ -665,7 +648,7 @@ function insightMetric(label, value, helper = "") {
   return `<div class="metric luna-insight-metric"><span>${label}</span><strong>${value}</strong>${helper ? `<small>${helper}</small>` : ""}</div>`;
 }
 
-function renderLunaInsights() {
+function legacyLunaInsightsRendererUnused() {
   const container = $("#lunaInsightsContent");
   if (!container) return;
   if (lunaInsightsError) {
@@ -758,7 +741,7 @@ function csvEscape(value) {
   return `"${String(value ?? "").replace(/"/g, '""')}"`;
 }
 
-function exportLunaInsightsCsv() {
+function legacyLunaInsightsCsvUnused() {
   const rows = filteredLunaInsights();
   const headers = ["created_at","category","detected_language","detected_topic","outcome","confidence","source","redacted_question_snippet","history_message_count"];
   const csv = [
@@ -785,7 +768,7 @@ function filteredLunaInsights() {
     if (lunaInsightFilters.outcome === "unknown" && (row.detected_topic || "unknown") !== "unknown" && row.category !== "Unknown") return false;
     if (!["all","low","unknown"].includes(lunaInsightFilters.outcome) && row.status !== lunaInsightFilters.outcome) return false;
     if (search) {
-      const messages = Array.isArray(row.messages) ? row.messages.map(message => message.redacted_text || message.omitted_reason || "").join(" ") : "";
+      const messages = Array.isArray(row.messages) ? row.messages.map(message => message.text || message.redacted_text || "").join(" ") : "";
       const haystack = [row.conversation_id,row.category,row.detected_topic,row.status,row.management_note,messages].join(" ").toLowerCase();
       if (!haystack.includes(search)) return false;
     }
@@ -808,9 +791,9 @@ function insightPeriodStart(period) {
 
 function conversationPreview(row) {
   const messages = Array.isArray(row.messages) ? row.messages : [];
-  const resident = messages.find(message => message.role === "resident" && (message.redacted_text || message.omitted));
+  const resident = messages.find(message => message.role === "resident" && (message.text || message.redacted_text));
   if (!resident) return "No reviewable message content.";
-  return resident.omitted ? "Message omitted because sensitive details were detected." : resident.redacted_text;
+  return resident.text || resident.redacted_text || "";
 }
 
 function statusClass(status) {
@@ -853,7 +836,7 @@ function renderLunaInsights() {
     </div>
     <div class="luna-insight-panels">
       <div class="admin-panel luna-insight-panel">
-        <div class="luna-insight-panel-head"><div><p class="eyebrow">Conversation review</p><h3>Redacted Luna conversations</h3></div><span>${spanishCount} Spanish · ${unknownCount} unknown · ${lowConfidenceCount} low confidence</span></div>
+        <div class="luna-insight-panel-head"><div><p class="eyebrow">Conversation review</p><h3>Luna conversations</h3></div><span>${spanishCount} Spanish · ${unknownCount} unknown · ${lowConfidenceCount} low confidence</span></div>
         ${rows.length ? `<div class="luna-review-list">${rows.map(row => `
           <button class="luna-review-card" type="button" data-luna-review="${escapeAdminHtml(row.conversation_id)}">
             <div>
@@ -861,7 +844,7 @@ function renderLunaInsights() {
               <small>${escapeAdminHtml(row.category || "Unknown")} · ${escapeAdminHtml(row.detected_language || "unknown")} · ${formatInsightDate(row.last_message_at || row.created_at)}</small>
             </div>
             <span class="status-pill ${statusClass(row.status)}">${escapeAdminHtml(row.status || "New")}</span>
-          </button>`).join("")}</div>` : `<div class="inventory-ok">No redacted conversations match this filter.</div>`}
+          </button>`).join("")}</div>` : `<div class="inventory-ok">No conversations match this filter.</div>`}
       </div>
       <div class="admin-panel luna-insight-panel">
         <div class="luna-insight-panel-head"><div><p class="eyebrow">90-day summary</p><h3>Top categories</h3></div></div>
@@ -869,7 +852,7 @@ function renderLunaInsights() {
           <div><span>${escapeAdminHtml(category)}</span><strong>${count}</strong></div>`).join("")}</div>` : `<div class="inventory-ok">No Luna conversations have been recorded in the review window.</div>`}
       </div>
     </div>
-    <div class="inventory-ok luna-review-guardrail">Management review only. These records are redacted, temporary, and cannot update Luna knowledge, prompts, model, or behavior.</div>`;
+    <div class="inventory-ok luna-review-guardrail">Management review only. These records are temporary and cannot update Luna knowledge, prompts, model, or behavior.</div>`;
   bindLunaReviewCards();
 }
 
@@ -892,8 +875,8 @@ function openLunaReview(conversationId) {
   $("#lunaReviewMessages").innerHTML = messages.length ? messages.map(message => `
     <div class="luna-review-message ${escapeAdminHtml(message.role || "")}">
       <span>${escapeAdminHtml(message.role === "luna" ? "Luna" : "Resident")}</span>
-      <p>${message.omitted ? "<em>Message omitted because sensitive details were detected.</em>" : escapeAdminHtml(message.redacted_text || "")}</p>
-    </div>`).join("") : `<div class="inventory-ok">No redacted messages are available for this conversation.</div>`;
+      <p>${escapeAdminHtml(message.text || message.redacted_text || "")}</p>
+    </div>`).join("") : `<div class="inventory-ok">No messages are available for this conversation.</div>`;
   modal.classList.add("open");
 }
 
@@ -931,13 +914,13 @@ async function saveLunaConversationReview() {
 
 function exportLunaInsightsCsv() {
   const rows = filteredLunaInsights();
-  const headers = ["conversation_id","created_at","last_message_at","category","detected_language","detected_topic","confidence","status","management_note","redacted_messages"];
+  const headers = ["conversation_id","created_at","last_message_at","category","detected_language","detected_topic","confidence","status","management_note","messages"];
   const csv = [
     headers.join(","),
     ...rows.map(row => headers.map(header => {
-      if (header === "redacted_messages") {
+      if (header === "messages") {
         const messages = Array.isArray(row.messages) ? row.messages : [];
-        return csvEscape(messages.map(message => `${message.role}: ${message.omitted ? "[omitted]" : message.redacted_text || ""}`).join(" | "));
+        return csvEscape(messages.map(message => `${message.role}: ${message.text || message.redacted_text || ""}`).join(" | "));
       }
       return csvEscape(row[header] || "");
     }).join(","))
@@ -948,7 +931,7 @@ function exportLunaInsightsCsv() {
   link.download = `luna-conversation-review-${new Date().toISOString().slice(0,10)}.csv`;
   link.click();
   URL.revokeObjectURL(link.href);
-  auditManagement("export", "luna_conversation_reviews", "redacted_csv");
+  auditManagement("export", "luna_conversation_reviews", "csv");
 }
 
 if ($("#saveLunaReview")) $("#saveLunaReview").onclick = saveLunaConversationReview;
