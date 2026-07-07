@@ -18,7 +18,8 @@ module.exports = function handler(request, response) {
 
   const provider = normalizedCheckoutProvider();
   const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY || "";
-  const enabled = provider === "stripe" && Boolean(publishableKey);
+  const testMode = publishableKey.startsWith("pk_test_");
+  const enabled = provider === "stripe" && testMode;
   const mode = publishableKey.startsWith("pk_live_")
     ? "live"
     : publishableKey.startsWith("pk_test_") ? "test" : "";
@@ -28,6 +29,6 @@ module.exports = function handler(request, response) {
     provider,
     publishableKey:enabled ? publishableKey : "",
     mode:enabled ? mode : "",
-    message:enabled || provider !== "stripe" ? "" : "Stripe checkout is not available."
+    message:enabled || provider !== "stripe" ? "" : "Stripe test checkout is not available."
   });
 };

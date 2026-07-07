@@ -1111,7 +1111,9 @@ function mapSupabaseOrderRows(rows) {
         legalAccepted:order.legal_accepted,legalAcceptedAt:order.legal_accepted_at || "",
         legalNoticeVersion:order.legal_notice_version,termsVersion:order.terms_version,privacyPolicyVersion:order.privacy_policy_version,
         status:order.status,publicNote:order.public_note || "",internalNote:order.internal_note || "",
-        paymentStatus:order.payment_status,squareTransactionId:order.square_payment_id || "",paymentDateTime:order.payment_at || ""
+        paymentStatus:order.payment_status,
+        squareTransactionId:order.square_payment_id || order.payment_processor_reference || order.stripe_payment_intent_id || order.stripe_checkout_session_id || "",
+        paymentDateTime:order.payment_at || ""
       }];
     }
     return items.map((item, index) => ({
@@ -1123,7 +1125,9 @@ function mapSupabaseOrderRows(rows) {
       legalAccepted:order.legal_accepted,legalAcceptedAt:order.legal_accepted_at || "",
       legalNoticeVersion:order.legal_notice_version,termsVersion:order.terms_version,privacyPolicyVersion:order.privacy_policy_version,
       status:order.status,publicNote:order.public_note || "",internalNote:order.internal_note || "",
-      paymentStatus:order.payment_status,squareTransactionId:order.square_payment_id || "",paymentDateTime:order.payment_at || ""
+      paymentStatus:order.payment_status,
+      squareTransactionId:order.square_payment_id || order.payment_processor_reference || order.stripe_payment_intent_id || order.stripe_checkout_session_id || "",
+      paymentDateTime:order.payment_at || ""
     }));
   });
 }
