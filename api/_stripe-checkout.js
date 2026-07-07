@@ -359,6 +359,30 @@ async function recordStripePaymentEvent({session, eventId = null, eventType = "m
   return {duplicate:false};
 }
 
+async function sendStripeOrderEmails(order, session, createdAt) {
+  const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id || "";
+  try {
+    await sendOrderEmails({
+      paymentId:paymentIntentId || session.id,
+      orderNumber:order.order_number,
+      residentName:order.resident_name,
+      unit:order.unit_number,
+      email:order.email,
+      phone:order.phone,
+      items:(order.order_items || []).map(item => ({
+        name:item.resident_name_snapshot,
+        quantity:item.quantity,
+        unitPriceCents:item.unit_price_cents
+      })),
+      totalCents:order.total_cents,
+      paymentMethod:"Stripe",
+      createdAt
+    });
+  } catch (error) {
+    console.error(`Stripe order email notification failed after successful payment: ${error.message || "Unknown error"}`);
+  }
+}
+
 async function fulfillPaidStripeSession(session, {eventId = null, eventType = "manual_confirmation"} = {}) {
   if (session.payment_status !== "paid") {
     const error = new Error("Stripe payment is not paid");
@@ -380,7 +404,6 @@ async function fulfillPaidStripeSession(session, {eventId = null, eventType = "m
     error.status = 409;
     throw error;
   }
-  if (existing.payment_status === "Paid") return {order:existing, existing:true};
   if (existing.payment_provider !== "stripe" || existing.stripe_checkout_session_id !== session.id) {
     const error = new Error("Stripe order verification failed");
     error.status = 409;
@@ -398,6 +421,12 @@ async function fulfillPaidStripeSession(session, {eventId = null, eventType = "m
   }
 
   const now = new Date().toISOString();
+  const createdAt = session.created ? new Date(session.created * 1000).toISOString() : now;
+  if (existing.payment_status === "Paid") {
+    await sendStripeOrderEmails(existing, session, createdAt);
+    return {order:existing, existing:true};
+  }
+
   const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id || "";
   const chargeId = latestChargeId(session.payment_intent);
   let orderRows;
@@ -409,7 +438,7 @@ async function fulfillPaidStripeSession(session, {eventId = null, eventType = "m
         payment_processor_reference:paymentIntentId || session.id,
         stripe_payment_intent_id:paymentIntentId || null,
         stripe_charge_id:chargeId || null,
-        payment_at:session.created ? new Date(session.created * 1000).toISOString() : now
+        payment_at:createdAt
       }
     });
   } catch (error) {
@@ -420,27 +449,7 @@ async function fulfillPaidStripeSession(session, {eventId = null, eventType = "m
     throw error;
   }
   const order = orderRows?.[0];
-
-  try {
-    await sendOrderEmails({
-      paymentId:paymentIntentId || session.id,
-      orderNumber:existing.order_number,
-      residentName:existing.resident_name,
-      unit:existing.unit_number,
-      email:existing.email,
-      phone:existing.phone,
-      items:existing.order_items.map(item => ({
-        name:item.resident_name_snapshot,
-        quantity:item.quantity,
-        unitPriceCents:item.unit_price_cents
-      })),
-      totalCents:existing.total_cents,
-      paymentMethod:"Stripe",
-      createdAt:session.created ? new Date(session.created * 1000).toISOString() : now
-    });
-  } catch (error) {
-    console.error(`Stripe order email notification failed after successful payment: ${error.message || "Unknown error"}`);
-  }
+  await sendStripeOrderEmails(existing, session, createdAt);
 
   return {order, existing:false};
 }

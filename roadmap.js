@@ -495,6 +495,48 @@ async function confirmStripeOrder(sessionId) {
   return result;
 }
 
+function clearResidentCart() {
+  cart = [];
+  persist();
+  renderCart();
+  renderProducts();
+  renderAdmin();
+  syncStripeCheckoutDisplay();
+}
+
+function showSuccessMessage({title, body, orderNumber = ""}) {
+  $("#successEyebrow") && ($("#successEyebrow").textContent = "Payment received");
+  $("#successTitle") && ($("#successTitle").textContent = title);
+  if ($("#successBody")) {
+    $("#successBody").innerHTML = orderNumber
+      ? `${body} <span class="success-order-reference">Order <strong>${escapeHtml(orderNumber)}</strong>.</span>`
+      : body;
+  }
+  $("#successName") && ($("#successName").textContent = "");
+  $("#successOrder") && ($("#successOrder").textContent = orderNumber);
+  $("#successPaymentNote") && ($("#successPaymentNote").textContent = "");
+  openModal("#successModal");
+}
+
+function showPaidOrderConfirmation(orderNumber = "") {
+  showSuccessMessage({
+    title:"Thank you. Your payment has been received.",
+    body:"Your request has been submitted successfully. Management will contact you once your order is ready.",
+    orderNumber
+  });
+}
+
+function showResidentOrderConfirmation({name = "", orderNumber = "", note = ""}) {
+  $("#successEyebrow") && ($("#successEyebrow").textContent = "Request received");
+  $("#successTitle") && ($("#successTitle").textContent = `Thank you${name ? `, ${name}` : ""}.`);
+  if ($("#successBody")) {
+    $("#successBody").innerHTML = `Your order <strong>${escapeHtml(orderNumber)}</strong> has been received. <span id="successPaymentNote">${escapeHtml(note)}</span>`;
+  }
+  $("#successName") && ($("#successName").textContent = name ? `, ${name}` : "");
+  $("#successOrder") && ($("#successOrder").textContent = orderNumber);
+  openModal("#successModal");
+}
+
 async function mountStripeCheckout(session, records, resident, number) {
   if (!stripeClient) throw new Error("Stripe checkout is not available");
   resetStripeCheckout();
@@ -505,15 +547,12 @@ async function mountStripeCheckout(session, records, resident, number) {
     clientSecret:session.clientSecret,
     onComplete:async () => {
       try {
-        await confirmStripeOrder(session.sessionId);
+        const result = await confirmStripeOrder(session.sessionId);
         finalizeSuccessfulOrder(records, {status:"Paid", id:session.sessionId, createdAt:acceptanceDateTime()});
-        $("#successName").textContent = resident.name.trim().split(" ")[0];
-        $("#successOrder").textContent = number;
-        $("#successPaymentNote").textContent = "Stripe confirmed the payment. Management can now process your request.";
         $("#checkoutForm").reset();
         resetStripeCheckout();
         closeModal("#checkoutModal");
-        openModal("#successModal");
+        showPaidOrderConfirmation(result.order?.orderNumber || number);
       } catch (error) {
         showPaymentError(error.message || "Stripe payment was received, but the order could not be confirmed. Please contact management.");
       }
@@ -527,6 +566,29 @@ function showPaymentError(message) {
   element.textContent = message;
   element.classList.remove("hidden");
   element.classList.add("error");
+}
+
+async function handleStripeReturnConfirmation() {
+  const params = new URLSearchParams(window.location.search);
+  const sessionId = params.get("stripe_session_id");
+  if (!sessionId) return;
+
+  const cleanUrl = `${window.location.pathname}${window.location.hash || ""}`;
+  window.history.replaceState({}, document.title, cleanUrl);
+  try {
+    const result = await confirmStripeOrder(sessionId);
+    clearResidentCart();
+    resetStripeCheckout();
+    $("#checkoutForm")?.reset();
+    closeModal("#checkoutModal");
+    showPaidOrderConfirmation(result.order?.orderNumber || "");
+  } catch (error) {
+    console.error("Stripe return confirmation failed", error);
+    showSuccessMessage({
+      title:"Payment received.",
+      body:"Your payment was received, but the website could not refresh the confirmation details. Please contact Management if your order does not appear shortly."
+    });
+  }
 }
 
 if ($("#checkoutOpen")) $("#checkoutOpen").addEventListener("click", () => {
@@ -672,14 +734,15 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
     }
 
     finalizeSuccessfulOrder(records, payment);
-    $("#successName").textContent = resident.name.trim().split(" ")[0];
-    $("#successOrder").textContent = number;
-    $("#successPaymentNote").textContent = !requiresPayment
-      ? "No payment was required. Management can now process your request."
-      : "Payment was confirmed. Management can now process your request.";
     form.reset();
     closeModal("#checkoutModal");
-    openModal("#successModal");
+    showResidentOrderConfirmation({
+      name:resident.name.trim().split(" ")[0],
+      orderNumber:number,
+      note:!requiresPayment
+        ? "No payment was required. Management can now process your request."
+        : "Payment was confirmed. Management can now process your request."
+    });
   } catch (error) {
     console.error(requiresPayment ? "Card payment failed" : "Order submission failed", error);
     message.textContent = requiresPayment
@@ -694,4 +757,4 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
   }
 };
 
-initializePaymentProvider();
+initializePaymentProvider().finally(handleStripeReturnConfirmation);
