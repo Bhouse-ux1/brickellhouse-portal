@@ -1,10 +1,12 @@
 const OPENAI_MODEL = "gpt-5.4-mini";
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
+const crypto = require("crypto");
 const {supabaseRequest} = require("./_supabase");
 const MAX_MESSAGE_LENGTH = 1500;
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_HISTORY_MESSAGE_LENGTH = 900;
 const SAFE_ERROR_MESSAGE = "Sorry, I could not respond right now. Please try again.";
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const KNOWLEDGE = {
   constitution: require("./_knowledge/brickellhouse/00_constitution.json"),
   identityContacts: require("./_knowledge/brickellhouse/01_identity_contacts.json"),
@@ -1138,6 +1140,89 @@ async function logLunaInsight(message, history, reply, source = "model") {
   }
 }
 
+function conversationIdFromRequest(value) {
+  const candidate = String(value || "").trim();
+  return UUID_PATTERN.test(candidate) ? candidate : crypto.randomUUID();
+}
+
+function hasHighRiskReviewData(value) {
+  const text = String(value || "");
+  return /(?:\d[\s-]*){12,}/.test(text)
+    || /\b(?:ssn|social security|routing|bank account|account number|credit card|debit card|card number|cvv|cvc|password|passcode|pin|tarjeta|cuenta bancaria|contraseÃ±a)\b/i.test(text)
+    || /\b(?:tracking|package|paquete|fedex|ups|usps|amazon|locker)\b[^.?!\n]{0,80}\b[A-Z0-9][A-Z0-9-]{5,}\b/i.test(text)
+    || /\b(?:license plate|plate number|tag number|vehicle tag|placa|matrÃ­cula|matricula)\b[^.?!\n]{0,60}\b[A-Z0-9-]{2,}\b/i.test(text)
+    || /\b\d{1,6}\s+[A-Za-z0-9 .'-]{2,}\s+(?:street|st|avenue|ave|road|rd|drive|dr|court|ct|lane|ln|boulevard|blvd|way|terrace|ter|place|pl)\b/i.test(text);
+}
+
+function redactReviewText(value) {
+  const original = String(value || "").replace(/\s+/g, " ").trim();
+  if (!original) return {text:null, omitted:true, reason:"empty"};
+  if (hasHighRiskReviewData(original)) return {text:null, omitted:true, reason:"sensitive-detail"};
+
+  let text = original;
+  text = text.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]");
+  text = text.replace(/\b(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}\b/g, "[phone]");
+  text = text.replace(/\b(?:unit|apt|apartment|suite|#|unidad|apartamento)\s*[A-Z]?\d{2,6}[A-Z]?\b/gi, "[unit]");
+  text = text.replace(/\b(my name is|i am|i'm|soy|me llamo)\s+[a-zÃ¡Ã©Ã­Ã³ÃºÃ±]+(?:\s+[a-zÃ¡Ã©Ã­Ã³ÃºÃ±]+){0,3}/gi, "$1 [name]");
+  text = text.replace(/\b(resident|owner|tenant|guest)\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\b/g, "$1 [name]");
+  text = text.replace(/\b[A-Z0-9][A-Z0-9-]{7,}\b/g, "[id]");
+  text = text.replace(/\b\d{4,}\b/g, "[number]");
+  text = text.replace(/\s+/g, " ").trim();
+
+  if (!text || text.length < Math.min(12, original.length * 0.25)) {
+    return {text:null, omitted:true, reason:"uncertain-redaction"};
+  }
+  return {text:text.slice(0, 1200), omitted:false};
+}
+
+function reviewMessage(role, value, offset = 0) {
+  const redacted = redactReviewText(value);
+  const order = Date.now() + offset;
+  return {
+    role,
+    redacted_text:redacted.omitted ? null : redacted.text,
+    omitted:Boolean(redacted.omitted),
+    omitted_reason:redacted.reason || null,
+    message_order:order,
+    created_at:new Date(order).toISOString()
+  };
+}
+
+function buildConversationReviewRecord(message, history, reply, source, conversationId) {
+  const category = insightCategory(message, history);
+  const outcome = insightOutcome(reply, source);
+  const confidence = insightConfidence(outcome, source, category.key);
+  return {
+    p_conversation_id:conversationId,
+    p_detected_language:insightLanguage(message, history),
+    p_detected_topic:inferTopic(message, history) || category.key || "unknown",
+    p_category:category.label,
+    p_confidence:confidence,
+    p_messages:[
+      reviewMessage("resident", message, 0),
+      reviewMessage("luna", reply, 1)
+    ]
+  };
+}
+
+async function logLunaConversationReview(conversationId, message, history, reply, source = "model") {
+  try {
+    const record = buildConversationReviewRecord(message, history, reply, source, conversationId);
+    await supabaseRequest("rpc/append_luna_conversation_review", {
+      method:"POST",
+      body:record,
+      prefer:"return=minimal"
+    });
+    await supabaseRequest("rpc/purge_old_luna_conversation_reviews", {
+      method:"POST",
+      body:{},
+      prefer:"return=minimal"
+    });
+  } catch (error) {
+    console.warn("Luna conversation review logging skipped", error?.message || "Error");
+  }
+}
+
 function send(response, status, payload) {
   response.setHeader("Cache-Control", "no-store");
   return response.status(status).json(payload);
@@ -1168,18 +1253,19 @@ module.exports = async function handler(request, response) {
     return send(response, 400, {success:false,message:`Please keep your message under ${MAX_MESSAGE_LENGTH} characters.`});
   }
   const history = validateHistory(request.body?.history);
+  const conversationId = conversationIdFromRequest(request.body?.conversationId);
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     console.error("OpenAI chat route is missing OPENAI_API_KEY.");
-    await logLunaInsight(message, history, SAFE_ERROR_MESSAGE, "error");
-    return send(response, 503, {success:false,message:SAFE_ERROR_MESSAGE});
+    await logLunaConversationReview(conversationId, message, history, SAFE_ERROR_MESSAGE, "error");
+    return send(response, 503, {success:false,message:SAFE_ERROR_MESSAGE,conversationId});
   }
 
   const directReply = deterministicReply(message, history);
   if (directReply) {
-    await logLunaInsight(message, history, directReply, "deterministic");
-    return send(response, 200, {success:true,reply:directReply});
+    await logLunaConversationReview(conversationId, message, history, directReply, "deterministic");
+    return send(response, 200, {success:true,reply:directReply,conversationId});
   }
 
   try {
@@ -1205,20 +1291,20 @@ module.exports = async function handler(request, response) {
         status:openAiResponse.status,
         type:payload?.error?.type || "unknown"
       });
-      await logLunaInsight(message, history, SAFE_ERROR_MESSAGE, "error");
-      return send(response, 502, {success:false,message:SAFE_ERROR_MESSAGE});
+      await logLunaConversationReview(conversationId, message, history, SAFE_ERROR_MESSAGE, "error");
+      return send(response, 502, {success:false,message:SAFE_ERROR_MESSAGE,conversationId});
     }
 
     const reply = extractAssistantText(payload);
     if (!reply) {
-      await logLunaInsight(message, history, SAFE_ERROR_MESSAGE, "error");
-      return send(response, 502, {success:false,message:SAFE_ERROR_MESSAGE});
+      await logLunaConversationReview(conversationId, message, history, SAFE_ERROR_MESSAGE, "error");
+      return send(response, 502, {success:false,message:SAFE_ERROR_MESSAGE,conversationId});
     }
-    await logLunaInsight(message, history, reply, "model");
-    return send(response, 200, {success:true,reply});
+    await logLunaConversationReview(conversationId, message, history, reply, "model");
+    return send(response, 200, {success:true,reply,conversationId});
   } catch (error) {
     console.error("OpenAI chat route failed", error?.name || "Error");
-    await logLunaInsight(message, history, SAFE_ERROR_MESSAGE, "error");
-    return send(response, 500, {success:false,message:SAFE_ERROR_MESSAGE});
+    await logLunaConversationReview(conversationId, message, history, SAFE_ERROR_MESSAGE, "error");
+    return send(response, 500, {success:false,message:SAFE_ERROR_MESSAGE,conversationId});
   }
 };

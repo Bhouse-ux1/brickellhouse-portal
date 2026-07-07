@@ -40,7 +40,8 @@ let orderSearchQuery = "";
 let revenueChartYear = String(new Date().getFullYear());
 let lunaInsights = [];
 let lunaInsightsError = "";
-let lunaInsightFilters = {period:"week",language:"all",outcome:"all",search:""};
+let lunaInsightFilters = {period:"month",language:"all",outcome:"all",search:""};
+let selectedLunaConversationId = "";
 
 products.forEach(product => {
   product.internalName ||= `${product.name} - GL ${product.glCode}`;
@@ -526,6 +527,7 @@ $$("[data-close]").forEach(button => button.addEventListener("click", () => {
   if (button.dataset.close === "success") closeModal("#successModal");
   if (button.dataset.close === "product") closeModal("#productModal");
   if (button.dataset.close === "legal") closeModal("#legalModal");
+  if (button.dataset.close === "lunaReview") closeModal("#lunaReviewModal");
 }));
 
 function renderAdmin() {
@@ -772,6 +774,185 @@ function exportLunaInsightsCsv() {
   auditManagement("export", "luna_insights", "redacted_csv");
 }
 
+function filteredLunaInsights() {
+  const start = insightPeriodStart(lunaInsightFilters.period === "quarter" ? "quarter" : lunaInsightFilters.period);
+  const search = lunaInsightFilters.search.trim().toLowerCase();
+  return lunaInsights.filter(row => {
+    const date = insightDate(row);
+    if (start && (!date || date < start)) return false;
+    if (lunaInsightFilters.language !== "all" && row.detected_language !== lunaInsightFilters.language) return false;
+    if (lunaInsightFilters.outcome === "low" && Number(row.confidence || 0) >= 60) return false;
+    if (lunaInsightFilters.outcome === "unknown" && (row.detected_topic || "unknown") !== "unknown" && row.category !== "Unknown") return false;
+    if (!["all","low","unknown"].includes(lunaInsightFilters.outcome) && row.status !== lunaInsightFilters.outcome) return false;
+    if (search) {
+      const messages = Array.isArray(row.messages) ? row.messages.map(message => message.redacted_text || message.omitted_reason || "").join(" ") : "";
+      const haystack = [row.conversation_id,row.category,row.detected_topic,row.status,row.management_note,messages].join(" ").toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  });
+}
+
+function insightDate(row) {
+  const date = new Date(row.last_message_at || row.created_at);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function insightPeriodStart(period) {
+  const now = new Date();
+  if (period === "week") return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  if (period === "month") return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  if (period === "quarter") return new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  return null;
+}
+
+function conversationPreview(row) {
+  const messages = Array.isArray(row.messages) ? row.messages : [];
+  const resident = messages.find(message => message.role === "resident" && (message.redacted_text || message.omitted));
+  if (!resident) return "No reviewable message content.";
+  return resident.omitted ? "Message omitted because sensitive details were detected." : resident.redacted_text;
+}
+
+function statusClass(status) {
+  return String(status || "New").toLowerCase().replace(/\s+/g, "-");
+}
+
+function conversationById(id) {
+  return lunaInsights.find(row => row.conversation_id === id);
+}
+
+function renderLunaInsights() {
+  const container = $("#lunaInsightsContent");
+  if (!container) return;
+  if (lunaInsightsError) {
+    container.innerHTML = `<div class="inventory-ok">${escapeAdminHtml(lunaInsightsError)}</div>`;
+    return;
+  }
+  const rows = filteredLunaInsights();
+  const now = Date.now();
+  const activeRows = lunaInsights.filter(row => {
+    const date = insightDate(row);
+    return date && now - date.getTime() <= 90 * 24 * 60 * 60 * 1000;
+  });
+  const newCount = activeRows.filter(row => row.status === "New").length;
+  const reviewedCount = activeRows.filter(row => row.status === "Reviewed").length;
+  const resolvedCount = activeRows.filter(row => row.status === "Resolved").length;
+  const spanishCount = activeRows.filter(row => row.detected_language === "es").length;
+  const unknownCount = activeRows.filter(row => (row.detected_topic || "unknown") === "unknown" || row.category === "Unknown").length;
+  const lowConfidenceCount = activeRows.filter(row => Number(row.confidence || 0) < 60).length;
+  const categoryCounts = Object.entries(countBy(activeRows, "category"))
+    .sort((a,b) => b[1] - a[1])
+    .slice(0, 6);
+
+  container.innerHTML = `
+    <div class="metric-grid luna-insight-grid">
+      ${insightMetric("Conversations", activeRows.length, "last 90 days")}
+      ${insightMetric("New", newCount, "awaiting review")}
+      ${insightMetric("Reviewed", reviewedCount, "management touched")}
+      ${insightMetric("Resolved", resolvedCount, "closed items")}
+    </div>
+    <div class="luna-insight-panels">
+      <div class="admin-panel luna-insight-panel">
+        <div class="luna-insight-panel-head"><div><p class="eyebrow">Conversation review</p><h3>Redacted Luna conversations</h3></div><span>${spanishCount} Spanish · ${unknownCount} unknown · ${lowConfidenceCount} low confidence</span></div>
+        ${rows.length ? `<div class="luna-review-list">${rows.map(row => `
+          <button class="luna-review-card" type="button" data-luna-review="${escapeAdminHtml(row.conversation_id)}">
+            <div>
+              <strong>${escapeAdminHtml(conversationPreview(row))}</strong>
+              <small>${escapeAdminHtml(row.category || "Unknown")} · ${escapeAdminHtml(row.detected_language || "unknown")} · ${formatInsightDate(row.last_message_at || row.created_at)}</small>
+            </div>
+            <span class="status-pill ${statusClass(row.status)}">${escapeAdminHtml(row.status || "New")}</span>
+          </button>`).join("")}</div>` : `<div class="inventory-ok">No redacted conversations match this filter.</div>`}
+      </div>
+      <div class="admin-panel luna-insight-panel">
+        <div class="luna-insight-panel-head"><div><p class="eyebrow">90-day summary</p><h3>Top categories</h3></div></div>
+        ${categoryCounts.length ? `<div class="luna-category-list">${categoryCounts.map(([category,count]) => `
+          <div><span>${escapeAdminHtml(category)}</span><strong>${count}</strong></div>`).join("")}</div>` : `<div class="inventory-ok">No Luna conversations have been recorded in the review window.</div>`}
+      </div>
+    </div>
+    <div class="inventory-ok luna-review-guardrail">Management review only. These records are redacted, temporary, and cannot update Luna knowledge, prompts, model, or behavior.</div>`;
+  bindLunaReviewCards();
+}
+
+function bindLunaReviewCards() {
+  $$("[data-luna-review]").forEach(button => {
+    button.onclick = () => openLunaReview(button.dataset.lunaReview);
+  });
+}
+
+function openLunaReview(conversationId) {
+  const row = conversationById(conversationId);
+  const modal = $("#lunaReviewModal");
+  if (!row || !modal) return;
+  selectedLunaConversationId = conversationId;
+  $("#lunaReviewId").textContent = conversationId;
+  $("#lunaReviewMeta").textContent = `${row.category || "Unknown"} · ${row.detected_language || "unknown"} · ${Number(row.confidence || 0)}% confidence · ${formatInsightDate(row.last_message_at || row.created_at)}`;
+  $("#lunaReviewStatus").value = row.status || "New";
+  $("#lunaReviewNote").value = row.management_note || "";
+  const messages = Array.isArray(row.messages) ? row.messages : [];
+  $("#lunaReviewMessages").innerHTML = messages.length ? messages.map(message => `
+    <div class="luna-review-message ${escapeAdminHtml(message.role || "")}">
+      <span>${escapeAdminHtml(message.role === "luna" ? "Luna" : "Resident")}</span>
+      <p>${message.omitted ? "<em>Message omitted because sensitive details were detected.</em>" : escapeAdminHtml(message.redacted_text || "")}</p>
+    </div>`).join("") : `<div class="inventory-ok">No redacted messages are available for this conversation.</div>`;
+  modal.classList.add("open");
+}
+
+async function saveLunaConversationReview() {
+  const row = conversationById(selectedLunaConversationId);
+  if (!row || !managementAuthClient) return;
+  const status = $("#lunaReviewStatus").value;
+  const managementNote = $("#lunaReviewNote").value;
+  try {
+    const {data:{session}} = await managementAuthClient.auth.getSession();
+    if (!session?.access_token) throw new Error("Management login required.");
+    const response = await fetch("/api/luna-insights", {
+      method:"PATCH",
+      headers:{
+        "Content-Type":"application/json",
+        "Accept":"application/json",
+        "Authorization":`Bearer ${session.access_token}`
+      },
+      body:JSON.stringify({conversationId:selectedLunaConversationId,status,managementNote})
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.success) throw new Error(payload.message || "Unable to save conversation review.");
+    Object.assign(row, payload.conversation || {}, {
+      status,
+      management_note:managementNote
+    });
+    renderLunaInsights();
+    closeModal("#lunaReviewModal");
+    auditManagement("luna_conversation_review_update", "luna_conversation_review", selectedLunaConversationId, null, {status});
+    toast("Conversation review saved");
+  } catch (error) {
+    toast(error.message || "Unable to save conversation review.");
+  }
+}
+
+function exportLunaInsightsCsv() {
+  const rows = filteredLunaInsights();
+  const headers = ["conversation_id","created_at","last_message_at","category","detected_language","detected_topic","confidence","status","management_note","redacted_messages"];
+  const csv = [
+    headers.join(","),
+    ...rows.map(row => headers.map(header => {
+      if (header === "redacted_messages") {
+        const messages = Array.isArray(row.messages) ? row.messages : [];
+        return csvEscape(messages.map(message => `${message.role}: ${message.omitted ? "[omitted]" : message.redacted_text || ""}`).join(" | "));
+      }
+      return csvEscape(row[header] || "");
+    }).join(","))
+  ].join("\n");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `luna-conversation-review-${new Date().toISOString().slice(0,10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+  auditManagement("export", "luna_conversation_reviews", "redacted_csv");
+}
+
+if ($("#saveLunaReview")) $("#saveLunaReview").onclick = saveLunaConversationReview;
+
 function matchingOrders() {
   const query = orderSearchQuery.trim().toLowerCase();
   if (!query) return orders;
@@ -878,7 +1059,7 @@ function showAdminView(view) {
   auditManagement("report_access", "management_view", view);
   $$(".admin-view").forEach(element => element.classList.add("hidden"));
   $(`#admin${view[0].toUpperCase() + view.slice(1)}`).classList.remove("hidden");
-  $("#adminTitle").textContent = view === "insights" ? "Luna Insights" : view[0].toUpperCase() + view.slice(1);
+  $("#adminTitle").textContent = view === "insights" ? "Luna Review" : view[0].toUpperCase() + view.slice(1);
   $$("[data-admin-view]").forEach(button => button.classList.toggle("active", button.dataset.adminView === view));
 }
 
@@ -1042,12 +1223,12 @@ async function loadLunaInsights() {
       }
     });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok || !payload.success) throw new Error(payload.message || "Luna insights are unavailable.");
-    lunaInsights = Array.isArray(payload.insights) ? payload.insights : [];
+    if (!response.ok || !payload.success) throw new Error(payload.message || "Luna conversation review is unavailable.");
+    lunaInsights = Array.isArray(payload.conversations) ? payload.conversations : [];
     lunaInsightsError = "";
   } catch (error) {
     lunaInsights = [];
-    lunaInsightsError = error.message || "Luna insights are unavailable.";
+    lunaInsightsError = error.message || "Luna conversation review is unavailable.";
   }
 }
 

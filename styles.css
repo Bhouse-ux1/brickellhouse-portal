@@ -365,6 +365,25 @@ body.management-page{background:#eef0ec}
 .management-page .luna-insight-table-panel{border:1px solid #e1e5de;border-radius:26px;background:rgba(255,255,255,.92)}
 .management-page .luna-insight-table-panel>p{margin-top:-4px;color:#707873;line-height:1.65}
 .management-page .luna-insight-table-panel table{min-width:900px}
+.management-page .luna-review-list{display:grid;gap:12px}
+.management-page .luna-review-card{width:100%;display:flex;justify-content:space-between;gap:18px;align-items:flex-start;text-align:left;border:1px solid #e4e8e1;border-radius:20px;background:linear-gradient(145deg,#fff,#f8f9f6);padding:16px 18px;box-shadow:0 14px 36px rgba(31,38,35,.055);cursor:pointer;transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}
+.management-page .luna-review-card:hover{transform:translateY(-2px);border-color:#bdcbbd;box-shadow:0 18px 44px rgba(31,38,35,.09)}
+.management-page .luna-review-card strong{display:block;font-family:var(--serif);font-size:17px;font-weight:500;color:#252b29;line-height:1.45}
+.management-page .luna-review-card small{display:block;margin-top:7px;color:#717a74;font-size:10px;line-height:1.5;text-transform:uppercase;letter-spacing:.08em}
+.management-page .status-pill.reviewed{background:#eef4ef;color:#4c6d51}
+.management-page .status-pill.resolved{background:#e8f5f1;color:#27624e}
+.management-page .status-pill.ignored{background:#f3f1eb;color:#777065}
+.management-page .luna-review-guardrail{font-size:12px;color:#69726c}
+.management-page .luna-review-modal-card{max-width:760px}
+.management-page .luna-review-id{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;color:#778079;word-break:break-all;margin:4px 0 0}
+.management-page .luna-review-meta{margin:8px 0 18px;color:#6f7872;font-size:12px;line-height:1.5}
+.management-page .luna-review-thread{display:grid;gap:12px;max-height:360px;overflow:auto;border:1px solid #e4e8e1;border-radius:20px;background:#fbfcfa;padding:14px;margin:18px 0}
+.management-page .luna-review-message{display:grid;gap:5px}
+.management-page .luna-review-message span{font-size:10px;text-transform:uppercase;letter-spacing:.11em;color:#7a827d}
+.management-page .luna-review-message p{margin:0;border-radius:16px;padding:12px 14px;line-height:1.55;color:#303735;background:#fff;border:1px solid #e7ebe4}
+.management-page .luna-review-message.luna p{background:#f4f7f1}
+.management-page .luna-review-fields{grid-template-columns:minmax(150px,.35fr) 1fr;margin-bottom:16px}
+.management-page .luna-review-fields textarea{min-height:96px}
 .auth-page .auth-card{animation:adminSectionIn .36s ease both}
 .auth-page .primary-button,.auth-page .outline-button{transition:transform .18s ease,box-shadow .18s ease,background .18s ease}
 .auth-page .primary-button:hover,.auth-page .outline-button:hover{transform:translateY(-1px);box-shadow:0 14px 32px rgba(31,38,35,.12)}

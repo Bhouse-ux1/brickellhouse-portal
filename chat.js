@@ -13,10 +13,12 @@ function initResidentChat() {
   const teaser = chatWidget.querySelector("#chatTeaser");
   const errorMessage = "Sorry, I could not respond right now. Please try again.";
   const promptStorageKey = "bh_ai_prompt_seen";
+  const conversationStorageKey = "bh_luna_conversation_id";
   const promptDelay = 4200;
   const promptVisibleDuration = 7600;
   const conversation = [];
   const maxConversationMessages = 20;
+  let conversationId = sessionStorage.getItem(conversationStorageKey) || "";
   let promptHideTimer;
 
   if (!launcher || !panel || !closeButton || !form || !input || !messages || !sendButton) return;
@@ -101,10 +103,14 @@ function initResidentChat() {
       const response = await fetch("/api/chat", {
         method:"POST",
         headers:{"Content-Type":"application/json","Accept":"application/json"},
-        body:JSON.stringify({message,history})
+        body:JSON.stringify({message,history,conversationId})
       });
       const payload = await response.json();
       if (!response.ok || !payload.success) throw new Error(payload.message || errorMessage);
+      if (payload.conversationId) {
+        conversationId = payload.conversationId;
+        sessionStorage.setItem(conversationStorageKey, conversationId);
+      }
       loading.classList.remove("loading");
       loading.innerHTML = linkifyText(payload.reply);
       remember("assistant", payload.reply);
