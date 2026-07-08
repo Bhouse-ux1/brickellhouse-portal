@@ -432,7 +432,7 @@ function syncStripeCheckoutDisplay() {
 
   container.classList.remove("hidden");
   if (!embedded.querySelector("[data-stripe-placeholder]")) {
-    embedded.innerHTML = `<div class="stripe-payment-placeholder" data-stripe-placeholder><strong>Stripe checkout ready</strong><span>Complete resident details and legal acceptance to open the secure payment form.</span></div>`;
+    embedded.innerHTML = `<div class="stripe-payment-notice" data-stripe-placeholder>Please complete all required details and accept the legal notice to continue to secure payment.</div>`;
   }
   setCheckoutSubmitLabel("Continue to secure payment");
 }
