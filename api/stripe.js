@@ -7,6 +7,7 @@ const {
   fulfillPaidStripeSession,
   readRawBody,
   retrieveCheckoutSession,
+  stripeKeyConfig,
   verifyStripeSignature
 } = require("./_stripe-checkout");
 
@@ -26,19 +27,15 @@ function send(response, status, payload) {
 
 function safeStripeConfig() {
   const provider = normalizedCheckoutProvider();
-  const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY || "";
-  const testMode = publishableKey.startsWith("pk_test_");
-  const enabled = provider === "stripe" && testMode;
-  const mode = publishableKey.startsWith("pk_live_")
-    ? "live"
-    : publishableKey.startsWith("pk_test_") ? "test" : "";
+  const keyConfig = stripeKeyConfig();
+  const enabled = provider === "stripe" && keyConfig.enabled;
 
   return {
     enabled,
     provider,
-    publishableKey:enabled ? publishableKey : "",
-    mode:enabled ? mode : "",
-    message:enabled || provider !== "stripe" ? "" : "Stripe test checkout is not available."
+    publishableKey:enabled ? keyConfig.publishableKey : "",
+    mode:enabled ? keyConfig.mode : "",
+    message:enabled || provider !== "stripe" ? "" : "Stripe checkout is not available."
   };
 }
 

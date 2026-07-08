@@ -17,14 +17,37 @@ function validEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
+function liveStripeModeAllowed() {
+  const mode = String(process.env.STRIPE_MODE || "").trim().toLowerCase();
+  const allowLive = String(process.env.STRIPE_ALLOW_LIVE || "").trim().toLowerCase();
+  return mode === "live" || allowLive === "true";
+}
+
+function stripeKeyMode(key, testPrefix, livePrefix) {
+  if (String(key || "").startsWith(testPrefix)) return "test";
+  if (String(key || "").startsWith(livePrefix)) return "live";
+  return "";
+}
+
+function stripeKeyConfig() {
+  const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY || "";
+  const secretKey = process.env.STRIPE_SECRET_KEY || "";
+  const publishableMode = stripeKeyMode(publishableKey, "pk_test_", "pk_live_");
+  const secretMode = stripeKeyMode(secretKey, "sk_test_", "sk_live_");
+  const matchingMode = publishableMode && secretMode && publishableMode === secretMode ? publishableMode : "";
+  const liveAllowed = liveStripeModeAllowed();
+  const enabled = matchingMode === "test" || (matchingMode === "live" && liveAllowed);
+  return {enabled, mode:enabled ? matchingMode : "", publishableKey, publishableMode, secretMode, liveAllowed};
+}
+
 function stripeSecretKey() {
-  const key = process.env.STRIPE_SECRET_KEY || "";
-  if (!key || !key.startsWith("sk_test_")) {
-    const error = new Error("Stripe test mode is not configured");
+  const config = stripeKeyConfig();
+  if (!config.enabled) {
+    const error = new Error("Stripe checkout is not configured for the selected key mode");
     error.status = 503;
     throw error;
   }
-  return key;
+  return process.env.STRIPE_SECRET_KEY || "";
 }
 
 async function stripeRequest(path, {method = "GET", body} = {}) {
@@ -513,5 +536,6 @@ module.exports = {
   fulfillPaidStripeSession,
   readRawBody,
   retrieveCheckoutSession,
+  stripeKeyConfig,
   verifyStripeSignature
 };
