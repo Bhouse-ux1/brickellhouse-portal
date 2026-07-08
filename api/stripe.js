@@ -10,6 +10,7 @@ const {
   stripeKeyConfig,
   verifyStripeSignature
 } = require("./_stripe-checkout");
+const {enforceRateLimit} = require("./_rate-limit");
 
 module.exports.config = {
   api:{bodyParser:false}
@@ -62,6 +63,7 @@ async function jsonBody(request) {
 async function createSession(request, response) {
   if (!stripeEnabled()) return send(response, 403, {success:false,message:"Stripe checkout is not enabled"});
   try {
+    enforceRateLimit(request, {namespace:"stripe-session", limit:5, windowMs:10 * 60 * 1000});
     await assertStripeStorageReady();
     const checkout = await buildTrustedCheckout(await jsonBody(request));
     const pendingOrder = await createPendingStripeOrder(checkout);

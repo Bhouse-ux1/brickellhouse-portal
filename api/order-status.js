@@ -1,4 +1,5 @@
 const {supabaseRequest} = require("./_supabase");
+const {enforceRateLimit} = require("./_rate-limit");
 
 function send(response, status, payload) {
   response.setHeader("Cache-Control", "no-store");
@@ -9,6 +10,12 @@ module.exports = async function handler(request, response) {
   if (request.method !== "GET") {
     response.setHeader("Allow", "GET");
     return send(response, 405, {success:false,message:"Method not allowed"});
+  }
+
+  try {
+    enforceRateLimit(request, {namespace:"order-status", limit:30, windowMs:10 * 60 * 1000});
+  } catch (error) {
+    return send(response, error.status || 429, {success:false,message:"Too many requests. Please try again later."});
   }
 
   const number = String(request.query?.number || "").trim().toUpperCase();

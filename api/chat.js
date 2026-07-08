@@ -2,6 +2,7 @@ const OPENAI_MODEL = "gpt-5.4-mini";
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const crypto = require("crypto");
 const {supabaseRequest} = require("./_supabase");
+const {enforceRateLimit} = require("./_rate-limit");
 const MAX_MESSAGE_LENGTH = 1500;
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_HISTORY_MESSAGE_LENGTH = 900;
@@ -1242,6 +1243,12 @@ module.exports = async function handler(request, response) {
   if (request.method !== "POST") {
     response.setHeader("Allow", "POST");
     return send(response, 405, {success:false,message:"Method not allowed"});
+  }
+
+  try {
+    enforceRateLimit(request, {namespace:"luna-chat", limit:30, windowMs:10 * 60 * 1000});
+  } catch (error) {
+    return send(response, error.status || 429, {success:false,message:"Too many requests. Please try again later."});
   }
 
   const message = String(request.body?.message || "").trim();
