@@ -8,7 +8,6 @@ let stripeConfig = {enabled:false, provider:"square", publishableKey:""};
 let stripeClient = null;
 let stripeEmbeddedCheckout = null;
 let paymentInProgress = false;
-const FRIENDLY_PAYMENT_ERROR = "Sorry, your payment did not go through. Please check your card information, expiration date, and CVV, then try again.";
 const PAYMENT_CANCELLED_MESSAGE = "Payment was not completed. Please try again when you are ready.";
 const UNIT_VALIDATION_MESSAGE = "Please check unit number and try again.";
 
@@ -401,6 +400,14 @@ function resetStripeCheckout() {
   $("#stripeCheckoutContainer")?.classList.add("hidden");
 }
 
+function clearPaymentMessage() {
+  const element = $("#paymentMessage");
+  if (!element) return;
+  element.textContent = "";
+  element.classList.add("hidden");
+  element.classList.remove("error");
+}
+
 function paidCheckoutRequired() {
   const subtotal = cartSubtotal();
   return cart.length > 0 && subtotal + processingFee(subtotal) > 0;
@@ -593,6 +600,7 @@ async function handleStripeReturnConfirmation() {
 
 if ($("#checkoutOpen")) $("#checkoutOpen").addEventListener("click", () => {
   hideApplePay();
+  clearPaymentMessage();
   syncStripeCheckoutDisplay();
 });
 
@@ -679,8 +687,7 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
   submit.disabled = true;
   paymentInProgress = true;
   submit.textContent = checkoutProvider === "stripe" ? "Preparing secure payment..." : "Recording demo order...";
-  message.classList.add("hidden");
-  message.classList.remove("error");
+  clearPaymentMessage();
 
   const number = generateOrderNumber();
   const subtotal = cartSubtotal();
@@ -696,7 +703,7 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
     return;
   }
   if (requiresPayment && checkoutProvider === "stripe" && (!stripeConfig.enabled || !stripeClient)) {
-    message.textContent = "Stripe test checkout is currently unavailable. Please contact management.";
+    message.textContent = "Secure online checkout is currently unavailable. Please contact management.";
     message.classList.remove("hidden");
     message.classList.add("error");
     submit.disabled = false;
@@ -744,9 +751,9 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
         : "Payment was confirmed. Management can now process your request."
     });
   } catch (error) {
-    console.error(requiresPayment ? "Card payment failed" : "Order submission failed", error);
+    console.error(requiresPayment ? "Secure payment setup failed" : "Order submission failed", error);
     message.textContent = requiresPayment
-      ? FRIENDLY_PAYMENT_ERROR
+      ? (error.message || "Secure payment could not be started. Please try again or contact Management.")
       : "Sorry, your order could not be submitted. Please try again.";
     message.classList.remove("hidden");
     message.classList.add("error");
