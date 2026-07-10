@@ -152,7 +152,16 @@ async function loadPublicProductCatalog() {
     const response = await fetch("/api/products", {headers:{"Accept":"application/json"}});
     const payload = await response.json();
     if (!response.ok || !payload.success || !Array.isArray(payload.products)) return;
-    products = payload.products.map(publicProduct);
+    const existingById = new Map(products.map(product => [product.id, product]));
+    const fallbackById = new Map(seedProducts.map(product => [product.id, product]));
+    products = payload.products.map(product => {
+      const existing = existingById.get(product.id) || {};
+      const fallback = fallbackById.get(product.id) || {};
+      return publicProduct({
+        ...product,
+        image:product.image || existing.image || fallback.image || ""
+      });
+    });
     reconcileCartWithCatalog();
     persist();
     renderTabs();
