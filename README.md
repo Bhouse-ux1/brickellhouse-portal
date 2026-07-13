@@ -1,81 +1,66 @@
-# BrickellHouse Resident Portal
+# BrickellHouse Portal
 
-A mobile-friendly resident storefront and management prototype for BrickellHouse Condominium.
+Production resident-services portal for BrickellHouse Condominium, built with static HTML/CSS/vanilla JavaScript, Vercel serverless functions, Supabase, Stripe, Resend, OpenAI, and Cloudflare.
 
-## Project Folder
+Production site: `https://portal.brickellhouse.org/`
 
-This entire folder is the GitHub/Vercel project root:
-
-```text
-C:\Users\Admin\Documents\Codex\2026-06-12\can-you-build-a-website-or\outputs\brickellhouse-portal
-```
-
-Upload the **contents of this folder as one GitHub repository**. Do not upload only `index.html` or only the `api` folder.
-
-## Included
-
-- Static resident storefront and management portal
-- Vercel serverless functions in `api/`
-- Square Web Payments SDK integration locked to Sandbox
-- Server-side payment amount calculation and verification
-- Legal acceptance, hidden GL mappings, feedback, and order tracking
-- Payment success and failure pages
-- Setup and deployment documentation
-
-## Required Software
-
-Install these before local Square Sandbox testing:
-
-1. [Git](https://git-scm.com/downloads)
-2. [Node.js LTS](https://nodejs.org/)
-3. A free [GitHub](https://github.com/) account
-4. A [Vercel](https://vercel.com/) account connected to GitHub
-
-## Basic Local Preview
-
-This command previews the static site only:
-
-```powershell
-python -m http.server 4173 --bind 127.0.0.1
-```
-
-Open:
+Project root:
 
 ```text
-http://127.0.0.1:4173/
+C:\Users\Admin\Documents\brickellhouse-portal
 ```
 
-The Python server cannot run `api/`, so paid checkout is unavailable in this mode.
+Read `SESSION_RESUME.md` completely before development. It is the authoritative technical handoff and protected-systems guide.
 
-## Local Square Sandbox Test
+## Current Systems
 
-1. Create `.env.local` in this project folder.
-2. Add your private Sandbox values using the variable names in `.env.example`.
-3. From this project folder, run:
+- Resident Portal and Supabase-backed Resident Store.
+- Dedicated checkout page at `checkout.html`.
+- Live Stripe Embedded Checkout with cards, Apple Pay, and eligible Google Pay.
+- Trusted server-side product validation, pricing, legal evidence, and payment fulfillment.
+- Supabase orders, order items, payment events, products, settings, feedback, audit data, Auth/RLS, and Luna Review.
+- Management Portal for products, orders, revenue, feedback, settings, exports, and Luna Review.
+- Resend resident and Management order emails.
+- Luna assistant with server-side knowledge, deterministic routing, Spanish, typo normalization, privacy controls, and OpenAI fallback.
+
+Square is retired from the active application. `SQUARE_SETUP.md` is an archive notice only; historical Square database/reporting compatibility is intentionally retained.
+
+## Frontend Separation
+
+- `index.html` loads resident-only `app.js`, `roadmap.js`, `chat.js`, `public-nav.js`, and `legal.js`.
+- `checkout.html` loads only resident-safe checkout dependencies: `legal.js`, `app.js`, and `roadmap.js`.
+- `management/dashboard.html` loads `management/dashboard.js`; Management accounting, exports, Supabase access, and Luna Review logic are not in resident bundles.
+
+Resident-loaded code and `/api/products` must not expose GL codes, internal names, Management logic, service-role data, or secrets.
+
+## Local Development
+
+Install Node.js LTS, then:
 
 ```powershell
+npm install
 npx vercel dev --listen 4173
 ```
 
-4. Complete Vercel’s first-time login/link prompts.
-5. Open `http://localhost:4173/`.
+Open `http://localhost:4173/`.
 
-Never commit `.env.local`. It is protected by `.gitignore`.
+A static file server can preview layout, but it cannot run `api/`, Stripe, Luna, product synchronization, order tracking, feedback persistence, or Management Auth.
 
-See [SQUARE_SETUP.md](SQUARE_SETUP.md) for the card and verification procedure.
+Never commit `.env.local`. Use `.env.example` for variable names only.
 
-## Important Files
+## Documentation
 
-- `.env.example` - required environment-variable names
-- `.gitignore` - excludes credentials and local Vercel state
-- `api/` - secure Square Sandbox backend routes
-- `SQUARE_SETUP.md` - Sandbox testing instructions
-- `DEPLOYMENT.md` - GitHub and Vercel setup
-- `SUPABASE_MIGRATION.md` - future persistent database design
-- `SUPABASE_AUTH_SETUP.md` - management login, approved users, and RLS setup
+- `SESSION_RESUME.md`: authoritative architecture, current state, safety rules, and continuation instructions.
+- `DEPLOYMENT.md`: controlled Vercel/Supabase/Stripe deployment process.
+- `PROJECT_HANDOFF.md`: shorter project handoff.
+- `.env.example`: placeholder-only environment-variable names confirmed from source.
+- `SQUARE_SETUP.md`: retired Square notice and historical compatibility rules.
 
-## Current Limitation
+## Protected Production Rules
 
-Resident orders, order items, payment events, and feedback are now saved through secure Vercel API routes into Supabase. The management dashboard reads approved management data from Supabase after login. The browser still uses `localStorage` only for temporary cart/catalog UI state.
-
-Live Square payments are disabled in code and must not be activated.
+- Do not change trusted pricing or paid verification casually.
+- Do not weaken Supabase RLS or Management approval checks.
+- Do not expose GL/internal accounting data publicly.
+- Do not merge resident and Management bundles.
+- Do not switch production to test keys.
+- Do not run migrations or deploy without explicit approval.
