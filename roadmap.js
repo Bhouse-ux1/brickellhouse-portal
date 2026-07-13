@@ -6,6 +6,11 @@ let stripeCheckoutScrolledFor = null;
 let paymentInProgress = false;
 const isCheckoutPage = document.body.classList.contains("checkout-page");
 let checkoutPageCatalogReady = !isCheckoutPage || Boolean(window.BH_CATALOG_STATE?.success);
+let legalAcceptedAt = "";
+let acceptedLegalNoticeVersion = "";
+let legalScrollGateReached = false;
+let legalReviewReturnFocus = null;
+const LEGAL_SCROLL_TOLERANCE = 12;
 const UNIT_VALIDATION_MESSAGE = "Please check unit number and try again.";
 
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, character => ({
@@ -187,6 +192,119 @@ function setCheckoutSubmitLabel(label) {
   if (submit) submit.innerHTML = `${label} <span>&rarr;</span>`;
 }
 
+function legalTermsAccepted() {
+  return Boolean(
+    $("#legalAcceptance")?.checked
+    && legalAcceptedAt
+    && acceptedLegalNoticeVersion === LEGAL_NOTICE_VERSION
+  );
+}
+
+function syncLegalReviewState() {
+  if (!isCheckoutPage) return;
+  const accepted = legalTermsAccepted();
+  $("#checkoutLegalReview")?.classList.toggle("accepted", accepted);
+  if ($("#legalStatusMark")) $("#legalStatusMark").textContent = accepted ? "\u2713" : "!";
+  if ($("#legalStatusTitle")) $("#legalStatusTitle").textContent = accepted ? "Legal Terms Accepted" : "Legal review required";
+  if ($("#legalStatusMessage")) {
+    $("#legalStatusMessage").textContent = accepted
+      ? "The complete terms have been reviewed and accepted for this checkout."
+      : "Please review the complete terms and accept them before continuing to secure payment.";
+  }
+  if ($("#legalNoticeOpen")) $("#legalNoticeOpen").textContent = accepted ? "View Legal Terms" : "Review Legal Terms";
+}
+
+function resetLegalAcceptance() {
+  legalAcceptedAt = "";
+  acceptedLegalNoticeVersion = "";
+  legalScrollGateReached = false;
+  if ($("#legalAcceptance")) $("#legalAcceptance").checked = false;
+  syncLegalReviewState();
+}
+
+function legalScrollIsAtBottom() {
+  const container = $("#legalScrollContainer");
+  if (!container) return false;
+  return container.scrollHeight - container.scrollTop - container.clientHeight <= LEGAL_SCROLL_TOLERANCE;
+}
+
+function updateLegalScrollGate() {
+  if (legalTermsAccepted()) return;
+  if (legalScrollIsAtBottom()) legalScrollGateReached = true;
+  const accept = $("#legalReviewAccept");
+  if (accept) accept.disabled = !legalScrollGateReached;
+}
+
+function closeLegalReview() {
+  const modal = $("#legalModal");
+  modal?.classList.remove("open");
+  document.body.classList.remove("legal-review-open");
+  legalScrollGateReached = false;
+  const container = $("#legalScrollContainer");
+  if (container) container.scrollTop = 0;
+  const accept = $("#legalReviewAccept");
+  if (accept) {
+    accept.disabled = true;
+    accept.textContent = legalTermsAccepted() ? "Legal Terms Accepted" : "Accept Legal Terms";
+  }
+  const returnFocus = legalReviewReturnFocus;
+  legalReviewReturnFocus = null;
+  returnFocus?.focus?.();
+}
+
+function openLegalReview() {
+  const modal = $("#legalModal");
+  const container = $("#legalScrollContainer");
+  const accept = $("#legalReviewAccept");
+  if (!modal || !container || !accept) return;
+
+  if (acceptedLegalNoticeVersion && acceptedLegalNoticeVersion !== LEGAL_NOTICE_VERSION) resetLegalAcceptance();
+  const accepted = legalTermsAccepted();
+  legalReviewReturnFocus = document.activeElement;
+  legalScrollGateReached = false;
+  container.scrollTop = 0;
+  accept.disabled = true;
+  accept.textContent = accepted ? "Legal Terms Accepted" : "Accept Legal Terms";
+  if ($("#legalReviewInstruction")) {
+    $("#legalReviewInstruction").textContent = accepted
+      ? "These complete terms have been accepted for this checkout."
+      : "Please review the complete terms. Acceptance will become available once you reach the end.";
+  }
+  modal.classList.add("open");
+  document.body.classList.add("legal-review-open");
+  requestAnimationFrame(() => {
+    container.scrollTop = 0;
+    container.focus();
+  });
+}
+
+function acceptLegalTerms() {
+  if (legalTermsAccepted() || !legalScrollGateReached) return;
+  legalAcceptedAt = new Date().toISOString();
+  acceptedLegalNoticeVersion = LEGAL_NOTICE_VERSION;
+  if ($("#legalAcceptance")) $("#legalAcceptance").checked = true;
+  syncLegalReviewState();
+  closeLegalReview();
+  syncCheckoutSubmitState();
+  syncStripeCheckoutDisplay();
+}
+
+function trapLegalReviewFocus(event) {
+  const modal = $("#legalModal");
+  if (!modal?.classList.contains("open") || event.key !== "Tab") return;
+  const focusable = Array.from(modal.querySelectorAll('button:not(:disabled), [tabindex="0"]'));
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
 function syncCheckoutPageState() {
   if (!isCheckoutPage) return;
   const loading = $("#checkoutLoading");
@@ -209,7 +327,7 @@ function syncCheckoutSubmitState() {
   const submit = $("#checkoutSubmit");
   if (!submit) return;
   const detailsComplete = checkoutDetailsComplete();
-  const accepted = Boolean($("#legalAcceptance")?.checked);
+  const accepted = legalTermsAccepted();
   submit.disabled = paymentInProgress || Boolean(stripeEmbeddedCheckout) || !detailsComplete || !accepted || !cart.length || !checkoutPageCatalogReady;
 }
 
@@ -249,7 +367,7 @@ function syncStripeCheckoutDisplay() {
   }
 
   container.classList.remove("hidden");
-  const readyToContinue = checkoutDetailsComplete() && Boolean($("#legalAcceptance")?.checked);
+  const readyToContinue = checkoutDetailsComplete() && legalTermsAccepted();
   embedded.innerHTML = `<div class="stripe-payment-notice" data-stripe-placeholder>${readyToContinue
     ? "Your details are complete. Select Continue to open secure payment."
     : "Please complete all required details and accept the legal notice to continue to secure payment."}</div>`;
@@ -465,7 +583,7 @@ function checkoutValidationMessage(form, resident) {
   if (!normalizeUnitNumber(resident.unit)) return UNIT_VALIDATION_MESSAGE;
   if (!form.elements.email.validity.valid) return "Please enter a valid email address.";
   if (!normalizeUsPhone(resident.phone)) return "Please enter a valid U.S. phone number, for example (305) 555-0000.";
-  if (!$("#legalAcceptance").checked) return "Please accept the legal notice before submitting.";
+  if (!legalTermsAccepted()) return "Please review and accept the legal notice before submitting.";
   return "";
 }
 
@@ -487,6 +605,7 @@ if ($("#checkoutForm")) {
   };
   $("#checkoutForm").addEventListener("input", syncCheckoutFormState);
   $("#checkoutForm").addEventListener("change", syncCheckoutFormState);
+  $("#checkoutForm").addEventListener("reset", resetLegalAcceptance);
   $("#checkoutForm").onsubmit = async event => {
   event.preventDefault();
   if (paymentInProgress || stripeEmbeddedCheckout) return;
@@ -534,7 +653,7 @@ if ($("#checkoutForm")) {
     syncStripeCheckoutDisplay();
     return;
   }
-  const acceptedAt = new Date().toISOString();
+  const acceptedAt = legalAcceptedAt;
   const records = createOrderRecords();
 
   try {
@@ -586,6 +705,26 @@ if ($("#checkoutForm")) {
   }
   };
 }
+
+if ($("#legalNoticeOpen")) $("#legalNoticeOpen").onclick = openLegalReview;
+if ($("#legalReviewClose")) $("#legalReviewClose").addEventListener("click", closeLegalReview);
+if ($("#legalReviewCancel")) $("#legalReviewCancel").addEventListener("click", closeLegalReview);
+if ($("#legalReviewAccept")) $("#legalReviewAccept").addEventListener("click", acceptLegalTerms);
+if ($("#legalScrollContainer")) $("#legalScrollContainer").addEventListener("scroll", updateLegalScrollGate, {passive:true});
+if ($("#legalModal")) $("#legalModal").addEventListener("click", event => {
+  if (event.target === event.currentTarget) closeLegalReview();
+});
+document.addEventListener("keydown", event => {
+  if (!$("#legalModal")?.classList.contains("open")) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeLegalReview();
+    return;
+  }
+  trapLegalReviewFocus(event);
+});
+
+syncLegalReviewState();
 
 function applyCheckoutCatalogState(success) {
   if (!isCheckoutPage) return;

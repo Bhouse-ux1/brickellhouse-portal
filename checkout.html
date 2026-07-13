@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260710-checkout-page1">
+  <link rel="stylesheet" href="styles.css?v=20260713-legal-review1">
 </head>
 <body class="checkout-page">
   <header class="checkout-header">
@@ -87,12 +87,16 @@
             <strong id="checkoutAmountDue">$0.00</strong>
           </div>
 
-          <div class="legal-acceptance" data-checkout-prepayment>
-            <label class="check-label">
-              <input id="legalAcceptance" name="legalAcceptance" type="checkbox" required>
-              <span>I acknowledge that I have read and agree to the <button class="inline-legal-button" id="legalNoticeOpen" type="button">Legal Notice and Limitation of Liability</button>.</span>
-            </label>
-            <small>Your acceptance date, time, order number, and document version will be saved with this order.</small>
+          <div class="legal-acceptance legal-review-state" id="checkoutLegalReview" data-checkout-prepayment>
+            <input class="legal-state-input" id="legalAcceptance" name="legalAcceptance" type="checkbox" required tabindex="-1" aria-hidden="true">
+            <div class="legal-review-status" id="legalReviewStatus" aria-live="polite">
+              <span class="legal-status-mark" id="legalStatusMark" aria-hidden="true">!</span>
+              <div>
+                <strong id="legalStatusTitle">Legal review required</strong>
+                <p id="legalStatusMessage">Please review the complete terms and accept them before continuing to secure payment.</p>
+              </div>
+            </div>
+            <button class="outline-button legal-review-trigger" id="legalNoticeOpen" type="button" aria-haspopup="dialog" aria-controls="legalModal">Review Legal Terms</button>
           </div>
 
           <div class="payment-message hidden" id="paymentMessage" aria-live="polite"></div>
@@ -117,20 +121,27 @@
     <a class="primary-button" href="./#shop">Return to Resident Store</a>
   </section>
 
-  <div class="modal checkout-legal-modal" id="legalModal" role="dialog" aria-modal="true" aria-labelledby="legalTitle">
-    <div class="modal-card legal-card">
-      <button class="icon-button modal-close" data-close="legal" type="button" aria-label="Close legal notice">&times;</button>
+  <div class="modal checkout-legal-modal" id="legalModal" role="dialog" aria-modal="true" aria-labelledby="legalTitle" aria-describedby="legalReviewInstruction">
+    <div class="modal-card legal-card legal-review-card">
+      <button class="icon-button modal-close" id="legalReviewClose" type="button" aria-label="Close legal notice">&times;</button>
       <p class="eyebrow">Resident legal notice</p>
       <h2 id="legalTitle">Legal Notice and Limitation of Liability</h2>
       <p class="legal-version" id="legalVersion"></p>
-      <div class="legal-document" id="legalDocument"></div>
-      <button class="primary-button" data-close="legal" type="button">Return to checkout</button>
+      <p class="legal-review-instruction" id="legalReviewInstruction">Please review the complete terms. Acceptance will become available once you reach the end.</p>
+      <div class="legal-review-scroll" id="legalScrollContainer" tabindex="0" aria-label="Complete legal terms">
+        <div class="legal-document" id="legalDocument"></div>
+        <p class="legal-review-end" aria-hidden="true">End of legal terms</p>
+      </div>
+      <div class="legal-review-actions">
+        <button class="outline-button" id="legalReviewCancel" type="button">Cancel</button>
+        <button class="primary-button" id="legalReviewAccept" type="button" disabled>Accept Legal Terms</button>
+      </div>
     </div>
   </div>
 
   <div class="toast" id="toast"></div>
   <script src="legal.js?v=20260615-legal1"></script>
   <script src="app.js?v=20260710-checkout-page1"></script>
-  <script src="roadmap.js?v=20260713-payment-focus1"></script>
+  <script src="roadmap.js?v=20260713-legal-review1"></script>
 </body>
 </html>
