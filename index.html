@@ -137,48 +137,6 @@
     </div>
   </aside>
 
-  <div class="modal" id="checkoutModal" role="dialog" aria-modal="true" aria-labelledby="checkoutTitle">
-    <div class="modal-card checkout-card">
-      <button class="icon-button modal-close" data-close="checkout">×</button>
-      <div class="checkout-intro">
-        <p class="eyebrow">Secure resident checkout</p>
-        <h2 id="checkoutTitle">Complete your request</h2>
-        <p>Verify your residence details. Management will contact you once your order is ready.</p>
-      </div>
-      <form id="checkoutForm">
-        <div class="field-grid">
-          <label><span>Resident name</span><input name="name" required autocomplete="name" placeholder="Full name"></label>
-          <label><span>Unit number</span><input name="unit" required placeholder="e.g. 2504"></label>
-          <label><span>Email</span><input name="email" type="email" required autocomplete="email" placeholder="you@example.com"></label>
-          <label><span>Phone</span><input name="phone" type="tel" required autocomplete="tel" placeholder="(305) 555-0000"></label>
-        </div>
-        <div class="apple-pay-option hidden" id="applePayOption">
-          <button class="apple-pay-button" id="applePayButton" type="button" aria-label="Pay with Apple Pay"></button>
-          <div class="payment-separator"><span>or pay with card</span></div>
-        </div>
-        <div class="stripe-checkout-container hidden" id="stripeCheckoutContainer">
-          <label><span>Secure Stripe checkout</span></label>
-          <div id="stripeEmbeddedCheckout"></div>
-        </div>
-        <div class="payment-message hidden" id="paymentMessage" aria-live="polite"></div>
-        <div class="checkout-breakdown">
-          <div><span>Subtotal</span><strong id="checkoutSubtotal">$0.00</strong></div>
-          <div><span id="checkoutFeeLabel">Processing fee</span><strong id="checkoutFee">$0.00</strong></div>
-          <div class="checkout-total"><span>Order total</span><strong id="checkoutTotal">$0.00</strong></div>
-        </div>
-        <div class="legal-acceptance">
-          <label class="check-label">
-            <input id="legalAcceptance" name="legalAcceptance" type="checkbox" required>
-            <span>I acknowledge that I have read and agree to the <button class="inline-legal-button" id="legalNoticeOpen" type="button">Legal Notice and Limitation of Liability</button>.</span>
-          </label>
-          <small>Your acceptance date, time, order number, and document version will be saved with this order.</small>
-        </div>
-        <button class="primary-button full" id="checkoutSubmit" type="submit" disabled>Submit resident order <span>→</span></button>
-        <p class="fine-print">By submitting, you authorize BrickellHouse to verify your resident status.</p>
-      </form>
-    </div>
-  </div>
-
   <div class="modal feedback-modal" id="feedbackModal" role="dialog" aria-modal="true" aria-label="Resident feedback">
     <div class="modal-card feedback-modal-card">
       <button class="icon-button modal-close" id="feedbackClose" type="button" aria-label="Close feedback">×</button>
@@ -222,17 +180,6 @@
     </div>
   </div>
 
-  <div class="modal" id="legalModal" role="dialog" aria-modal="true" aria-labelledby="legalTitle">
-    <div class="modal-card legal-card">
-      <button class="icon-button modal-close" data-close="legal">×</button>
-      <p class="eyebrow">Resident legal notice</p>
-      <h2 id="legalTitle">Legal Notice and Limitation of Liability</h2>
-      <p class="legal-version" id="legalVersion"></p>
-      <div class="legal-document" id="legalDocument"></div>
-      <button class="primary-button" data-close="legal">Return to checkout</button>
-    </div>
-  </div>
-
   <div class="modal" id="successModal" role="dialog" aria-modal="true">
     <div class="modal-card success-card">
       <span class="success-icon">✓</span><p class="eyebrow" id="successEyebrow">Request received</p><h2 id="successTitle">Thank you<span id="successName"></span>.</h2>
@@ -269,8 +216,8 @@
   </section>
   <script src="legal.js?v=20260615-legal1"></script>
   <script src="public-nav.js?v=20260622-ui-polish1"></script>
-  <script src="app.js?v=20260710-resident-images1"></script>
-  <script src="roadmap.js?v=20260710-resident-split1"></script>
+  <script src="app.js?v=20260710-checkout-page1"></script>
+  <script src="roadmap.js?v=20260713-payment-focus1"></script>
   <script src="chat.js?v=20260707-luna-review1"></script>
 </body>
 </html>

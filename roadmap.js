@@ -2,7 +2,10 @@ let checkoutProvider = "square";
 let stripeConfig = {enabled:false, provider:"square", publishableKey:""};
 let stripeClient = null;
 let stripeEmbeddedCheckout = null;
+let stripeCheckoutScrolledFor = null;
 let paymentInProgress = false;
+const isCheckoutPage = document.body.classList.contains("checkout-page");
+let checkoutPageCatalogReady = !isCheckoutPage || Boolean(window.BH_CATALOG_STATE?.success);
 const UNIT_VALIDATION_MESSAGE = "Please check unit number and try again.";
 
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, character => ({
@@ -125,9 +128,43 @@ async function loadStripeScript() {
   await loadExternalScript("https://js.stripe.com/v3/");
 }
 
+function setCheckoutPaymentFocus(focused) {
+  if (!isCheckoutPage) return;
+  $$('[data-checkout-prepayment]').forEach(element => element.classList.toggle("hidden", focused));
+}
+
+function focusMountedStripeCheckout() {
+  if (!isCheckoutPage || !stripeEmbeddedCheckout || stripeCheckoutScrolledFor === stripeEmbeddedCheckout) return;
+  const mountedCheckout = stripeEmbeddedCheckout;
+  const container = $("#stripeCheckoutContainer");
+  if (!container) return;
+
+  setCheckoutPaymentFocus(true);
+  clearPaymentMessage();
+  stripeCheckoutScrolledFor = mountedCheckout;
+
+  requestAnimationFrame(() => {
+    if (stripeEmbeddedCheckout !== mountedCheckout) return;
+    const headerHeight = $(".checkout-header")?.getBoundingClientRect().height || 0;
+    const top = Math.max(0, window.scrollY + container.getBoundingClientRect().top - headerHeight - 20);
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reducedMotion) {
+      window.scrollTo(0, top);
+      return;
+    }
+    try {
+      window.scrollTo({top, behavior:"smooth"});
+    } catch {
+      window.scrollTo(0, top);
+    }
+  });
+}
+
 function resetStripeCheckout() {
   if (stripeEmbeddedCheckout?.destroy) stripeEmbeddedCheckout.destroy();
   stripeEmbeddedCheckout = null;
+  stripeCheckoutScrolledFor = null;
+  setCheckoutPaymentFocus(false);
   $("#stripeEmbeddedCheckout") && ($("#stripeEmbeddedCheckout").innerHTML = "");
   $("#stripeCheckoutContainer")?.classList.add("hidden");
 }
@@ -150,6 +187,46 @@ function setCheckoutSubmitLabel(label) {
   if (submit) submit.innerHTML = `${label} <span>&rarr;</span>`;
 }
 
+function syncCheckoutPageState() {
+  if (!isCheckoutPage) return;
+  const loading = $("#checkoutLoading");
+  const content = $("#checkoutPageContent");
+  const empty = $("#checkoutEmptyState");
+  const hasItems = cart.length > 0;
+
+  if (!checkoutPageCatalogReady) {
+    content?.classList.add("hidden");
+    empty?.classList.add("hidden");
+    return;
+  }
+
+  loading?.classList.add("hidden");
+  content?.classList.toggle("hidden", !hasItems);
+  empty?.classList.toggle("hidden", hasItems);
+}
+
+function syncCheckoutSubmitState() {
+  const submit = $("#checkoutSubmit");
+  if (!submit) return;
+  const detailsComplete = checkoutDetailsComplete();
+  const accepted = Boolean($("#legalAcceptance")?.checked);
+  submit.disabled = paymentInProgress || Boolean(stripeEmbeddedCheckout) || !detailsComplete || !accepted || !cart.length || !checkoutPageCatalogReady;
+}
+
+function checkoutDetailsComplete() {
+  const form = $("#checkoutForm");
+  const fields = form ? Object.fromEntries(new FormData(form)) : {};
+  return Boolean(
+    form
+    && String(fields.name || "").trim()
+    && normalizeUnitNumber(fields.unit)
+    && form.elements.email.validity.valid
+    && normalizeUsPhone(fields.phone)
+  );
+}
+
+window.syncCheckoutSubmitState = syncCheckoutSubmitState;
+
 function syncStripeCheckoutDisplay() {
   const container = $("#stripeCheckoutContainer");
   const embedded = $("#stripeEmbeddedCheckout");
@@ -158,6 +235,7 @@ function syncStripeCheckoutDisplay() {
   if (stripeEmbeddedCheckout) {
     container.classList.remove("hidden");
     setCheckoutSubmitLabel("Complete secure payment below");
+    syncCheckoutSubmitState();
     return;
   }
 
@@ -166,14 +244,17 @@ function syncStripeCheckoutDisplay() {
     container.classList.add("hidden");
     embedded.innerHTML = "";
     setCheckoutSubmitLabel("Submit resident order");
+    syncCheckoutSubmitState();
     return;
   }
 
   container.classList.remove("hidden");
-  if (!embedded.querySelector("[data-stripe-placeholder]")) {
-    embedded.innerHTML = `<div class="stripe-payment-notice" data-stripe-placeholder>Please complete all required details and accept the legal notice to continue to secure payment.</div>`;
-  }
+  const readyToContinue = checkoutDetailsComplete() && Boolean($("#legalAcceptance")?.checked);
+  embedded.innerHTML = `<div class="stripe-payment-notice" data-stripe-placeholder>${readyToContinue
+    ? "Your details are complete. Select Continue to open secure payment."
+    : "Please complete all required details and accept the legal notice to continue to secure payment."}</div>`;
   setCheckoutSubmitLabel("Continue to secure payment");
+  syncCheckoutSubmitState();
 }
 
 async function initializePaymentProvider() {
@@ -253,7 +334,13 @@ function showSuccessMessage({title, body, orderNumber = ""}) {
   $("#successName") && ($("#successName").textContent = "");
   $("#successOrder") && ($("#successOrder").textContent = orderNumber);
   $("#successPaymentNote") && ($("#successPaymentNote").textContent = "");
-  openModal("#successModal");
+  if (isCheckoutPage) {
+    $("#checkoutMain")?.classList.add("hidden");
+    $("#successModal")?.classList.remove("hidden");
+    window.scrollTo({top:0, behavior:"auto"});
+  } else {
+    openModal("#successModal");
+  }
 }
 
 function showPaidOrderConfirmation(orderNumber = "") {
@@ -272,7 +359,13 @@ function showResidentOrderConfirmation({name = "", orderNumber = "", note = ""})
   }
   $("#successName") && ($("#successName").textContent = name ? `, ${name}` : "");
   $("#successOrder") && ($("#successOrder").textContent = orderNumber);
-  openModal("#successModal");
+  if (isCheckoutPage) {
+    $("#checkoutMain")?.classList.add("hidden");
+    $("#successModal")?.classList.remove("hidden");
+    window.scrollTo({top:0, behavior:"auto"});
+  } else {
+    openModal("#successModal");
+  }
 }
 
 async function mountStripeCheckout(session, records, resident, number) {
@@ -296,11 +389,18 @@ async function mountStripeCheckout(session, records, resident, number) {
       }
     }
   });
-  stripeEmbeddedCheckout.mount("#stripeEmbeddedCheckout");
+  try {
+    stripeEmbeddedCheckout.mount("#stripeEmbeddedCheckout");
+    focusMountedStripeCheckout();
+  } catch (error) {
+    resetStripeCheckout();
+    throw error;
+  }
 }
 
 function showPaymentError(message) {
   const element = $("#paymentMessage");
+  if (!element) return;
   element.textContent = message;
   element.classList.remove("hidden");
   element.classList.add("error");
@@ -358,6 +458,7 @@ function normalizeUnitNumber(value) {
 }
 
 function checkoutValidationMessage(form, resident) {
+  if (!checkoutPageCatalogReady) return "Product availability could not be confirmed. Please return to the store and try again.";
   if (!cart.length) return "Your bag is empty. Add a resident service before checkout.";
   if (!resident.name.trim()) return "Please enter the resident's full name.";
   if (!resident.unit.trim()) return "Please enter the unit number.";
@@ -379,9 +480,16 @@ function finalizeSuccessfulOrder(records) {
   renderProducts();
 }
 
-if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
+if ($("#checkoutForm")) {
+  const syncCheckoutFormState = () => {
+    syncCheckoutSubmitState();
+    syncStripeCheckoutDisplay();
+  };
+  $("#checkoutForm").addEventListener("input", syncCheckoutFormState);
+  $("#checkoutForm").addEventListener("change", syncCheckoutFormState);
+  $("#checkoutForm").onsubmit = async event => {
   event.preventDefault();
-  if (paymentInProgress) return;
+  if (paymentInProgress || stripeEmbeddedCheckout) return;
   const form = event.target;
   const resident = Object.fromEntries(new FormData(form));
   const validationMessage = checkoutValidationMessage(form, resident);
@@ -464,6 +572,7 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
     });
   } catch (error) {
     console.error(requiresPayment ? "Secure payment setup failed" : "Order submission failed", error);
+    resetStripeCheckout();
     message.textContent = requiresPayment
       ? (error.message || "Secure payment could not be started. Please try again or contact Management.")
       : "Sorry, your order could not be submitted. Please try again.";
@@ -473,7 +582,41 @@ if ($("#checkoutForm")) $("#checkoutForm").onsubmit = async event => {
   } finally {
     paymentInProgress = false;
     syncStripeCheckoutDisplay();
+    syncCheckoutSubmitState();
   }
-};
+  };
+}
 
-initializePaymentProvider().finally(handleStripeReturnConfirmation);
+function applyCheckoutCatalogState(success) {
+  if (!isCheckoutPage) return;
+  checkoutPageCatalogReady = Boolean(success);
+  const loading = $("#checkoutLoading");
+  if (!checkoutPageCatalogReady && loading) {
+    loading.classList.add("error");
+    loading.innerHTML = `<p>Product availability could not be confirmed. Please <a href="./#store">return to the store</a> and try again.</p>`;
+  }
+  syncCheckoutPageState();
+  syncStripeCheckoutDisplay();
+  syncCheckoutSubmitState();
+}
+
+document.addEventListener("bh:catalog-ready", event => {
+  applyCheckoutCatalogState(event.detail?.success);
+});
+
+document.addEventListener("bh:cart-updated", () => {
+  syncCheckoutPageState();
+  syncStripeCheckoutDisplay();
+  syncCheckoutSubmitState();
+});
+
+syncCheckoutPageState();
+syncCheckoutSubmitState();
+if (isCheckoutPage && window.BH_CATALOG_STATE?.complete) {
+  applyCheckoutCatalogState(window.BH_CATALOG_STATE.success);
+}
+if ($("#checkoutForm")) {
+  initializePaymentProvider().finally(handleStripeReturnConfirmation);
+} else if (new URLSearchParams(window.location.search).has("stripe_session_id")) {
+  handleStripeReturnConfirmation();
+}

@@ -60,6 +60,7 @@ let products = (Array.isArray(storedProducts) ? storedProducts : seedProducts).m
 let cart = catalogIsCurrent ? JSON.parse(localStorage.getItem("bh_cart") || "[]") : [];
 let feeSettings = publicFeeSettings(JSON.parse(localStorage.getItem("bh_fee_settings") || "null") || {});
 let activeCategory = "All";
+window.BH_CATALOG_STATE = {complete:false, success:false};
 
 function productImageSrc(image) {
   const source = image || "product-documents.webp";
@@ -148,10 +149,11 @@ function renderProducts() {
 }
 
 async function loadPublicProductCatalog() {
+  let loaded = false;
   try {
     const response = await fetch("/api/products", {headers:{"Accept":"application/json"}});
     const payload = await response.json();
-    if (!response.ok || !payload.success || !Array.isArray(payload.products)) return;
+    if (!response.ok || !payload.success || !Array.isArray(payload.products)) throw new Error("Product catalog is unavailable");
     const existingById = new Map(products.map(product => [product.id, product]));
     const fallbackById = new Map(seedProducts.map(product => [product.id, product]));
     products = payload.products.map(product => {
@@ -167,8 +169,12 @@ async function loadPublicProductCatalog() {
     renderTabs();
     renderProducts();
     renderCart();
+    loaded = true;
   } catch (error) {
     console.warn("Using local product catalog fallback", error);
+  } finally {
+    window.BH_CATALOG_STATE = {complete:true, success:loaded};
+    document.dispatchEvent(new CustomEvent("bh:catalog-ready", {detail:{success:loaded}}));
   }
 }
 
@@ -192,12 +198,15 @@ function updateCartSummary(items = cart.map(item => ({...item, product:products.
   const subtotal = cartSubtotal();
   const fee = processingFee(subtotal);
   $("#cartTotal").textContent = money(subtotal);
-  $("#checkoutSubtotal").textContent = money(subtotal);
-  $("#checkoutFee").textContent = money(fee);
-  $("#checkoutTotal").textContent = money(subtotal + fee);
-  $("#checkoutFeeLabel").textContent = feeSettings.enabled && feeSettings.type === "percent"
-    ? `${feeSettings.label} (${feeSettings.amount}%)`
-    : feeSettings.label;
+  if ($("#checkoutSubtotal")) $("#checkoutSubtotal").textContent = money(subtotal);
+  if ($("#checkoutFee")) $("#checkoutFee").textContent = money(fee);
+  if ($("#checkoutTotal")) $("#checkoutTotal").textContent = money(subtotal + fee);
+  if ($("#checkoutAmountDue")) $("#checkoutAmountDue").textContent = money(subtotal + fee);
+  if ($("#checkoutFeeLabel")) {
+    $("#checkoutFeeLabel").textContent = feeSettings.enabled && feeSettings.type === "percent"
+      ? `${feeSettings.label} (${feeSettings.amount}%)`
+      : feeSettings.label;
+  }
   if (toggleEmptyState) {
     $("#cartEmpty").classList.toggle("hidden", items.length > 0);
     $("#cartFooter").classList.toggle("hidden", !items.length);
@@ -216,6 +225,7 @@ function renderCart() {
     </div>`
   ).join("");
   bindCartControls();
+  document.dispatchEvent(new CustomEvent("bh:cart-updated", {detail:{count:items.length}}));
 }
 
 function bindCartControls() {
@@ -269,11 +279,15 @@ function toast(message) {
 if ($("#cartOpen")) $("#cartOpen").onclick = () => setDrawer(true);
 if ($("#drawerBackdrop")) $("#drawerBackdrop").onclick = () => setDrawer(false);
 if ($('[data-close="cart"]')) $('[data-close="cart"]').onclick = () => setDrawer(false);
-if ($("#checkoutOpen")) $("#checkoutOpen").onclick = () => { setDrawer(false); openModal("#checkoutModal"); };
+if ($("#checkoutOpen")) $("#checkoutOpen").onclick = () => {
+  setDrawer(false);
+  window.location.href = "checkout.html";
+};
 if ($("#searchInput")) $("#searchInput").oninput = renderProducts;
 if ($("#legalNoticeOpen")) $("#legalNoticeOpen").onclick = () => openModal("#legalModal");
 if ($("#legalAcceptance")) $("#legalAcceptance").onchange = event => {
-  $("#checkoutSubmit").disabled = !event.target.checked;
+  if (window.syncCheckoutSubmitState) window.syncCheckoutSubmitState();
+  else $("#checkoutSubmit").disabled = !event.target.checked;
 };
 
 $$('[data-close]').forEach(button => button.addEventListener("click", () => {
@@ -282,30 +296,34 @@ $$('[data-close]').forEach(button => button.addEventListener("click", () => {
   if (button.dataset.close === "legal") closeModal("#legalModal");
 }));
 
-const observer = new IntersectionObserver(entries => entries.forEach(entry => entry.isIntersecting && entry.target.classList.add("visible")), {threshold:.12});
-$$('.reveal').forEach(element => observer.observe(element));
+function updateParallax() {}
 
-let parallaxFrame = 0;
-function updateParallax() {
-  parallaxFrame = 0;
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const viewportCenter = window.innerHeight / 2;
-  $$('.parallax-image').forEach(image => {
-    const rect = image.parentElement.getBoundingClientRect();
-    if (rect.bottom < 0 || rect.top > window.innerHeight) return;
-    const distance = rect.top + rect.height / 2 - viewportCenter;
-    image.style.transform = `translate3d(0, ${distance * +image.dataset.parallax}px, 0) scale(1.04)`;
-  });
-  const heroImage = $(".hero-image");
-  if (heroImage && window.scrollY < window.innerHeight * 1.2) {
-    heroImage.style.transform = `translate3d(0, ${window.scrollY * .12}px, 0) scale(1.04)`;
-  }
+if (!document.body.classList.contains("checkout-page")) {
+  const observer = new IntersectionObserver(entries => entries.forEach(entry => entry.isIntersecting && entry.target.classList.add("visible")), {threshold:.12});
+  $$('.reveal').forEach(element => observer.observe(element));
+
+  let parallaxFrame = 0;
+  updateParallax = () => {
+    parallaxFrame = 0;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const viewportCenter = window.innerHeight / 2;
+    $$('.parallax-image').forEach(image => {
+      const rect = image.parentElement.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > window.innerHeight) return;
+      const distance = rect.top + rect.height / 2 - viewportCenter;
+      image.style.transform = `translate3d(0, ${distance * +image.dataset.parallax}px, 0) scale(1.04)`;
+    });
+    const heroImage = $(".hero-image");
+    if (heroImage && window.scrollY < window.innerHeight * 1.2) {
+      heroImage.style.transform = `translate3d(0, ${window.scrollY * .12}px, 0) scale(1.04)`;
+    }
+  };
+
+  window.addEventListener("scroll", () => {
+    if (!parallaxFrame) parallaxFrame = requestAnimationFrame(updateParallax);
+  }, {passive:true});
+  window.addEventListener("resize", updateParallax);
 }
-
-window.addEventListener("scroll", () => {
-  if (!parallaxFrame) parallaxFrame = requestAnimationFrame(updateParallax);
-}, {passive:true});
-window.addEventListener("resize", updateParallax);
 
 reconcileCartWithCatalog();
 persist();
