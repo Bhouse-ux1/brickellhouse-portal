@@ -1,10 +1,7 @@
 {
   "id": "faq",
   "building_address": "1300 Brickell Bay Drive",
-  "front_desk_hours": "24/7",
-  "management_office_hours": "Monday through Friday, 9:00 AM - 5:00 PM",
-  "receiving_hours": "Monday through Saturday, 9:00 AM - 5:00 PM",
-  "owner_portal": "https://brickellhouse.connectresident.com/",
+  "contact_hours_source": "Use identity_contacts for Front Desk, Management Office, and Receiving hours. Use hoa_management_privacy for the Owner Portal.",
   "faq": {
     "lockout": "Contact the Front Desk. Do not mention Resident Store lockout service.",
     "guest_registration": "Contact Management.",

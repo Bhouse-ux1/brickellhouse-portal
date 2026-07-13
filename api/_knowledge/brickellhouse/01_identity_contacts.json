@@ -6,18 +6,30 @@
     "who_are_you_es": "Soy Luna, estoy aquí para ayudarte con cualquier cosa que necesites."
   },
   "contacts": {
-    "management": {"email": "admin@brickellhouse.net", "extension": "7002"},
+    "management": {"email": "admin@brickellhouse.net", "extension": "7002", "office_hours": "Monday through Friday, 9:00 AM to 5:00 PM"},
     "maintenance": {"email": "maintenance@brickellhouse.net", "extension": null},
     "receiving": {"email": "receiving@brickellhouse.net", "extension": "7007", "hours": "Monday through Saturday, 9:00 AM to 5:00 PM"},
     "front_desk": {"email": "frontdesk@brickellhouse.net", "hours": "24/7"},
     "main_number": "305-400-9661",
+    "administrator": {
+      "name": "Jorge Torres",
+      "title": "Administrator",
+      "email": "admin@brickellhouse.net",
+      "answer_en": "Jorge Torres is the Administrator at BrickellHouse.",
+      "answer_es": "Jorge Torres es el Administrador de BrickellHouse.",
+      "aliases_en": ["administrator", "admin", "building administrator", "management administrator", "property administrator", "Jorge", "Jorge Torres"],
+      "aliases_es": ["administrador", "administración", "administrador del edificio", "Jorge", "Jorge Torres"],
+      "rule": "This is approved public staff knowledge. The shared Management email may be provided, but no personal contact information may be inferred or disclosed."
+    },
     "general_manager": {"name": "Buriel Noel", "title": "General Manager", "answer_en": "Buriel Noel is the General Manager.", "answer_es": "Buriel Noel es el General Manager.", "rule": "This is approved public staff knowledge. Do not provide personal phone, personal email, address, or private staff details."},
-    "caleb": {"title": "Assistant Manager", "answer_en": "Caleb is the Assistant Manager at BrickellHouse.", "rule": "Mention Caleb by name only when needed or when specifically asked. Do not provide personal information."}
+    "caleb": {"title": "Assistant Manager", "answer_en": "Caleb is the Assistant Manager at BrickellHouse.", "answer_es": "Caleb es el Assistant Manager de BrickellHouse.", "rule": "Mention Caleb by name only when needed or when specifically asked. Do not provide personal information."}
   },
   "general_help_en": "What do you need help with?",
   "general_help_es": "¿Con qué necesitas ayuda?",
   "unsure_route": "If unsure, route to admin@brickellhouse.net or the Front Desk depending on the issue.",
-  "aliases_es": ["quién eres", "quien eres", "contacto", "teléfono", "extensión", "correo de management", "front desk", "receiving", "general manager", "admin", "administrador"],
-  "examples_es": ["¿Quién eres?", "¿Cuál es el correo de Management?", "Necesito ayuda.", "¿Cómo se llama el admin?", "¿Quién es el General Manager?"],
+  "retrieval_terms_en": ["management", "management office", "office hours", "administrator", "admin", "building administrator", "management administrator", "property administrator", "Jorge", "Jorge Torres", "general manager", "Buriel Noel", "assistant manager", "Caleb", "front desk", "receiving", "maintenance", "contact", "email", "phone", "extension"],
+  "retrieval_terms_es": ["management", "oficina de management", "horario de oficina", "administrador", "administración", "administrador del edificio", "Jorge", "Jorge Torres", "general manager", "Buriel Noel", "front desk", "receiving", "mantenimiento", "contacto", "correo", "teléfono", "extensión"],
+  "aliases_es": ["quién eres", "quien eres", "contacto", "teléfono", "extensión", "correo de management", "front desk", "receiving", "general manager", "admin", "administrador", "administración", "administrador del edificio", "Jorge Torres"],
+  "examples_es": ["¿Quién eres?", "¿Cuál es el correo de Management?", "Necesito ayuda.", "¿Quién es el administrador?", "¿Cuál es el correo del administrador?", "¿Quién es el General Manager?"],
   "response_es": "Responde en español con el contacto exacto solicitado y no agregues departamentos que no fueron pedidos."
 }

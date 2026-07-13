@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260707-luna-review1">
+  <link rel="stylesheet" href="styles.css?v=20260713-luna-phase1">
 </head>
 <body>
   <div class="ambient" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -199,7 +199,10 @@
         <div>
           <h2>How can I help?</h2>
         </div>
-        <button class="icon-button" id="chatClose" type="button" aria-label="Close assistant">×</button>
+        <div class="chat-head-actions">
+          <button class="chat-clear" id="chatClear" type="button">Clear chat</button>
+          <button class="icon-button" id="chatClose" type="button" aria-label="Close assistant">×</button>
+        </div>
       </div>
       <div class="chat-messages" id="chatMessages" aria-live="polite">
         <div class="chat-message assistant chat-welcome">
@@ -218,6 +221,6 @@
   <script src="public-nav.js?v=20260622-ui-polish1"></script>
   <script src="app.js?v=20260710-checkout-page1"></script>
   <script src="roadmap.js?v=20260713-payment-focus1"></script>
-  <script src="chat.js?v=20260707-luna-review1"></script>
+  <script src="chat.js?v=20260713-luna-phase1"></script>
 </body>
 </html>

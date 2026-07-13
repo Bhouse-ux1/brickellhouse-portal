@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "description": "BrickellHouse resident services portal",
+  "scripts": {
+    "test:luna": "node scripts/luna-eval.js"
+  },
   "dependencies": {
     "resend": "^6.14.0"
   }
