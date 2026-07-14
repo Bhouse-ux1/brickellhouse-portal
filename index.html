@@ -3,86 +3,92 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="BrickellHouse resident services and essentials portal.">
+  <meta name="description" content="BrickellHouse resident services and essentials portal." data-i18n-content="portal.metaDescription">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://js.stripe.com https://cdn.jsdelivr.net; frame-src 'self' https://js.stripe.com https://hooks.stripe.com; connect-src 'self' https://api.stripe.com https://r.stripe.com https://o160250.ingest.sentry.io https://*.supabase.co wss://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:;">
   <title>BrickellHouse | Resident Services</title>
+  <script src="i18n.js?v=20260713-resident-i18n1"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260713-luna-phase1">
+  <link rel="stylesheet" href="styles.css?v=20260713-resident-i18n1">
 </head>
-<body>
+<body data-i18n-title="portal.pageTitle">
   <div class="ambient" aria-hidden="true"><i></i><i></i><i></i></div>
   <header class="site-header">
-    <button class="mobile-menu-toggle" type="button" aria-expanded="false" aria-controls="mobileMenu" aria-label="Open menu"><span></span><span></span><span></span></button>
-    <a class="brand" href="#home" aria-label="BrickellHouse home">
+    <button class="mobile-menu-toggle" type="button" aria-expanded="false" aria-controls="mobileMenu" aria-label="Open menu" data-i18n-aria-label="nav.openMenu"><span></span><span></span><span></span></button>
+    <a class="brand" href="#home" aria-label="BrickellHouse home" data-i18n-aria-label="nav.homeLabel">
       <img class="official-logo logo-on-dark" src="bh-logo-transparent.png" alt="Brickell House">
-      <span class="brand-name"><small>RESIDENT SERVICES</small></span>
+      <span class="brand-name"><small data-i18n="brand.residentServices">RESIDENT SERVICES</small></span>
     </a>
-    <nav aria-label="Main navigation">
-      <a href="#shop">Services</a>
-      <a href="#track">Track Order</a>
-      <a href="#feedback">Feedback</a>
-      <a href="#concierge">Concierge</a>
-      <a href="lifestyle.html">Lifestyle</a>
+    <nav aria-label="Main navigation" data-i18n-aria-label="nav.mainLabel">
+      <a href="#shop" data-i18n="nav.services">Services</a>
+      <a href="#track" data-i18n="nav.trackOrder">Track Order</a>
+      <a href="#feedback" data-i18n="nav.feedback">Feedback</a>
+      <a href="#concierge" data-i18n="nav.concierge">Concierge</a>
+      <a href="lifestyle.html" data-i18n="common.lifestyle">Lifestyle</a>
     </nav>
-    <button class="cart-button" id="cartOpen" aria-label="Open cart">
-      <span>Bag</span><b id="cartCount">0</b>
+    <div class="language-selector" role="group" aria-label="Resident language" data-i18n-aria-label="language.selector">
+      <button type="button" data-language="en" aria-pressed="true" aria-label="English" data-i18n-aria-label="language.english">EN</button>
+      <span aria-hidden="true">|</span>
+      <button type="button" data-language="es" aria-pressed="false" aria-label="Spanish" data-i18n-aria-label="language.spanish">ES</button>
+    </div>
+    <button class="cart-button" id="cartOpen" aria-label="Open cart" data-i18n-aria-label="nav.openCart">
+      <span data-i18n="nav.bag">Bag</span><b id="cartCount">0</b>
     </button>
     <div class="mobile-menu" id="mobileMenu">
-      <a href="index.html">Home</a>
-      <a href="lifestyle.html">Lifestyle</a>
+      <a href="index.html" data-i18n="common.home">Home</a>
+      <a href="lifestyle.html" data-i18n="common.lifestyle">Lifestyle</a>
     </div>
   </header>
 
   <main>
     <section class="hero" id="home">
-      <div class="hero-image" role="img" aria-label="Luxury Miami glass residence at sunrise"></div>
+      <div class="hero-image" role="img" aria-label="Luxury Miami glass residence at sunrise" data-i18n-aria-label="hero.imageLabel"></div>
       <div class="hero-overlay"></div>
       <div class="hero-content reveal">
-        <p class="eyebrow light">Exclusively for residents</p>
+        <p class="eyebrow light" data-i18n="hero.eyebrow">Exclusively for residents</p>
         <div class="hero-logo">
           <img src="bh-logo-transparent.png" alt="Brickell House">
         </div>
-        <p class="hero-copy">Elevated resident essentials,<br>thoughtfully delivered.</p>
-        <a class="primary-button light-button" href="#shop">Explore resident services <svg class="cta-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+        <p class="hero-copy" data-i18n="hero.copy">Elevated resident essentials, thoughtfully delivered.</p>
+        <a class="primary-button light-button" href="#shop"><span data-i18n="hero.cta">Explore resident services</span> <svg class="cta-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
       </div>
-      <div class="residence-note"><span>25.7617° N</span><span>Miami, Florida</span></div>
+      <div class="residence-note"><span>25.7617° N</span><span data-i18n="hero.location">Miami, Florida</span></div>
     </section>
 
     <section class="shop-section" id="shop">
       <div class="shop-head reveal">
         <div>
-          <p class="eyebrow">Resident collection</p>
-          <h2>Services & essentials</h2>
+          <p class="eyebrow" data-i18n="store.eyebrow">Resident collection</p>
+          <h2 data-i18n="store.title">Services & essentials</h2>
         </div>
         <label class="search">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
-          <input id="searchInput" type="search" placeholder="Search resident services">
+          <input id="searchInput" type="search" placeholder="Search resident services" data-i18n-placeholder="store.search">
         </label>
       </div>
-      <div class="category-tabs reveal" id="categoryTabs" aria-label="Product categories"></div>
+      <div class="category-tabs reveal" id="categoryTabs" aria-label="Product categories" data-i18n-aria-label="store.categoriesLabel"></div>
       <div class="product-grid" id="productGrid"></div>
-      <div class="empty-state hidden" id="emptyState">No services match your search.</div>
+      <div class="empty-state hidden" id="emptyState" data-i18n="store.noResults">No services match your search.</div>
     </section>
 
     <section class="concierge" id="concierge">
       <div class="concierge-card reveal">
-        <p class="eyebrow light">Private concierge</p>
-        <h2>Need a little assistance?</h2>
-        <p>Our resident services team is available to guide your request and coordinate collection.</p>
-        <a href="mailto:frontdesk@brickellhouse.net">Contact resident support <svg class="cta-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+        <p class="eyebrow light" data-i18n="concierge.eyebrow">Private concierge</p>
+        <h2 data-i18n="concierge.title">Need a little assistance?</h2>
+        <p data-i18n="concierge.copy">Our resident services team is available to guide your request and coordinate collection.</p>
+        <a href="mailto:frontdesk@brickellhouse.net"><span data-i18n="concierge.contact">Contact resident support</span> <svg class="cta-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
       </div>
       <div class="concierge-hours reveal">
-        <span>Resident services office</span>
-        <strong>Monday – Friday</strong>
+        <span data-i18n="concierge.office">Resident services office</span>
+        <strong data-i18n="concierge.weekdays">Monday – Friday</strong>
         <p>9:00 AM – 5:00 PM</p>
         <a class="office-phone" href="tel:+13054009661">305-400-9661</a>
         <div class="extension-list">
-          <span><b>Front Desk</b> Ext. 7000 · frontdesk@brickellhouse.net</span>
-          <span><b>Administrative Assistant</b> Ext. 7002 · admin@brickellhouse.net</span>
-          <span><b>Receiving</b> Ext. 7007 · receiving@brickellhouse.net</span>
-          <span><b>Parking Attendant</b> Ext. 7009 · parking@brickellhouse.net</span>
+          <span><b data-i18n="concierge.frontDesk">Front Desk</b> Ext. 7000 · frontdesk@brickellhouse.net</span>
+          <span><b data-i18n="concierge.adminAssistant">Administrative Assistant</b> Ext. 7002 · admin@brickellhouse.net</span>
+          <span><b data-i18n="concierge.receiving">Receiving</b> Ext. 7007 · receiving@brickellhouse.net</span>
+          <span><b data-i18n="concierge.parkingAttendant">Parking Attendant</b> Ext. 7009 · parking@brickellhouse.net</span>
         </div>
         <small>1300 Brickell Bay Drive, Miami</small>
       </div>
@@ -90,28 +96,28 @@
 
     <section class="resident-tools" id="track">
       <div class="resident-tool-card reveal">
-        <p class="eyebrow">Order updates</p>
-        <h2>Track your order</h2>
-        <p>Enter your BrickellHouse order number to see its current status.</p>
+        <p class="eyebrow" data-i18n="tracker.eyebrow">Order updates</p>
+        <h2 data-i18n="tracker.title">Track your order</h2>
+        <p data-i18n="tracker.copy">Enter your BrickellHouse order number to see its current status.</p>
         <form id="trackingForm" class="compact-form">
-          <label><span>Order ID</span><input name="orderNumber" required placeholder="BH-06152026-XXXXXXXXXX" autocomplete="off"></label>
-          <button class="primary-button" type="submit">Check status</button>
+          <label><span data-i18n="tracker.orderId">Order ID</span><input name="orderNumber" required placeholder="BH-06152026-XXXXXXXXXX" autocomplete="off"></label>
+          <button class="primary-button" type="submit" data-i18n="tracker.check">Check status</button>
         </form>
         <div class="tracking-result hidden" id="trackingResult" aria-live="polite"></div>
       </div>
       <div class="resident-tool-card feedback-entry-card reveal" id="feedback">
-        <p class="eyebrow">Resident voice</p>
-        <h2>Tell us what you think.</h2>
-        <p>Your perspective helps us shape a better BrickellHouse resident experience.</p>
-        <button class="primary-button feedback-open-button" id="feedbackOpen" type="button">Share feedback <svg class="cta-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+        <p class="eyebrow" data-i18n="feedback.eyebrow">Resident voice</p>
+        <h2 data-i18n="feedback.title">Tell us what you think.</h2>
+        <p data-i18n="feedback.entryCopy">Your perspective helps us shape a better BrickellHouse resident experience.</p>
+        <button class="primary-button feedback-open-button" id="feedbackOpen" type="button"><span data-i18n="feedback.open">Share feedback</span> <svg class="cta-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
       </div>
     </section>
 
-    <section class="closing-pool" aria-label="BrickellHouse rooftop pool">
+    <section class="closing-pool" aria-label="BrickellHouse rooftop pool" data-i18n-aria-label="closing.label">
       <div class="closing-pool-image parallax-image" data-parallax="0.08"></div>
       <div class="closing-pool-shade"></div>
       <div class="closing-pool-copy reveal">
-        <p class="eyebrow light">At home above Brickell</p>
+        <p class="eyebrow light" data-i18n="closing.copy">At home above Brickell</p>
         <img src="bh-logo-transparent.png" alt="Brickell House">
       </div>
     </section>
@@ -120,107 +126,107 @@
 
   <footer>
     <div class="footer-brand"><img class="official-logo logo-on-dark" src="bh-logo-transparent.png" alt="Brickell House"></div>
-    <p>Resident Services Portal<br>1300 Brickell Bay Drive, Miami, FL</p>
-    <div><a href="#">Privacy</a><a href="#">Resident Support</a></div>
-    <small>© 2026 BrickellHouse Condominium Association</small>
+    <p><span data-i18n="footer.portal">Resident Services Portal</span><br>1300 Brickell Bay Drive, Miami, FL</p>
+    <div><a href="#" data-i18n="footer.privacy">Privacy</a><a href="#" data-i18n="footer.support">Resident Support</a></div>
+    <small data-i18n="footer.copyright">© 2026 BrickellHouse Condominium Association</small>
   </footer>
 
   <div class="drawer-backdrop" id="drawerBackdrop"></div>
-  <aside class="drawer" id="cartDrawer" aria-label="Shopping bag">
-    <div class="drawer-head"><div><p class="eyebrow">Resident order</p><h2>Your bag</h2></div><button class="icon-button" data-close="cart">×</button></div>
+  <aside class="drawer" id="cartDrawer" aria-label="Shopping bag" data-i18n-aria-label="cart.label">
+    <div class="drawer-head"><div><p class="eyebrow" data-i18n="cart.eyebrow">Resident order</p><h2 data-i18n="cart.title">Your bag</h2></div><button class="icon-button" data-close="cart" aria-label="Close" data-i18n-aria-label="common.close">×</button></div>
     <div class="cart-items" id="cartItems"></div>
-    <div class="cart-empty" id="cartEmpty"><span><img src="bh-logo-transparent.png" alt="Brickell House"></span><h3>Your bag is empty</h3><p>Resident services you select will appear here.</p></div>
+    <div class="cart-empty" id="cartEmpty"><span><img src="bh-logo-transparent.png" alt="Brickell House"></span><h3 data-i18n="cart.emptyTitle">Your bag is empty</h3><p data-i18n="cart.emptyCopy">Resident services you select will appear here.</p></div>
     <div class="cart-footer" id="cartFooter">
-      <div class="total-row"><span>Subtotal</span><strong id="cartTotal">$0.00</strong></div>
-      <p>Requests may require resident services approval and resident verification.</p>
-      <button class="primary-button full" id="checkoutOpen">Continue to checkout <span>→</span></button>
+      <div class="total-row"><span data-i18n="cart.subtotal">Subtotal</span><strong id="cartTotal">$0.00</strong></div>
+      <p data-i18n="cart.approvalCopy">Requests may require resident services approval and resident verification.</p>
+      <button class="primary-button full" id="checkoutOpen"><span data-i18n="cart.checkout">Continue to checkout</span> <span aria-hidden="true">→</span></button>
     </div>
   </aside>
 
-  <div class="modal feedback-modal" id="feedbackModal" role="dialog" aria-modal="true" aria-label="Resident feedback">
+  <div class="modal feedback-modal" id="feedbackModal" role="dialog" aria-modal="true" aria-label="Resident feedback" data-i18n-aria-label="feedback.dialogLabel">
     <div class="modal-card feedback-modal-card">
-      <button class="icon-button modal-close" id="feedbackClose" type="button" aria-label="Close feedback">×</button>
+      <button class="icon-button modal-close" id="feedbackClose" type="button" aria-label="Close feedback" data-i18n-aria-label="feedback.close">×</button>
 
       <div class="feedback-view" id="feedbackChoiceView">
-        <p class="eyebrow">Resident voice</p>
-        <h2 id="feedbackTitle">Tell us what you think.</h2>
-        <p class="feedback-view-copy">Choose the option that best describes what you would like to share.</p>
+        <p class="eyebrow" data-i18n="feedback.eyebrow">Resident voice</p>
+        <h2 id="feedbackTitle" data-i18n="feedback.title">Tell us what you think.</h2>
+        <p class="feedback-view-copy" data-i18n="feedback.choiceCopy">Choose the option that best describes what you would like to share.</p>
         <div class="feedback-type-list">
-          <button type="button" data-feedback-category="Compliments" data-feedback-label="I like something"><span>I like something</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
-          <button type="button" data-feedback-category="General Feedback" data-feedback-label="I don't like something"><span>I don't like something</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
-          <button type="button" data-feedback-category="Suggestions" data-feedback-label="I have a suggestion"><span>I have a suggestion</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+          <button type="button" data-feedback-category="Compliments" data-feedback-i18n="feedback.like"><span data-i18n="feedback.like">I like something</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+          <button type="button" data-feedback-category="General Feedback" data-feedback-i18n="feedback.dislike"><span data-i18n="feedback.dislike">I don't like something</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+          <button type="button" data-feedback-category="Suggestions" data-feedback-i18n="feedback.suggestion"><span data-i18n="feedback.suggestion">I have a suggestion</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
         </div>
       </div>
 
       <div class="feedback-view feedback-form-view hidden" id="feedbackFormView">
-        <button class="feedback-back-button" id="feedbackBack" type="button">Back to feedback types</button>
-        <p class="eyebrow">Share your thoughts</p>
-        <h2 id="feedbackSelectedType">Feedback</h2>
+        <button class="feedback-back-button" id="feedbackBack" type="button" data-i18n="feedback.back">Back to feedback types</button>
+        <p class="eyebrow" data-i18n="feedback.share">Share your thoughts</p>
+        <h2 id="feedbackSelectedType" data-i18n="feedback.label">Feedback</h2>
         <form id="feedbackForm">
           <input name="category" id="feedbackCategory" type="hidden" required>
           <div class="field-grid">
-            <label><span>Resident name</span><input name="name" required autocomplete="name"></label>
-            <label><span>Unit number</span><input name="unit" required></label>
-            <label><span>Email</span><input name="email" type="email" autocomplete="email"></label>
-            <label><span>Phone optional</span><input name="phone" type="tel" autocomplete="tel"></label>
+            <label><span data-i18n="feedback.name">Resident name</span><input name="name" required autocomplete="name"></label>
+            <label><span data-i18n="feedback.unit">Unit number</span><input name="unit" required></label>
+            <label><span data-i18n="feedback.email">Email</span><input name="email" type="email" autocomplete="email"></label>
+            <label><span data-i18n="feedback.phoneOptional">Phone optional</span><input name="phone" type="tel" autocomplete="tel"></label>
           </div>
-          <label><span>Message</span><textarea name="message" required></textarea></label>
-          <button class="primary-button full" type="submit">Send feedback</button>
+          <label><span data-i18n="feedback.message">Message</span><textarea name="message" required></textarea></label>
+          <button class="primary-button full" type="submit" data-i18n="feedback.send">Send feedback</button>
         </form>
         <div class="feedback-confirmation hidden" id="feedbackConfirmation" aria-live="polite"></div>
       </div>
 
       <div class="feedback-view feedback-thanks hidden" id="feedbackThanksView">
         <span class="feedback-success-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 12 4 4 8-9"></path></svg></span>
-        <p class="eyebrow">Feedback received</p>
-        <h2>Thank you.</h2>
-        <p>Thank you for your feedback. We appreciate you taking the time to share your thoughts with us.</p>
-        <button class="primary-button" id="feedbackDone" type="button">Return to resident services</button>
+        <p class="eyebrow" data-i18n="feedback.received">Feedback received</p>
+        <h2 data-i18n="feedback.thankYou">Thank you.</h2>
+        <p data-i18n="feedback.thanksCopy">Thank you for your feedback. We appreciate you taking the time to share your thoughts with us.</p>
+        <button class="primary-button" id="feedbackDone" type="button" data-i18n="feedback.done">Return to resident services</button>
       </div>
     </div>
   </div>
 
   <div class="modal" id="successModal" role="dialog" aria-modal="true">
     <div class="modal-card success-card">
-      <span class="success-icon">✓</span><p class="eyebrow" id="successEyebrow">Request received</p><h2 id="successTitle">Thank you<span id="successName"></span>.</h2>
+      <span class="success-icon">✓</span><p class="eyebrow" id="successEyebrow" data-i18n="success.requestReceived">Request received</p><h2 id="successTitle">Thank you<span id="successName"></span>.</h2>
       <p id="successBody">Your order <strong id="successOrder"></strong> has been received. <span id="successPaymentNote"></span></p>
-      <button class="primary-button" data-close="success">Return to residence portal</button>
+      <button class="primary-button" data-close="success" data-i18n="success.returnPortal">Return to residence portal</button>
     </div>
   </div>
 
   <div class="toast" id="toast"></div>
-  <section class="resident-chat" id="residentChat" aria-label="AI assistant chat">
-    <button class="chat-launcher" id="chatLauncher" type="button" aria-expanded="false" aria-controls="chatPanel" aria-label="Open AI assistant">
+  <section class="resident-chat" id="residentChat" aria-label="AI assistant chat" data-i18n-aria-label="luna.widgetLabel">
+    <button class="chat-launcher" id="chatLauncher" type="button" aria-expanded="false" aria-controls="chatPanel" aria-label="Open AI assistant" data-i18n-aria-label="luna.open">
       <img src="ai-assistant-launcher.webp" alt="" aria-hidden="true">
     </button>
-    <button class="chat-teaser" id="chatTeaser" type="button">Ask me anything</button>
+    <button class="chat-teaser" id="chatTeaser" type="button" data-i18n="luna.teaser">Ask me anything</button>
     <div class="chat-panel" id="chatPanel" aria-hidden="true">
       <div class="chat-head">
         <div>
-          <h2>How can I help?</h2>
+          <h2 data-i18n="luna.title">How can I help?</h2>
         </div>
         <div class="chat-head-actions">
-          <button class="chat-clear" id="chatClear" type="button">Clear chat</button>
-          <button class="icon-button" id="chatClose" type="button" aria-label="Close assistant">×</button>
+          <button class="chat-clear" id="chatClear" type="button" data-i18n="luna.clear">Clear chat</button>
+          <button class="icon-button" id="chatClose" type="button" aria-label="Close assistant" data-i18n-aria-label="luna.close">×</button>
         </div>
       </div>
       <div class="chat-messages" id="chatMessages" aria-live="polite">
         <div class="chat-message assistant chat-welcome">
-          <strong>Hi! I'm Luna, BrickellHouse's virtual concierge.</strong>
-          <span>I can help with amenities, parking, packages, resident services, and much more.</span>
+          <strong data-i18n="luna.welcomeTitle">Hi! I'm Luna, BrickellHouse's virtual concierge.</strong>
+          <span data-i18n="luna.welcomeCopy">I can help with amenities, parking, packages, resident services, and much more.</span>
         </div>
       </div>
       <form class="chat-form" id="chatForm">
-        <input id="chatInput" name="message" maxlength="1500" autocomplete="off" placeholder="Ask a question" aria-label="Message the AI Assistant">
-        <button class="primary-button" id="chatSend" type="submit">Send</button>
+        <input id="chatInput" name="message" maxlength="1500" autocomplete="off" placeholder="Ask a question" aria-label="Message the AI Assistant" data-i18n-placeholder="luna.placeholder" data-i18n-aria-label="luna.inputLabel">
+        <button class="primary-button" id="chatSend" type="submit" data-i18n="luna.send">Send</button>
       </form>
-      <p class="chat-disclaimer">Luna can make mistakes. Check important information with Management.</p>
+      <p class="chat-disclaimer" data-i18n="luna.disclaimer">Luna can make mistakes. Check important information with Management.</p>
     </div>
   </section>
   <script src="legal.js?v=20260615-legal1"></script>
-  <script src="public-nav.js?v=20260622-ui-polish1"></script>
-  <script src="app.js?v=20260710-checkout-page1"></script>
-  <script src="roadmap.js?v=20260713-payment-focus1"></script>
-  <script src="chat.js?v=20260713-luna-phase2-contextfix1"></script>
+  <script src="public-nav.js?v=20260713-resident-i18n1"></script>
+  <script src="app.js?v=20260713-bilingual-cartlock2"></script>
+  <script src="roadmap.js?v=20260713-bilingual-cartlock2"></script>
+  <script src="chat.js?v=20260713-resident-i18n1"></script>
 </body>
 </html>

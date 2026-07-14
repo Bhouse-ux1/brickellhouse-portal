@@ -23,7 +23,9 @@ const seedProducts = [
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const money = value => new Intl.NumberFormat("en-US", {style:"currency",currency:"USD"}).format(value);
+const residentI18n = window.BH_I18N;
+const t = (key, params = {}) => residentI18n?.t(key, params) || key;
+const money = value => new Intl.NumberFormat(residentI18n?.getLanguage() === "es" ? "es-US" : "en-US", {style:"currency",currency:"USD"}).format(value);
 const todayISO = () => {
   const date = new Date();
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -54,11 +56,48 @@ function publicFeeSettings(value = {}) {
   };
 }
 
-const catalogIsCurrent = localStorage.getItem("bh_catalog_version") === CATALOG_VERSION;
-const storedProducts = catalogIsCurrent ? JSON.parse(localStorage.getItem("bh_products") || "null") : null;
+function safeLocalStorageGet(key) {
+  try {
+    return window.localStorage?.getItem(key) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function safeLocalStorageSet(key, value) {
+  try {
+    window.localStorage?.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function safeLocalStorageRemove(key) {
+  try {
+    window.localStorage?.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function safeJsonParse(value, fallback) {
+  if (typeof value !== "string" || !value) return fallback;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+const catalogIsCurrent = safeLocalStorageGet("bh_catalog_version") === CATALOG_VERSION;
+const storedProducts = catalogIsCurrent ? safeJsonParse(safeLocalStorageGet("bh_products"), null) : null;
+const storedCart = catalogIsCurrent ? safeJsonParse(safeLocalStorageGet("bh_cart"), []) : [];
+const storedFeeSettings = safeJsonParse(safeLocalStorageGet("bh_fee_settings"), null);
 let products = (Array.isArray(storedProducts) ? storedProducts : seedProducts).map(publicProduct);
-let cart = catalogIsCurrent ? JSON.parse(localStorage.getItem("bh_cart") || "[]") : [];
-let feeSettings = publicFeeSettings(JSON.parse(localStorage.getItem("bh_fee_settings") || "null") || {});
+let cart = Array.isArray(storedCart) ? storedCart : [];
+let feeSettings = publicFeeSettings(storedFeeSettings || {});
 let activeCategory = "All";
 window.BH_CATALOG_STATE = {complete:false, success:false};
 
@@ -69,11 +108,11 @@ function productImageSrc(image) {
 }
 
 function persist() {
-  localStorage.setItem("bh_products", JSON.stringify(products.map(publicProduct)));
-  localStorage.removeItem("bh_orders");
-  localStorage.setItem("bh_cart", JSON.stringify(cart));
-  localStorage.setItem("bh_fee_settings", JSON.stringify(publicFeeSettings(feeSettings)));
-  localStorage.setItem("bh_catalog_version", CATALOG_VERSION);
+  safeLocalStorageSet("bh_products", JSON.stringify(products.map(publicProduct)));
+  safeLocalStorageRemove("bh_orders");
+  safeLocalStorageSet("bh_cart", JSON.stringify(cart));
+  safeLocalStorageSet("bh_fee_settings", JSON.stringify(publicFeeSettings(feeSettings)));
+  safeLocalStorageSet("bh_catalog_version", CATALOG_VERSION);
 }
 
 function reconcileCartWithCatalog() {
@@ -90,6 +129,11 @@ function cartSubtotal() {
     const product = products.find(candidate => candidate.id === item.id);
     return sum + (product ? product.price * item.quantity : 0);
   }, 0);
+}
+
+function activeCheckoutSnapshot() {
+  if (!document.body.classList.contains("checkout-page")) return null;
+  return typeof window.BH_GET_CHECKOUT_SNAPSHOT === "function" ? window.BH_GET_CHECKOUT_SNAPSHOT() : null;
 }
 
 function processingFee(subtotal) {
@@ -110,7 +154,7 @@ function renderTabs() {
   const tabs = $("#categoryTabs");
   if (!tabs) return;
   tabs.innerHTML = ["All", ...CATEGORIES].map(category =>
-    `<button class="${category === activeCategory ? "active" : ""}" data-cat="${category}">${category}</button>`
+    `<button class="${category === activeCategory ? "active" : ""}" data-cat="${category}">${residentI18n?.categoryLabel(category) || category}</button>`
   ).join("");
   $$("#categoryTabs button").forEach(button => {
     button.onclick = () => {
@@ -126,24 +170,31 @@ function renderProducts() {
   const search = $("#searchInput");
   if (!grid || !search) return;
   const query = search.value.trim().toLowerCase();
-  const filtered = products.filter(product =>
-    product.active
-    && (activeCategory === "All" || product.category === activeCategory)
-    && `${product.name} ${product.description}`.toLowerCase().includes(query)
-  );
-  grid.innerHTML = filtered.map((product, index) =>
+  const filtered = products.filter(product => {
+    const display = residentI18n?.displayProduct(product) || product;
+    return product.active
+      && (activeCategory === "All" || product.category === activeCategory)
+      && `${product.name} ${product.description} ${display.name} ${display.description} ${display.category}`.toLowerCase().includes(query);
+  });
+  grid.innerHTML = filtered.map((product, index) => {
+    const display = residentI18n?.displayProduct(product) || product;
+    const stockText = product.inventory === 0
+      ? t("common.unavailable")
+      : product.inventory < 10 ? t("store.onlyAvailable", {count:product.inventory}) : t("common.available");
+    return (
     `<article class="product-card" style="animation-delay:${Math.min(index * .05, .4)}s">
       <div class="product-image">
-        <img src="${productImageSrc(product.image)}" alt="${product.name}">
-        <span class="stock-badge ${product.inventory < 10 ? "low" : ""}">${product.inventory === 0 ? "Unavailable" : product.inventory < 10 ? `Only ${product.inventory} available` : "Available"}</span>
+        <img src="${productImageSrc(product.image)}" alt="${display.name}">
+        <span class="stock-badge ${product.inventory < 10 ? "low" : ""}">${stockText}</span>
       </div>
       <div class="product-info">
-        <span class="product-category">${product.category}</span>
-        <h3>${product.name}</h3><p>${product.description}</p>
-        <div class="product-bottom"><strong>${product.price === 0 ? "Free" : money(product.price)}</strong><button class="add-button" data-add="${product.id}" ${product.inventory === 0 ? "disabled" : ""} aria-label="Add ${product.name}">+</button></div>
+        <span class="product-category">${display.category}</span>
+        <h3>${display.name}</h3><p>${display.description}</p>
+        <div class="product-bottom"><strong>${product.price === 0 ? t("common.free") : money(product.price)}</strong><button class="add-button" data-add="${product.id}" ${product.inventory === 0 ? "disabled" : ""} aria-label="${t("store.add", {name:display.name})}">+</button></div>
       </div>
     </article>`
-  ).join("");
+    );
+  }).join("");
   $("#emptyState")?.classList.toggle("hidden", filtered.length > 0);
   $$('[data-add]').forEach(button => button.onclick = () => addToCart(button.dataset.add));
 }
@@ -189,23 +240,25 @@ function addToCart(id) {
   }
   persist();
   renderCart();
-  toast(`${product.name} added to your bag`);
+  const display = residentI18n?.displayProduct(product) || product;
+  toast(t("store.added", {name:display.name}));
 }
 
-function updateCartSummary(items = cart.map(item => ({...item, product:products.find(product => product.id === item.id)})).filter(item => item.product), {toggleEmptyState = true} = {}) {
+function updateCartSummary(items = cart.map(item => ({...item, product:products.find(product => product.id === item.id)})).filter(item => item.product), {toggleEmptyState = true, totals = null} = {}) {
   if (!$("#cartCount")) return;
   $("#cartCount").textContent = items.reduce((sum, item) => sum + item.quantity, 0);
-  const subtotal = cartSubtotal();
-  const fee = processingFee(subtotal);
+  const subtotal = totals ? totals.subtotal : cartSubtotal();
+  const fee = totals ? totals.processingFee : processingFee(subtotal);
   $("#cartTotal").textContent = money(subtotal);
   if ($("#checkoutSubtotal")) $("#checkoutSubtotal").textContent = money(subtotal);
   if ($("#checkoutFee")) $("#checkoutFee").textContent = money(fee);
   if ($("#checkoutTotal")) $("#checkoutTotal").textContent = money(subtotal + fee);
   if ($("#checkoutAmountDue")) $("#checkoutAmountDue").textContent = money(subtotal + fee);
   if ($("#checkoutFeeLabel")) {
+    const feeLabel = String(feeSettings.label || "").trim().toLowerCase() === "processing fee" ? t("cart.processingFee") : feeSettings.label;
     $("#checkoutFeeLabel").textContent = feeSettings.enabled && feeSettings.type === "percent"
-      ? `${feeSettings.label} (${feeSettings.amount}%)`
-      : feeSettings.label;
+      ? `${feeLabel} (${feeSettings.amount}%)`
+      : feeLabel;
   }
   if (toggleEmptyState) {
     $("#cartEmpty").classList.toggle("hidden", items.length > 0);
@@ -215,13 +268,21 @@ function updateCartSummary(items = cart.map(item => ({...item, product:products.
 
 function renderCart() {
   if (!$("#cartCount") || !$("#cartItems")) return;
-  const items = cart.map(item => ({...item, product:products.find(product => product.id === item.id)})).filter(item => item.product);
-  updateCartSummary(items);
+  const snapshot = activeCheckoutSnapshot();
+  const items = snapshot
+    ? snapshot.items.map(item => ({...item, product:{id:item.id,name:item.name,price:item.price}}))
+    : cart.map(item => {
+      const product = products.find(product => product.id === item.id);
+      return product ? {...item, product:residentI18n?.displayProduct(product) || product} : null;
+    }).filter(Boolean);
+  updateCartSummary(items, {totals:snapshot});
   $("#cartItems").innerHTML = items.map(item =>
-    `<div class="cart-item">
+    `<div class="cart-item${snapshot ? " cart-item-locked" : ""}">
       <div class="cart-thumb">BH</div>
-      <div><h4>${item.product.name}</h4><div class="qty"><button data-qty="${item.id}" data-delta="-1">-</button><span>${item.quantity}</span><button data-qty="${item.id}" data-delta="1">+</button></div></div>
-      <div><strong>${money(item.product.price * item.quantity)}</strong><button class="remove" data-remove="${item.id}">Remove</button></div>
+      <div><h4>${item.product.name}</h4>${snapshot
+        ? `<div class="qty qty-locked">${t("cart.lockedQuantity", {count:item.quantity})}</div>`
+        : `<div class="qty"><button data-qty="${item.id}" data-delta="-1" aria-label="${t("cart.decrease", {name:item.product.name})}">-</button><span>${item.quantity}</span><button data-qty="${item.id}" data-delta="1" aria-label="${t("cart.increase", {name:item.product.name})}">+</button></div>`}</div>
+      <div><strong>${money(item.product.price * item.quantity)}</strong>${snapshot ? "" : `<button class="remove" data-remove="${item.id}">${t("common.remove")}</button>`}</div>
     </div>`
   ).join("");
   bindCartControls();
@@ -244,6 +305,7 @@ function bindCartControls() {
 }
 
 function changeQty(id, delta) {
+  if (activeCheckoutSnapshot()) return;
   const item = cart.find(candidate => candidate.id === id);
   const product = products.find(candidate => candidate.id === id);
   if (!item || !product) return;
@@ -255,7 +317,7 @@ function changeQty(id, delta) {
 
 function renderLegalNotice() {
   if (!$("#legalVersion") || !$("#legalDocument")) return;
-  $("#legalVersion").textContent = `Document version ${LEGAL_NOTICE_VERSION}`;
+  $("#legalVersion").textContent = t("legal.version", {version:LEGAL_NOTICE_VERSION});
   $("#legalDocument").innerHTML = window.BH_LEGAL_NOTICE.sections.map((section, index) =>
     `<section><${index ? "h3" : "h2"}>${section.title}</${index ? "h3" : "h2"}><p>${section.body}</p></section>`
   ).join("");
@@ -324,6 +386,13 @@ if (!document.body.classList.contains("checkout-page")) {
   }, {passive:true});
   window.addEventListener("resize", updateParallax);
 }
+
+document.addEventListener("bh:language-changed", () => {
+  renderTabs();
+  renderProducts();
+  renderCart();
+  renderLegalNotice();
+});
 
 reconcileCartWithCatalog();
 persist();

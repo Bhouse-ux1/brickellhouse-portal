@@ -1,0 +1,579 @@
+(function () {
+  "use strict";
+
+  const STORAGE_KEY = "bh_language";
+  const ALLOWED_LANGUAGES = new Set(["en", "es"]);
+  const dictionaries = {
+    en: {
+      "language.selector": "Resident language",
+      "language.english": "English",
+      "language.spanish": "Spanish",
+      "common.home": "Home",
+      "common.lifestyle": "Lifestyle",
+      "common.cancel": "Cancel",
+      "common.free": "Free",
+      "common.available": "Available",
+      "common.unavailable": "Unavailable",
+      "common.items": "items",
+      "common.quantity": "Quantity",
+      "common.phone": "Phone",
+      "common.remove": "Remove",
+      "common.close": "Close",
+      "common.tryAgain": "Please try again.",
+      "nav.openMenu": "Open menu",
+      "nav.closeMenu": "Close menu",
+      "nav.homeLabel": "BrickellHouse home",
+      "nav.mainLabel": "Main navigation",
+      "nav.lifestyleLabel": "Lifestyle navigation",
+      "nav.services": "Services",
+      "nav.trackOrder": "Track Order",
+      "nav.feedback": "Feedback",
+      "nav.concierge": "Concierge",
+      "nav.bag": "Bag",
+      "nav.openCart": "Open cart",
+      "brand.residentServices": "RESIDENT SERVICES",
+      "portal.pageTitle": "BrickellHouse | Resident Services",
+      "portal.metaDescription": "BrickellHouse resident services and essentials portal.",
+      "hero.imageLabel": "Luxury Miami glass residence at sunrise",
+      "hero.eyebrow": "Exclusively for residents",
+      "hero.copy": "Elevated resident essentials, thoughtfully delivered.",
+      "hero.cta": "Explore resident services",
+      "hero.location": "Miami, Florida",
+      "store.eyebrow": "Resident collection",
+      "store.title": "Services & essentials",
+      "store.search": "Search resident services",
+      "store.categoriesLabel": "Product categories",
+      "store.noResults": "No services match your search.",
+      "store.add": "Add {{name}}",
+      "store.added": "{{name}} added to your bag",
+      "store.onlyAvailable": "Only {{count}} available",
+      "concierge.eyebrow": "Private concierge",
+      "concierge.title": "Need a little assistance?",
+      "concierge.copy": "Our resident services team is available to guide your request and coordinate collection.",
+      "concierge.contact": "Contact resident support",
+      "concierge.office": "Resident services office",
+      "concierge.weekdays": "Monday - Friday",
+      "concierge.frontDesk": "Front Desk",
+      "concierge.adminAssistant": "Administrative Assistant",
+      "concierge.receiving": "Receiving",
+      "concierge.parkingAttendant": "Parking Attendant",
+      "tracker.eyebrow": "Order updates",
+      "tracker.title": "Track your order",
+      "tracker.copy": "Enter your BrickellHouse order number to see its current status.",
+      "tracker.orderId": "Order ID",
+      "tracker.check": "Check status",
+      "tracker.checking": "Checking order...",
+      "tracker.currentStatus": "Current Status",
+      "tracker.notFoundTitle": "Order not found.",
+      "tracker.notFoundBody": "Check the order ID and try again, or contact Management for assistance.",
+      "status.new": "New",
+      "status.received": "Received",
+      "status.pending": "Pending",
+      "status.paid": "Paid",
+      "status.processing": "Processing",
+      "status.ready": "Ready",
+      "status.ready-for-pickup": "Ready for Pickup",
+      "status.completed": "Completed",
+      "status.cancelled": "Cancelled",
+      "feedback.eyebrow": "Resident voice",
+      "feedback.title": "Tell us what you think.",
+      "feedback.entryCopy": "Your perspective helps us shape a better BrickellHouse resident experience.",
+      "feedback.open": "Share feedback",
+      "feedback.dialogLabel": "Resident feedback",
+      "feedback.close": "Close feedback",
+      "feedback.choiceCopy": "Choose the option that best describes what you would like to share.",
+      "feedback.like": "I like something",
+      "feedback.dislike": "I don't like something",
+      "feedback.suggestion": "I have a suggestion",
+      "feedback.back": "Back to feedback types",
+      "feedback.share": "Share your thoughts",
+      "feedback.label": "Feedback",
+      "feedback.name": "Resident name",
+      "feedback.unit": "Unit number",
+      "feedback.email": "Email",
+      "feedback.phoneOptional": "Phone optional",
+      "feedback.message": "Message",
+      "feedback.send": "Send feedback",
+      "feedback.sending": "Sending feedback...",
+      "feedback.failed": "Feedback was not submitted.",
+      "feedback.unable": "Unable to save feedback.",
+      "feedback.received": "Feedback received",
+      "feedback.thankYou": "Thank you.",
+      "feedback.thanksCopy": "Thank you for your feedback. We appreciate you taking the time to share your thoughts with us.",
+      "feedback.done": "Return to resident services",
+      "footer.portal": "Resident Services Portal",
+      "footer.privacy": "Privacy",
+      "footer.support": "Resident Support",
+      "footer.copyright": "© 2026 BrickellHouse Condominium Association",
+      "closing.label": "BrickellHouse rooftop pool",
+      "closing.copy": "At home above Brickell",
+      "cart.label": "Shopping bag",
+      "cart.eyebrow": "Resident order",
+      "cart.title": "Your bag",
+      "cart.emptyTitle": "Your bag is empty",
+      "cart.emptyCopy": "Resident services you select will appear here.",
+      "cart.subtotal": "Subtotal",
+      "cart.processingFee": "Processing fee",
+      "cart.approvalCopy": "Requests may require resident services approval and resident verification.",
+      "cart.checkout": "Continue to checkout",
+      "cart.decrease": "Decrease {{name}} quantity",
+      "cart.increase": "Increase {{name}} quantity",
+      "cart.lockedQuantity": "Quantity: {{count}}",
+      "success.requestReceived": "Request received",
+      "success.thankYou": "Thank you{{name}}.",
+      "success.orderReceived": "Your order {{order}} has been received.",
+      "success.returnPortal": "Return to residence portal",
+      "checkout.pageTitle": "Resident Checkout | BrickellHouse",
+      "checkout.metaDescription": "Secure BrickellHouse resident checkout",
+      "checkout.returnLabel": "Return to BrickellHouse Resident Store",
+      "checkout.returnStore": "Return to Store",
+      "checkout.returnResidentStore": "Return to Resident Store",
+      "checkout.eyebrow": "Secure resident checkout",
+      "checkout.title": "Complete your request.",
+      "checkout.intro": "Review your order, verify your residence details, and continue when you are ready.",
+      "checkout.confirmingAvailability": "Confirming product availability...",
+      "checkout.emptyEyebrow": "Your bag",
+      "checkout.emptyTitle": "There is nothing to check out yet.",
+      "checkout.emptyCopy": "Return to the Resident Store to select a service or product.",
+      "checkout.selection": "Your selection",
+      "checkout.summary": "Order summary",
+      "checkout.itemsSubtotal": "Items subtotal",
+      "checkout.total": "Total",
+      "checkout.residentInfo": "Resident information",
+      "checkout.contactTitle": "Where should Management contact you?",
+      "checkout.fullName": "Full name",
+      "checkout.unitExample": "e.g. 2504",
+      "checkout.emailExample": "you@example.com",
+      "checkout.phoneExample": "(305) 555-0000",
+      "checkout.securityLabel": "Secure payment information",
+      "checkout.securityTitle": "Secure encrypted checkout",
+      "checkout.securityCopy": "Payments are securely processed by Stripe. BrickellHouse does not store your card information.",
+      "checkout.amountDue": "Amount due",
+      "checkout.legalRequired": "Legal review required",
+      "checkout.legalRequiredCopy": "Please review the complete terms and accept them before continuing to secure payment.",
+      "checkout.legalAccepted": "Legal Terms Accepted",
+      "checkout.legalAcceptedCopy": "The complete terms have been reviewed and accepted for this checkout.",
+      "checkout.reviewLegal": "Review Legal Terms",
+      "checkout.viewLegal": "View Legal Terms",
+      "checkout.continueSecure": "Continue to secure payment",
+      "checkout.submitOrder": "Submit resident order",
+      "checkout.completeBelow": "Complete secure payment below",
+      "checkout.preparing": "Preparing secure payment...",
+      "checkout.recording": "Recording resident order...",
+      "checkout.authorization": "By continuing, you authorize BrickellHouse to verify your resident status.",
+      "checkout.detailsReady": "Your details are complete. Select Continue to open secure payment.",
+      "checkout.detailsNeeded": "Please complete all required details and accept the legal notice to continue to secure payment.",
+      "checkout.stripeReady": "Complete your secure Stripe payment below.",
+      "checkout.catalogUnavailable": "Product availability could not be confirmed. Please return to the store and try again.",
+      "checkout.emptyError": "Your bag is empty. Add a resident service before checkout.",
+      "checkout.nameError": "Please enter the resident's full name.",
+      "checkout.unitError": "Please enter the unit number.",
+      "checkout.unitInvalid": "Please check the unit number and try again.",
+      "checkout.emailError": "Please enter a valid email address.",
+      "checkout.phoneError": "Please enter a valid U.S. phone number, for example (305) 555-0000.",
+      "checkout.legalError": "Please review and accept the legal notice before submitting.",
+      "checkout.paymentUnavailable": "Online payment is currently unavailable. Please contact Management.",
+      "checkout.secureUnavailable": "Secure online checkout is currently unavailable. Please contact Management.",
+      "checkout.sessionFailed": "Secure payment could not be started. Please try again or contact Management.",
+      "checkout.orderFailed": "Sorry, your order could not be submitted. Please try again.",
+      "checkout.confirmFailed": "Stripe payment was received, but the order could not be confirmed. Please contact Management.",
+      "checkout.paymentReceived": "Payment received",
+      "checkout.paidTitle": "Thank you. Your payment has been received.",
+      "checkout.paidBody": "Your request has been submitted successfully. Management will contact you once your order is ready.",
+      "checkout.orderReference": "Order {{order}}.",
+      "checkout.returnPaymentTitle": "Payment received.",
+      "checkout.returnPaymentBody": "Your payment was received, but the website could not refresh the confirmation details. Please contact Management if your order does not appear shortly.",
+      "checkout.noPayment": "No payment was required. Management can now process your request.",
+      "checkout.paymentConfirmed": "Payment was confirmed. Management can now process your request.",
+      "checkout.interrupted": "Your secure payment session is being restored. Please wait.",
+      "legal.close": "Close legal notice",
+      "legal.eyebrow": "Resident legal notice",
+      "legal.title": "Legal Notice and Limitation of Liability",
+      "legal.officialNotice": "Official legal notice. The authoritative agreement below is provided in English.",
+      "legal.version": "Document version {{version}}",
+      "legal.instruction": "Please review the complete terms. Acceptance will become available once you reach the end.",
+      "legal.acceptedInstruction": "These complete terms have been accepted for this checkout.",
+      "legal.completeTerms": "Complete legal terms",
+      "legal.end": "End of legal terms",
+      "legal.accept": "Accept Legal Terms",
+      "luna.widgetLabel": "AI assistant chat",
+      "luna.open": "Open AI assistant",
+      "luna.close": "Close assistant",
+      "luna.teaser": "Ask me anything",
+      "luna.title": "How can I help?",
+      "luna.clear": "Clear chat",
+      "luna.welcomeTitle": "Hi! I'm Luna, BrickellHouse's virtual concierge.",
+      "luna.welcomeCopy": "I can help with amenities, parking, packages, resident services, and much more.",
+      "luna.placeholder": "Ask a question",
+      "luna.inputLabel": "Message the AI Assistant",
+      "luna.send": "Send",
+      "luna.thinking": "Thinking",
+      "luna.error": "Sorry, I could not respond right now. Please try again.",
+      "luna.rateLimit": "Luna has received several messages. Please wait a moment and try again.",
+      "luna.disclaimer": "Luna can make mistakes. Check important information with Management.",
+      "lifestyle.heroLabel": "BrickellHouse lifestyle coming soon",
+      "lifestyle.pageTitle": "BrickellHouse | Lifestyle",
+      "lifestyle.metaDescription": "BrickellHouse lifestyle experiences coming soon.",
+      "lifestyle.comingSoon": "Coming soon",
+      "lifestyle.copy": "Resident experiences, curated amenities, and elevated BrickellHouse living are coming soon.",
+      "lifestyle.returnHome": "Return home"
+    },
+    es: {
+      "language.selector": "Idioma para residentes",
+      "language.english": "Inglés",
+      "language.spanish": "Español",
+      "common.home": "Inicio",
+      "common.lifestyle": "Estilo de vida",
+      "common.cancel": "Cancelar",
+      "common.free": "Gratis",
+      "common.available": "Disponible",
+      "common.unavailable": "No disponible",
+      "common.items": "artículos",
+      "common.quantity": "Cantidad",
+      "common.phone": "Teléfono",
+      "common.remove": "Eliminar",
+      "common.close": "Cerrar",
+      "common.tryAgain": "Inténtelo de nuevo.",
+      "nav.openMenu": "Abrir menú",
+      "nav.closeMenu": "Cerrar menú",
+      "nav.homeLabel": "Inicio de BrickellHouse",
+      "nav.mainLabel": "Navegación principal",
+      "nav.lifestyleLabel": "Navegación de estilo de vida",
+      "nav.services": "Servicios",
+      "nav.trackOrder": "Rastrear pedido",
+      "nav.feedback": "Comentarios",
+      "nav.concierge": "Conserjería",
+      "nav.bag": "Bolsa",
+      "nav.openCart": "Abrir bolsa",
+      "brand.residentServices": "SERVICIOS PARA RESIDENTES",
+      "portal.pageTitle": "BrickellHouse | Servicios para Residentes",
+      "portal.metaDescription": "Portal de servicios y artículos esenciales para residentes de BrickellHouse.",
+      "hero.imageLabel": "Residencia de vidrio de lujo en Miami al amanecer",
+      "hero.eyebrow": "Exclusivamente para residentes",
+      "hero.copy": "Servicios esenciales para residentes, cuidadosamente preparados.",
+      "hero.cta": "Explorar servicios para residentes",
+      "hero.location": "Miami, Florida",
+      "store.eyebrow": "Colección para residentes",
+      "store.title": "Servicios y artículos esenciales",
+      "store.search": "Buscar servicios para residentes",
+      "store.categoriesLabel": "Categorías de productos",
+      "store.noResults": "Ningún servicio coincide con su búsqueda.",
+      "store.add": "Agregar {{name}}",
+      "store.added": "{{name}} se agregó a su bolsa",
+      "store.onlyAvailable": "Solo quedan {{count}}",
+      "concierge.eyebrow": "Conserjería privada",
+      "concierge.title": "¿Necesita asistencia?",
+      "concierge.copy": "Nuestro equipo de servicios para residentes está disponible para orientarle y coordinar la entrega.",
+      "concierge.contact": "Contactar asistencia para residentes",
+      "concierge.office": "Oficina de servicios para residentes",
+      "concierge.weekdays": "Lunes a viernes",
+      "concierge.frontDesk": "Recepción",
+      "concierge.adminAssistant": "Asistente administrativa",
+      "concierge.receiving": "Paquetería",
+      "concierge.parkingAttendant": "Encargado de estacionamiento",
+      "tracker.eyebrow": "Actualizaciones del pedido",
+      "tracker.title": "Rastree su pedido",
+      "tracker.copy": "Ingrese su número de pedido de BrickellHouse para ver el estado actual.",
+      "tracker.orderId": "ID del pedido",
+      "tracker.check": "Consultar estado",
+      "tracker.checking": "Consultando el pedido...",
+      "tracker.currentStatus": "Estado actual",
+      "tracker.notFoundTitle": "No se encontró el pedido.",
+      "tracker.notFoundBody": "Revise el ID del pedido e inténtelo de nuevo, o comuníquese con la Administración.",
+      "status.new": "Nuevo",
+      "status.received": "Recibido",
+      "status.pending": "Pendiente",
+      "status.paid": "Pagado",
+      "status.processing": "En proceso",
+      "status.ready": "Listo",
+      "status.ready-for-pickup": "Listo para recoger",
+      "status.completed": "Completado",
+      "status.cancelled": "Cancelado",
+      "feedback.eyebrow": "La voz del residente",
+      "feedback.title": "Cuéntenos qué piensa.",
+      "feedback.entryCopy": "Su opinión nos ayuda a mejorar la experiencia residencial de BrickellHouse.",
+      "feedback.open": "Compartir comentarios",
+      "feedback.dialogLabel": "Comentarios de residentes",
+      "feedback.close": "Cerrar comentarios",
+      "feedback.choiceCopy": "Elija la opción que mejor describa lo que desea compartir.",
+      "feedback.like": "Me gusta algo",
+      "feedback.dislike": "No me gusta algo",
+      "feedback.suggestion": "Tengo una sugerencia",
+      "feedback.back": "Volver a los tipos de comentarios",
+      "feedback.share": "Comparta sus ideas",
+      "feedback.label": "Comentarios",
+      "feedback.name": "Nombre del residente",
+      "feedback.unit": "Número de unidad",
+      "feedback.email": "Correo electrónico",
+      "feedback.phoneOptional": "Teléfono opcional",
+      "feedback.message": "Mensaje",
+      "feedback.send": "Enviar comentarios",
+      "feedback.sending": "Enviando comentarios...",
+      "feedback.failed": "No se enviaron los comentarios.",
+      "feedback.unable": "No fue posible guardar los comentarios.",
+      "feedback.received": "Comentarios recibidos",
+      "feedback.thankYou": "Gracias.",
+      "feedback.thanksCopy": "Gracias por sus comentarios. Agradecemos que se haya tomado el tiempo para compartirlos.",
+      "feedback.done": "Volver a los servicios para residentes",
+      "footer.portal": "Portal de Servicios para Residentes",
+      "footer.privacy": "Privacidad",
+      "footer.support": "Asistencia para residentes",
+      "footer.copyright": "© 2026 BrickellHouse Condominium Association",
+      "closing.label": "Piscina en la azotea de BrickellHouse",
+      "closing.copy": "En casa sobre Brickell",
+      "cart.label": "Bolsa de compras",
+      "cart.eyebrow": "Pedido del residente",
+      "cart.title": "Su bolsa",
+      "cart.emptyTitle": "Su bolsa está vacía",
+      "cart.emptyCopy": "Los servicios que seleccione aparecerán aquí.",
+      "cart.subtotal": "Subtotal",
+      "cart.processingFee": "Cargo por procesamiento",
+      "cart.approvalCopy": "Las solicitudes pueden requerir aprobación y verificación de residencia.",
+      "cart.checkout": "Continuar al pago",
+      "cart.decrease": "Reducir la cantidad de {{name}}",
+      "cart.increase": "Aumentar la cantidad de {{name}}",
+      "cart.lockedQuantity": "Cantidad: {{count}}",
+      "success.requestReceived": "Solicitud recibida",
+      "success.thankYou": "Gracias{{name}}.",
+      "success.orderReceived": "Su pedido {{order}} ha sido recibido.",
+      "success.returnPortal": "Volver al portal de residentes",
+      "checkout.pageTitle": "Pago para Residentes | BrickellHouse",
+      "checkout.metaDescription": "Pago seguro para residentes de BrickellHouse",
+      "checkout.returnLabel": "Volver a la Tienda para Residentes de BrickellHouse",
+      "checkout.returnStore": "Volver a la Tienda",
+      "checkout.returnResidentStore": "Volver a la Tienda para Residentes",
+      "checkout.eyebrow": "Pago seguro para residentes",
+      "checkout.title": "Complete su solicitud.",
+      "checkout.intro": "Revise su pedido, verifique los datos de residencia y continúe cuando esté listo.",
+      "checkout.confirmingAvailability": "Confirmando disponibilidad de productos...",
+      "checkout.emptyEyebrow": "Su bolsa",
+      "checkout.emptyTitle": "Todavía no hay artículos para pagar.",
+      "checkout.emptyCopy": "Vuelva a la Tienda para Residentes para seleccionar un servicio o producto.",
+      "checkout.selection": "Su selección",
+      "checkout.summary": "Resumen del pedido",
+      "checkout.itemsSubtotal": "Subtotal de artículos",
+      "checkout.total": "Total",
+      "checkout.residentInfo": "Información del residente",
+      "checkout.contactTitle": "¿Dónde debe contactarle la Administración?",
+      "checkout.fullName": "Nombre completo",
+      "checkout.unitExample": "p. ej., 2504",
+      "checkout.emailExample": "usted@ejemplo.com",
+      "checkout.phoneExample": "(305) 555-0000",
+      "checkout.securityLabel": "Información de pago seguro",
+      "checkout.securityTitle": "Pago seguro y cifrado",
+      "checkout.securityCopy": "Stripe procesa los pagos de forma segura. BrickellHouse no almacena la información de su tarjeta.",
+      "checkout.amountDue": "Monto a pagar",
+      "checkout.legalRequired": "Se requiere revisión legal",
+      "checkout.legalRequiredCopy": "Revise todos los términos y acéptelos antes de continuar al pago seguro.",
+      "checkout.legalAccepted": "Términos legales aceptados",
+      "checkout.legalAcceptedCopy": "Los términos completos fueron revisados y aceptados para este pago.",
+      "checkout.reviewLegal": "Revisar términos legales",
+      "checkout.viewLegal": "Ver términos legales",
+      "checkout.continueSecure": "Continuar al pago seguro",
+      "checkout.submitOrder": "Enviar pedido del residente",
+      "checkout.completeBelow": "Complete el pago seguro a continuación",
+      "checkout.preparing": "Preparando el pago seguro...",
+      "checkout.recording": "Registrando el pedido...",
+      "checkout.authorization": "Al continuar, autoriza a BrickellHouse a verificar su condición de residente.",
+      "checkout.detailsReady": "Sus datos están completos. Seleccione Continuar para abrir el pago seguro.",
+      "checkout.detailsNeeded": "Complete todos los datos requeridos y acepte el aviso legal para continuar al pago seguro.",
+      "checkout.stripeReady": "Complete su pago seguro con Stripe a continuación.",
+      "checkout.catalogUnavailable": "No se pudo confirmar la disponibilidad. Vuelva a la tienda e inténtelo de nuevo.",
+      "checkout.emptyError": "Su bolsa está vacía. Agregue un servicio antes de pagar.",
+      "checkout.nameError": "Ingrese el nombre completo del residente.",
+      "checkout.unitError": "Ingrese el número de unidad.",
+      "checkout.unitInvalid": "Revise el número de unidad e inténtelo de nuevo.",
+      "checkout.emailError": "Ingrese una dirección de correo válida.",
+      "checkout.phoneError": "Ingrese un teléfono válido de EE. UU., por ejemplo (305) 555-0000.",
+      "checkout.legalError": "Revise y acepte el aviso legal antes de enviar.",
+      "checkout.paymentUnavailable": "El pago en línea no está disponible en este momento. Comuníquese con la Administración.",
+      "checkout.secureUnavailable": "El pago seguro en línea no está disponible en este momento. Comuníquese con la Administración.",
+      "checkout.sessionFailed": "No se pudo iniciar el pago seguro. Inténtelo de nuevo o comuníquese con la Administración.",
+      "checkout.orderFailed": "Lo sentimos, no se pudo enviar su pedido. Inténtelo de nuevo.",
+      "checkout.confirmFailed": "Stripe recibió el pago, pero no se pudo confirmar el pedido. Comuníquese con la Administración.",
+      "checkout.paymentReceived": "Pago recibido",
+      "checkout.paidTitle": "Gracias. Hemos recibido su pago.",
+      "checkout.paidBody": "Su solicitud se envió correctamente. La Administración le contactará cuando su pedido esté listo.",
+      "checkout.orderReference": "Pedido {{order}}.",
+      "checkout.returnPaymentTitle": "Pago recibido.",
+      "checkout.returnPaymentBody": "Recibimos su pago, pero el sitio no pudo actualizar la confirmación. Comuníquese con la Administración si su pedido no aparece pronto.",
+      "checkout.noPayment": "No se requirió pago. La Administración ya puede procesar su solicitud.",
+      "checkout.paymentConfirmed": "El pago fue confirmado. La Administración ya puede procesar su solicitud.",
+      "checkout.interrupted": "Estamos restaurando su sesión de pago seguro. Espere un momento.",
+      "legal.close": "Cerrar aviso legal",
+      "legal.eyebrow": "Aviso legal para residentes",
+      "legal.title": "Aviso Legal y Limitación de Responsabilidad",
+      "legal.officialNotice": "Aviso legal oficial. El acuerdo vinculante que aparece a continuación se proporciona en inglés.",
+      "legal.version": "Versión del documento {{version}}",
+      "legal.instruction": "Revise todos los términos. Podrá aceptarlos cuando llegue al final.",
+      "legal.acceptedInstruction": "Estos términos completos fueron aceptados para este pago.",
+      "legal.completeTerms": "Términos legales completos",
+      "legal.end": "Fin de los términos legales",
+      "legal.accept": "Aceptar términos legales",
+      "luna.widgetLabel": "Chat con asistente de IA",
+      "luna.open": "Abrir asistente de IA",
+      "luna.close": "Cerrar asistente",
+      "luna.teaser": "Pregúntame lo que quieras",
+      "luna.title": "¿Cómo puedo ayudar?",
+      "luna.clear": "Borrar chat",
+      "luna.welcomeTitle": "¡Hola! Soy Luna, la conserje virtual de BrickellHouse.",
+      "luna.welcomeCopy": "Puedo ayudar con amenidades, estacionamiento, paquetes, servicios para residentes y mucho más.",
+      "luna.placeholder": "Haga una pregunta",
+      "luna.inputLabel": "Mensaje para la asistente de IA",
+      "luna.send": "Enviar",
+      "luna.thinking": "Pensando",
+      "luna.error": "Lo sentimos, no pude responder en este momento. Inténtelo de nuevo.",
+      "luna.rateLimit": "Luna ha recibido varios mensajes. Espere un momento e inténtelo de nuevo.",
+      "luna.disclaimer": "Luna puede cometer errores. Confirme la información importante con la Administración.",
+      "lifestyle.heroLabel": "Próximamente: estilo de vida BrickellHouse",
+      "lifestyle.pageTitle": "BrickellHouse | Estilo de vida",
+      "lifestyle.metaDescription": "Próximamente: experiencias de estilo de vida BrickellHouse.",
+      "lifestyle.comingSoon": "Próximamente",
+      "lifestyle.copy": "Muy pronto: experiencias para residentes, amenidades seleccionadas y la vida elevada de BrickellHouse.",
+      "lifestyle.returnHome": "Volver al inicio"
+    }
+  };
+
+  const categoryKeys = {
+    "All":"category.all",
+    "Keys & Access":"category.keysAccess",
+    "Maintenance Services":"category.maintenance",
+    "HVAC Services":"category.hvac",
+    "Subscriptions & Plans":"category.subscriptions"
+  };
+  Object.assign(dictionaries.en, {
+    "category.all":"All",
+    "category.keysAccess":"Keys & Access",
+    "category.maintenance":"Maintenance Services",
+    "category.hvac":"HVAC Services",
+    "category.subscriptions":"Subscriptions & Plans"
+  });
+  Object.assign(dictionaries.es, {
+    "category.all":"Todos",
+    "category.keysAccess":"Llaves y acceso",
+    "category.maintenance":"Servicios de mantenimiento",
+    "category.hvac":"Servicios de aire acondicionado",
+    "category.subscriptions":"Suscripciones y planes"
+  });
+
+  const productTranslations = {
+    svc1:{name:"Copia de llave del buzón",description:"Llave de reemplazo para su buzón asignado."},
+    svc2:{name:"Copia de llave de la unidad",description:"Reemplazo de la llave de la puerta de su unidad."},
+    svc3:{name:"Reemplazo de batería del detector de humo",description:"Incluye batería y mano de obra."},
+    svc4:{name:"Reemplazo del filtro del aire acondicionado",description:"Incluye filtro y mano de obra."},
+    svc5:{name:"Reemplazo del compactador de basura",description:"Incluye piezas y mano de obra."},
+    svc6:{name:"Servicio para destapar inodoro o fregadero",description:"Incluye destape y mano de obra para cada fregadero o inodoro."},
+    svc7:{name:"Asistencia por cierre accidental",description:"Incluye acceso y mano de obra."},
+    svc8:{name:"Reparación de grifo",description:"Incluye piezas y mano de obra."},
+    svc9:{name:"Reinicio del termostato o revisión del sistema",description:"Incluye ajustes menores y mano de obra."},
+    svc10:{name:"Alquiler de unidad portátil de aire acondicionado",description:"$25.00 por día; requiere un depósito reembolsable de $300 pagado por adelantado."},
+    svc11:{name:"Reemplazo del termostato",description:"Reemplazo del termostato sin costo."},
+    svc12:{name:"Suscripción anual de filtros de aire acondicionado",description:"Incluye 12 reemplazos programados al año, uno por mes."},
+    svc13:{name:"Suscripción al servicio de valet",description:"Incluye valet ilimitado durante un mes para cada vehículo registrado por unidad."},
+    svc14:{name:"Limpieza de la línea de drenaje del aire acondicionado",description:"Incluye limpieza y enjuague de la línea para evitar desbordamientos."},
+    svc15:{name:"Plan Premium de Cuidado para Residentes",description:"Facturación anual. Cubre mano de obra básica de mantenimiento en la unidad, incluyendo bombillas, aire acondicionado, filtros, termostatos, destapes, retoques menores e inspecciones generales."}
+  };
+
+  function safeReadLanguage() {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      return ALLOWED_LANGUAGES.has(stored) ? stored : "en";
+    } catch {
+      return "en";
+    }
+  }
+
+  let language = safeReadLanguage();
+  document.documentElement.lang = language;
+
+  function interpolate(value, params) {
+    return String(value).replace(/\{\{(\w+)\}\}/g, (match, key) => Object.prototype.hasOwnProperty.call(params, key) ? String(params[key]) : match);
+  }
+
+  function t(key, params = {}) {
+    const value = dictionaries[language]?.[key] ?? dictionaries.en[key] ?? key;
+    return interpolate(value, params);
+  }
+
+  function apply(root = document) {
+    root.querySelectorAll("[data-i18n]").forEach(element => {
+      element.textContent = t(element.dataset.i18n);
+    });
+    root.querySelectorAll("[data-i18n-placeholder]").forEach(element => {
+      element.setAttribute("placeholder", t(element.dataset.i18nPlaceholder));
+    });
+    root.querySelectorAll("[data-i18n-aria-label]").forEach(element => {
+      element.setAttribute("aria-label", t(element.dataset.i18nAriaLabel));
+    });
+    root.querySelectorAll("[data-i18n-title]").forEach(element => {
+      element.setAttribute("title", t(element.dataset.i18nTitle));
+    });
+    document.querySelectorAll("[data-language]").forEach(button => {
+      const selected = button.dataset.language === language;
+      button.setAttribute("aria-pressed", String(selected));
+      if (selected) button.setAttribute("aria-current", "true");
+      else button.removeAttribute("aria-current");
+    });
+    const titleKey = document.body?.dataset.i18nTitle;
+    if (titleKey) document.title = t(titleKey);
+    const descriptionKey = document.querySelector('meta[name="description"]')?.dataset.i18nContent;
+    if (descriptionKey) document.querySelector('meta[name="description"]').setAttribute("content", t(descriptionKey));
+  }
+
+  function setLanguage(nextLanguage, {persist = true, announce = true} = {}) {
+    const next = ALLOWED_LANGUAGES.has(nextLanguage) ? nextLanguage : "en";
+    const changed = next !== language;
+    language = next;
+    document.documentElement.lang = language;
+    if (persist) {
+      try { localStorage.setItem(STORAGE_KEY, language); } catch {}
+    }
+    apply(document);
+    if (changed && announce) document.dispatchEvent(new CustomEvent("bh:language-changed", {detail:{language}}));
+  }
+
+  function bindLanguageControls() {
+    document.querySelectorAll("[data-language]").forEach(button => {
+      button.addEventListener("click", () => setLanguage(button.dataset.language));
+    });
+    apply(document);
+  }
+
+  function displayProduct(product = {}) {
+    if (language !== "es") return {...product};
+    const translated = productTranslations[product.id] || {};
+    return {
+      ...product,
+      name:translated.name || product.name,
+      description:translated.description || product.description,
+      category:t(categoryKeys[product.category] || product.category)
+    };
+  }
+
+  function categoryLabel(category) {
+    return t(categoryKeys[category] || category);
+  }
+
+  function statusLabel(status) {
+    const normalized = String(status || "").trim().toLowerCase().replace(/\s+/g, "-");
+    return t(`status.${normalized}`) === `status.${normalized}` ? String(status || "") : t(`status.${normalized}`);
+  }
+
+  window.BH_I18N = Object.freeze({
+    STORAGE_KEY,
+    t,
+    apply,
+    setLanguage,
+    getLanguage:() => language,
+    displayProduct,
+    categoryLabel,
+    statusLabel
+  });
+
+  window.addEventListener("storage", event => {
+    if (event.key === STORAGE_KEY) setLanguage(ALLOWED_LANGUAGES.has(event.newValue) ? event.newValue : "en", {persist:false});
+  });
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bindLanguageControls);
+  else bindLanguageControls();
+})();

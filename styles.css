@@ -500,6 +500,28 @@ body.management-page{background:#eef0ec}
 @media(max-width:900px){.checkout-layout{grid-template-columns:1fr}.checkout-summary{position:static}.checkout-details{padding:32px}.checkout-summary{padding:27px}}
 @media(max-width:600px){.checkout-page .checkout-header{min-height:72px;padding:14px 18px}.checkout-brand img{width:58px;height:38px}.checkout-brand strong{font-size:19px}.checkout-brand small{display:none}.checkout-return{font-size:8px}.checkout-shell{width:min(100% - 24px,1220px);padding:42px 0 60px}.checkout-heading{margin-bottom:28px}.checkout-heading h1{font-size:42px}.checkout-summary,.checkout-details{padding:22px 18px}.checkout-summary-head{display:grid}.checkout-page .field-grid{grid-template-columns:1fr}.checkout-security{grid-template-columns:36px 1fr;padding:15px}.checkout-page .legal-review-state{grid-template-columns:1fr}.checkout-page .legal-review-trigger{width:100%}.checkout-confirmation{margin:32px auto;padding:50px 22px}.checkout-confirmation h1{font-size:42px}.checkout-page .checkout-legal-modal{padding:8px}.checkout-page .checkout-legal-modal .legal-review-card{width:100%;height:calc(100vh - 16px);height:calc(100svh - 16px);max-height:calc(100vh - 16px);max-height:calc(100svh - 16px);padding:36px 18px 16px}.checkout-page .legal-review-card>h2{font-size:30px}.checkout-page .legal-review-instruction{margin:10px 0}.checkout-page .legal-review-scroll{padding:19px 17px}.checkout-page .legal-review-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding-top:12px}.checkout-page .legal-review-actions button{padding:11px 10px}}
 @media(prefers-reduced-motion:reduce){.checkout-loading span{animation:none}.checkout-page .checkout-proceed:hover:not(:disabled){transform:none}}
+
+.language-selector{display:flex;align-items:center;gap:6px;margin-left:24px;color:rgba(255,255,255,.72);font-size:10px;line-height:1;white-space:nowrap}
+.language-selector button{min-width:28px;min-height:32px;padding:0 4px;border:0;border-bottom:1px solid transparent;background:transparent;color:inherit;font:inherit;letter-spacing:.08em;cursor:pointer}
+.language-selector button[aria-pressed="true"]{border-bottom-color:#fff;color:#fff;font-weight:600}
+.language-selector button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.checkout-page .cart-item-locked{cursor:default}
+.checkout-page .qty-locked{color:#676d68;font-size:10px;line-height:1.5}
+.checkout-page .legal-official-note{margin:10px 0 0;color:#5e655f;font-size:10px;line-height:1.55}
+.checkout-page .checkout-legal-modal .legal-review-card{grid-template-rows:auto auto auto auto auto minmax(0,1fr) auto}
+
+@media(max-width:900px){
+  .site-header .language-selector{margin-left:16px}
+  .site-header nav{gap:20px}
+}
+
+@media(max-width:700px){
+  .site-header .language-selector{margin-left:auto;margin-right:10px;gap:3px}
+  .site-header .language-selector button{min-width:25px;min-height:34px}
+  .site-header .cart-button{margin-left:0}
+  .lifestyle-page .site-header .language-selector{margin-left:auto}
+  .lifestyle-page .site-header>.primary-button{display:none}
+}
 @keyframes chatIconPulse{0%,100%{opacity:.38;transform:translate(-50%,-50%) scale(.98)}50%{opacity:.82;transform:translate(-50%,-50%) scale(1.28)}}
 @media(max-width:700px){.chat-launcher{width:68px;height:68px}.chat-launcher:before{width:64px;height:64px}.chat-launcher img{width:64px;height:64px}.chat-teaser{right:78px;bottom:15px;max-width:none}.chat-panel{bottom:82px}}
 .resident-chat{z-index:1000}

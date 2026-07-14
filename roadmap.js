@@ -5,13 +5,59 @@ let stripeEmbeddedCheckout = null;
 let stripeCheckoutScrolledFor = null;
 let paymentInProgress = false;
 const isCheckoutPage = document.body.classList.contains("checkout-page");
+const residentTranslations = window.BH_I18N;
+const tr = (key, params = {}) => residentTranslations?.t(key, params) || key;
+let checkoutSnapshot = null;
 let checkoutPageCatalogReady = !isCheckoutPage || Boolean(window.BH_CATALOG_STATE?.success);
 let legalAcceptedAt = "";
 let acceptedLegalNoticeVersion = "";
 let legalScrollGateReached = false;
 let legalReviewReturnFocus = null;
 const LEGAL_SCROLL_TOLERANCE = 12;
-const UNIT_VALIDATION_MESSAGE = "Please check unit number and try again.";
+const unitValidationMessage = () => tr("checkout.unitInvalid");
+
+window.BH_GET_CHECKOUT_SNAPSHOT = () => checkoutSnapshot;
+
+function immutableCheckoutSnapshot(value) {
+  if (!value || !Array.isArray(value.items) || !value.items.length) return null;
+  const items = value.items.map(item => Object.freeze({
+    id:String(item.id || ""),
+    name:String(item.name || ""),
+    quantity:Number(item.quantity),
+    price:Number(item.price)
+  }));
+  if (items.some(item => !item.id || !item.name || !Number.isInteger(item.quantity) || item.quantity < 1 || !Number.isFinite(item.price) || item.price < 0)) return null;
+  const subtotal = Number(value.subtotal);
+  const processingFeeAmount = Number(value.processingFee);
+  const total = Number(value.total);
+  if (![subtotal,processingFeeAmount,total].every(Number.isFinite) || subtotal < 0 || processingFeeAmount < 0 || total < 0) return null;
+  return Object.freeze({items:Object.freeze(items),subtotal,processingFee:processingFeeAmount,total});
+}
+
+function captureCheckoutSnapshot() {
+  const items = cart.map(cartItem => {
+    const product = products.find(candidate => candidate.id === cartItem.id && candidate.active);
+    if (!product) return null;
+    const display = residentTranslations?.displayProduct(product) || product;
+    return {id:product.id,name:display.name,quantity:cartItem.quantity,price:product.price};
+  }).filter(Boolean);
+  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const fee = processingFee(subtotal);
+  return immutableCheckoutSnapshot({items,subtotal,processingFee:fee,total:subtotal + fee});
+}
+
+function setCheckoutSnapshot(snapshot) {
+  checkoutSnapshot = immutableCheckoutSnapshot(snapshot);
+  renderCart();
+  syncCheckoutSubmitState();
+  return checkoutSnapshot;
+}
+
+function releaseCheckoutSnapshot() {
+  checkoutSnapshot = null;
+  renderCart();
+  syncCheckoutSubmitState();
+}
 
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, character => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
@@ -22,15 +68,15 @@ if ($("#trackingForm")) $("#trackingForm").onsubmit = async event => {
   const number = new FormData(event.target).get("orderNumber").trim().toUpperCase();
   const result = $("#trackingResult");
   result.classList.remove("hidden", "error");
-  result.innerHTML = "<strong>Checking order...</strong>";
+  result.innerHTML = `<strong>${tr("tracker.checking")}</strong>`;
   try {
     const response = await fetch(`/api/order-status?number=${encodeURIComponent(number)}`, {headers:{"Accept":"application/json"}});
     const payload = await response.json();
     if (!response.ok || !payload.success) throw new Error(payload.message || "Order not found");
-    result.innerHTML = `<div class="tracking-status"><span>Current Status</span><strong>${escapeHtml(payload.order.status)}</strong></div>${payload.order.publicNote ? `<p>${escapeHtml(payload.order.publicNote)}</p>` : ""}`;
+    result.innerHTML = `<div class="tracking-status"><span>${tr("tracker.currentStatus")}</span><strong>${escapeHtml(residentTranslations?.statusLabel(payload.order.status) || payload.order.status)}</strong></div>${payload.order.publicNote ? `<p>${escapeHtml(payload.order.publicNote)}</p>` : ""}`;
   } catch (error) {
     result.classList.add("error");
-    result.innerHTML = `<strong>Order not found.</strong><br>Check the order ID and try again, or contact management for assistance.`;
+    result.innerHTML = `<strong>${tr("tracker.notFoundTitle")}</strong><br>${tr("tracker.notFoundBody")}`;
   }
 };
 
@@ -45,7 +91,7 @@ function showFeedbackView(view) {
 function resetFeedbackFlow() {
   $("#feedbackForm")?.reset();
   if ($("#feedbackCategory")) $("#feedbackCategory").value = "";
-  if ($("#feedbackSelectedType")) $("#feedbackSelectedType").textContent = "Feedback";
+  if ($("#feedbackSelectedType")) $("#feedbackSelectedType").textContent = tr("feedback.label");
   if ($("#feedbackConfirmation")) {
     $("#feedbackConfirmation").classList.add("hidden");
     $("#feedbackConfirmation").innerHTML = "";
@@ -78,7 +124,7 @@ document.addEventListener("keydown", event => {
 });
 $$('[data-feedback-category]').forEach(button => button.addEventListener("click", () => {
   $("#feedbackCategory").value = button.dataset.feedbackCategory;
-  $("#feedbackSelectedType").textContent = button.dataset.feedbackLabel;
+  $("#feedbackSelectedType").textContent = tr(button.dataset.feedbackI18n || "feedback.label");
   showFeedbackView("feedbackFormView");
   requestAnimationFrame(() => $('#feedbackForm [name="name"]')?.focus());
 }));
@@ -90,13 +136,13 @@ if ($("#feedbackForm")) $("#feedbackForm").onsubmit = async event => {
   confirmation.classList.remove("hidden");
   const normalizedUnit = normalizeUnitNumber(data.unit);
   if (!normalizedUnit) {
-    confirmation.innerHTML = `<strong>${UNIT_VALIDATION_MESSAGE}</strong>`;
-    toast(UNIT_VALIDATION_MESSAGE);
+    confirmation.innerHTML = `<strong>${unitValidationMessage()}</strong>`;
+    toast(unitValidationMessage());
     return;
   }
   data.unit = normalizedUnit;
   event.target.elements.unit.value = normalizedUnit;
-  confirmation.innerHTML = `<strong>Sending feedback...</strong>`;
+  confirmation.innerHTML = `<strong>${tr("feedback.sending")}</strong>`;
   try {
     const response = await fetch("/api/feedback", {
       method:"POST",
@@ -104,13 +150,13 @@ if ($("#feedbackForm")) $("#feedbackForm").onsubmit = async event => {
       body:JSON.stringify(data)
     });
     const payload = await response.json();
-    if (!response.ok || !payload.success) throw new Error(payload.message || "Unable to save feedback");
+    if (!response.ok || !payload.success) throw new Error("Unable to save feedback");
     event.target.reset();
     confirmation.classList.add("hidden");
     confirmation.innerHTML = "";
     showFeedbackView("feedbackThanksView");
   } catch (error) {
-    confirmation.innerHTML = `<strong>Feedback was not submitted.</strong><br><br>${escapeHtml(error.message || "Please try again.")}`;
+    confirmation.innerHTML = `<strong>${tr("feedback.failed")}</strong><br><br>${tr("feedback.unable")}`;
   }
 };
 
@@ -205,13 +251,13 @@ function syncLegalReviewState() {
   const accepted = legalTermsAccepted();
   $("#checkoutLegalReview")?.classList.toggle("accepted", accepted);
   if ($("#legalStatusMark")) $("#legalStatusMark").textContent = accepted ? "\u2713" : "!";
-  if ($("#legalStatusTitle")) $("#legalStatusTitle").textContent = accepted ? "Legal Terms Accepted" : "Legal review required";
+  if ($("#legalStatusTitle")) $("#legalStatusTitle").textContent = accepted ? tr("checkout.legalAccepted") : tr("checkout.legalRequired");
   if ($("#legalStatusMessage")) {
     $("#legalStatusMessage").textContent = accepted
-      ? "The complete terms have been reviewed and accepted for this checkout."
-      : "Please review the complete terms and accept them before continuing to secure payment.";
+      ? tr("checkout.legalAcceptedCopy")
+      : tr("checkout.legalRequiredCopy");
   }
-  if ($("#legalNoticeOpen")) $("#legalNoticeOpen").textContent = accepted ? "View Legal Terms" : "Review Legal Terms";
+  if ($("#legalNoticeOpen")) $("#legalNoticeOpen").textContent = accepted ? tr("checkout.viewLegal") : tr("checkout.reviewLegal");
 }
 
 function resetLegalAcceptance() {
@@ -245,7 +291,7 @@ function closeLegalReview() {
   const accept = $("#legalReviewAccept");
   if (accept) {
     accept.disabled = true;
-    accept.textContent = legalTermsAccepted() ? "Legal Terms Accepted" : "Accept Legal Terms";
+    accept.textContent = legalTermsAccepted() ? tr("checkout.legalAccepted") : tr("legal.accept");
   }
   const returnFocus = legalReviewReturnFocus;
   legalReviewReturnFocus = null;
@@ -264,11 +310,11 @@ function openLegalReview() {
   legalScrollGateReached = false;
   container.scrollTop = 0;
   accept.disabled = true;
-  accept.textContent = accepted ? "Legal Terms Accepted" : "Accept Legal Terms";
+  accept.textContent = accepted ? tr("checkout.legalAccepted") : tr("legal.accept");
   if ($("#legalReviewInstruction")) {
     $("#legalReviewInstruction").textContent = accepted
-      ? "These complete terms have been accepted for this checkout."
-      : "Please review the complete terms. Acceptance will become available once you reach the end.";
+      ? tr("legal.acceptedInstruction")
+      : tr("legal.instruction");
   }
   modal.classList.add("open");
   document.body.classList.add("legal-review-open");
@@ -310,7 +356,7 @@ function syncCheckoutPageState() {
   const loading = $("#checkoutLoading");
   const content = $("#checkoutPageContent");
   const empty = $("#checkoutEmptyState");
-  const hasItems = cart.length > 0;
+  const hasItems = checkoutSnapshot ? checkoutSnapshot.items.length > 0 : cart.length > 0;
 
   if (!checkoutPageCatalogReady) {
     content?.classList.add("hidden");
@@ -328,7 +374,7 @@ function syncCheckoutSubmitState() {
   if (!submit) return;
   const detailsComplete = checkoutDetailsComplete();
   const accepted = legalTermsAccepted();
-  submit.disabled = paymentInProgress || Boolean(stripeEmbeddedCheckout) || !detailsComplete || !accepted || !cart.length || !checkoutPageCatalogReady;
+  submit.disabled = paymentInProgress || Boolean(stripeEmbeddedCheckout) || Boolean(checkoutSnapshot) || !detailsComplete || !accepted || !cart.length || !checkoutPageCatalogReady;
 }
 
 function checkoutDetailsComplete() {
@@ -352,7 +398,7 @@ function syncStripeCheckoutDisplay() {
 
   if (stripeEmbeddedCheckout) {
     container.classList.remove("hidden");
-    setCheckoutSubmitLabel("Complete secure payment below");
+    setCheckoutSubmitLabel(tr("checkout.completeBelow"));
     syncCheckoutSubmitState();
     return;
   }
@@ -361,7 +407,7 @@ function syncStripeCheckoutDisplay() {
   if (!shouldShowStripe) {
     container.classList.add("hidden");
     embedded.innerHTML = "";
-    setCheckoutSubmitLabel("Submit resident order");
+    setCheckoutSubmitLabel(tr("checkout.submitOrder"));
     syncCheckoutSubmitState();
     return;
   }
@@ -369,9 +415,9 @@ function syncStripeCheckoutDisplay() {
   container.classList.remove("hidden");
   const readyToContinue = checkoutDetailsComplete() && legalTermsAccepted();
   embedded.innerHTML = `<div class="stripe-payment-notice" data-stripe-placeholder>${readyToContinue
-    ? "Your details are complete. Select Continue to open secure payment."
-    : "Please complete all required details and accept the legal notice to continue to secure payment."}</div>`;
-  setCheckoutSubmitLabel("Continue to secure payment");
+    ? tr("checkout.detailsReady")
+    : tr("checkout.detailsNeeded")}</div>`;
+  setCheckoutSubmitLabel(tr("checkout.continueSecure"));
   syncCheckoutSubmitState();
 }
 
@@ -407,13 +453,13 @@ async function initializePaymentProvider() {
   syncStripeCheckoutDisplay();
 }
 
-async function createStripeCheckoutSession({number, resident, acceptedAt}) {
+async function createStripeCheckoutSession({number, resident, acceptedAt, snapshot}) {
   const response = await fetch("/api/stripe?action=session", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
       orderNumber:number,resident,
-      items:cart.map(item => ({id:item.id,quantity:item.quantity})),
+      items:snapshot.items.map(item => ({id:item.id,quantity:item.quantity})),
       legalAccepted:true,legalNoticeVersion:LEGAL_NOTICE_VERSION,legalAcceptedAt:acceptedAt
     })
   });
@@ -434,6 +480,7 @@ async function confirmStripeOrder(sessionId) {
 }
 
 function clearResidentCart() {
+  checkoutSnapshot = null;
   cart = [];
   persist();
   renderCart();
@@ -442,11 +489,11 @@ function clearResidentCart() {
 }
 
 function showSuccessMessage({title, body, orderNumber = ""}) {
-  $("#successEyebrow") && ($("#successEyebrow").textContent = "Payment received");
+  $("#successEyebrow") && ($("#successEyebrow").textContent = tr("checkout.paymentReceived"));
   $("#successTitle") && ($("#successTitle").textContent = title);
   if ($("#successBody")) {
     $("#successBody").innerHTML = orderNumber
-      ? `${body} <span class="success-order-reference">Order <strong>${escapeHtml(orderNumber)}</strong>.</span>`
+      ? `${body} <span class="success-order-reference">${tr("checkout.orderReference", {order:`<strong>${escapeHtml(orderNumber)}</strong>`})}</span>`
       : body;
   }
   $("#successName") && ($("#successName").textContent = "");
@@ -463,17 +510,17 @@ function showSuccessMessage({title, body, orderNumber = ""}) {
 
 function showPaidOrderConfirmation(orderNumber = "") {
   showSuccessMessage({
-    title:"Thank you. Your payment has been received.",
-    body:"Your request has been submitted successfully. Management will contact you once your order is ready.",
+    title:tr("checkout.paidTitle"),
+    body:tr("checkout.paidBody"),
     orderNumber
   });
 }
 
 function showResidentOrderConfirmation({name = "", orderNumber = "", note = ""}) {
-  $("#successEyebrow") && ($("#successEyebrow").textContent = "Request received");
-  $("#successTitle") && ($("#successTitle").textContent = `Thank you${name ? `, ${name}` : ""}.`);
+  $("#successEyebrow") && ($("#successEyebrow").textContent = tr("success.requestReceived"));
+  $("#successTitle") && ($("#successTitle").textContent = tr("success.thankYou", {name:name ? `, ${name}` : ""}));
   if ($("#successBody")) {
-    $("#successBody").innerHTML = `Your order <strong>${escapeHtml(orderNumber)}</strong> has been received. <span id="successPaymentNote">${escapeHtml(note)}</span>`;
+    $("#successBody").innerHTML = `${tr("success.orderReceived", {order:`<strong>${escapeHtml(orderNumber)}</strong>`})} <span id="successPaymentNote">${escapeHtml(note)}</span>`;
   }
   $("#successName") && ($("#successName").textContent = name ? `, ${name}` : "");
   $("#successOrder") && ($("#successOrder").textContent = orderNumber);
@@ -490,7 +537,7 @@ async function mountStripeCheckout(session, records, resident, number) {
   if (!stripeClient) throw new Error("Stripe checkout is not available");
   resetStripeCheckout();
   $("#stripeCheckoutContainer")?.classList.remove("hidden");
-  $("#paymentMessage").textContent = "Complete your secure Stripe payment below.";
+  $("#paymentMessage").textContent = tr("checkout.stripeReady");
   $("#paymentMessage").classList.remove("hidden", "error");
   stripeEmbeddedCheckout = await stripeClient.initEmbeddedCheckout({
     clientSecret:session.clientSecret,
@@ -503,7 +550,7 @@ async function mountStripeCheckout(session, records, resident, number) {
         closeModal("#checkoutModal");
         showPaidOrderConfirmation(result.order?.orderNumber || number);
       } catch (error) {
-        showPaymentError(error.message || "Stripe payment was received, but the order could not be confirmed. Please contact management.");
+        showPaymentError(tr("checkout.confirmFailed"));
       }
     }
   });
@@ -541,8 +588,8 @@ async function handleStripeReturnConfirmation() {
   } catch (error) {
     console.error("Stripe return confirmation failed", error);
     showSuccessMessage({
-      title:"Payment received.",
-      body:"Your payment was received, but the website could not refresh the confirmation details. Please contact Management if your order does not appear shortly."
+      title:tr("checkout.returnPaymentTitle"),
+      body:tr("checkout.returnPaymentBody")
     });
   }
 }
@@ -554,7 +601,8 @@ if ($("#checkoutOpen")) $("#checkoutOpen").addEventListener("click", () => {
 });
 
 function createOrderRecords() {
-  return cart.map(cartItem => ({productId:cartItem.id, quantity:cartItem.quantity}));
+  const source = checkoutSnapshot?.items || cart;
+  return source.map(item => ({productId:item.id, quantity:item.quantity}));
 }
 
 function normalizeUsPhone(value) {
@@ -576,14 +624,14 @@ function normalizeUnitNumber(value) {
 }
 
 function checkoutValidationMessage(form, resident) {
-  if (!checkoutPageCatalogReady) return "Product availability could not be confirmed. Please return to the store and try again.";
-  if (!cart.length) return "Your bag is empty. Add a resident service before checkout.";
-  if (!resident.name.trim()) return "Please enter the resident's full name.";
-  if (!resident.unit.trim()) return "Please enter the unit number.";
-  if (!normalizeUnitNumber(resident.unit)) return UNIT_VALIDATION_MESSAGE;
-  if (!form.elements.email.validity.valid) return "Please enter a valid email address.";
-  if (!normalizeUsPhone(resident.phone)) return "Please enter a valid U.S. phone number, for example (305) 555-0000.";
-  if (!legalTermsAccepted()) return "Please review and accept the legal notice before submitting.";
+  if (!checkoutPageCatalogReady) return tr("checkout.catalogUnavailable");
+  if (!cart.length) return tr("checkout.emptyError");
+  if (!resident.name.trim()) return tr("checkout.nameError");
+  if (!resident.unit.trim()) return tr("checkout.unitError");
+  if (!normalizeUnitNumber(resident.unit)) return unitValidationMessage();
+  if (!form.elements.email.validity.valid) return tr("checkout.emailError");
+  if (!normalizeUsPhone(resident.phone)) return tr("checkout.phoneError");
+  if (!legalTermsAccepted()) return tr("checkout.legalError");
   return "";
 }
 
@@ -593,6 +641,7 @@ function finalizeSuccessfulOrder(records) {
     if (product) product.inventory = Math.max(0, product.inventory - record.quantity);
   });
   cart = [];
+  checkoutSnapshot = null;
   persist();
   renderCart();
   renderProducts();
@@ -608,7 +657,7 @@ if ($("#checkoutForm")) {
   $("#checkoutForm").addEventListener("reset", resetLegalAcceptance);
   $("#checkoutForm").onsubmit = async event => {
   event.preventDefault();
-  if (paymentInProgress || stripeEmbeddedCheckout) return;
+  if (paymentInProgress || stripeEmbeddedCheckout || checkoutSnapshot) return;
   const form = event.target;
   const resident = Object.fromEntries(new FormData(form));
   const validationMessage = checkoutValidationMessage(form, resident);
@@ -628,7 +677,7 @@ if ($("#checkoutForm")) {
   const message = $("#paymentMessage");
   submit.disabled = true;
   paymentInProgress = true;
-  submit.textContent = checkoutProvider === "stripe" ? "Preparing secure payment..." : "Recording demo order...";
+  submit.textContent = checkoutProvider === "stripe" ? tr("checkout.preparing") : tr("checkout.recording");
   clearPaymentMessage();
 
   const number = generateOrderNumber();
@@ -636,7 +685,7 @@ if ($("#checkoutForm")) {
   const fee = processingFee(subtotal);
   const requiresPayment = subtotal + fee > 0;
   if (requiresPayment && checkoutProvider !== "stripe") {
-    message.textContent = "Online payment is currently unavailable. Please contact management.";
+    message.textContent = tr("checkout.paymentUnavailable");
     message.classList.remove("hidden");
     message.classList.add("error");
     submit.disabled = false;
@@ -645,7 +694,7 @@ if ($("#checkoutForm")) {
     return;
   }
   if (requiresPayment && checkoutProvider === "stripe" && (!stripeConfig.enabled || !stripeClient)) {
-    message.textContent = "Secure online checkout is currently unavailable. Please contact management.";
+    message.textContent = tr("checkout.secureUnavailable");
     message.classList.remove("hidden");
     message.classList.add("error");
     submit.disabled = false;
@@ -654,6 +703,15 @@ if ($("#checkoutForm")) {
     return;
   }
   const acceptedAt = legalAcceptedAt;
+  const snapshot = setCheckoutSnapshot(captureCheckoutSnapshot());
+  if (!snapshot) {
+    message.textContent = tr("checkout.catalogUnavailable");
+    message.classList.remove("hidden");
+    message.classList.add("error");
+    submit.disabled = false;
+    paymentInProgress = false;
+    return;
+  }
   const records = createOrderRecords();
 
   try {
@@ -664,7 +722,7 @@ if ($("#checkoutForm")) {
         headers:{"Content-Type":"application/json","Accept":"application/json"},
         body:JSON.stringify({
           orderNumber:number,resident,
-          items:cart.map(item => ({id:item.id,quantity:item.quantity})),
+          items:snapshot.items.map(item => ({id:item.id,quantity:item.quantity})),
           legalAccepted:true,legalNoticeVersion:LEGAL_NOTICE_VERSION,legalAcceptedAt:acceptedAt
         })
       });
@@ -672,9 +730,9 @@ if ($("#checkoutForm")) {
       if (!response.ok || !result.success) throw new Error(result.message || "Order could not be saved");
       payment = {status:"No Payment Required",id:"",createdAt:acceptedAt};
     } else if (checkoutProvider === "stripe") {
-      const session = await createStripeCheckoutSession({number,resident,acceptedAt});
+      const session = await createStripeCheckoutSession({number,resident,acceptedAt,snapshot});
       await mountStripeCheckout(session, records, resident, number);
-      submit.textContent = "Complete secure payment below";
+      submit.textContent = tr("checkout.completeBelow");
       paymentInProgress = false;
       return;
     }
@@ -686,15 +744,16 @@ if ($("#checkoutForm")) {
       name:resident.name.trim().split(" ")[0],
       orderNumber:number,
       note:!requiresPayment
-        ? "No payment was required. Management can now process your request."
-        : "Payment was confirmed. Management can now process your request."
+        ? tr("checkout.noPayment")
+        : tr("checkout.paymentConfirmed")
     });
   } catch (error) {
     console.error(requiresPayment ? "Secure payment setup failed" : "Order submission failed", error);
     resetStripeCheckout();
+    releaseCheckoutSnapshot();
     message.textContent = requiresPayment
-      ? (error.message || "Secure payment could not be started. Please try again or contact Management.")
-      : "Sorry, your order could not be submitted. Please try again.";
+      ? tr("checkout.sessionFailed")
+      : tr("checkout.orderFailed");
     message.classList.remove("hidden");
     message.classList.add("error");
     submit.disabled = false;
@@ -732,7 +791,7 @@ function applyCheckoutCatalogState(success) {
   const loading = $("#checkoutLoading");
   if (!checkoutPageCatalogReady && loading) {
     loading.classList.add("error");
-    loading.innerHTML = `<p>Product availability could not be confirmed. Please <a href="./#store">return to the store</a> and try again.</p>`;
+    loading.innerHTML = `<p>${tr("checkout.catalogUnavailable")}</p>`;
   }
   syncCheckoutPageState();
   syncStripeCheckoutDisplay();
@@ -747,6 +806,31 @@ document.addEventListener("bh:cart-updated", () => {
   syncCheckoutPageState();
   syncStripeCheckoutDisplay();
   syncCheckoutSubmitState();
+});
+
+document.addEventListener("bh:language-changed", () => {
+  syncLegalReviewState();
+  const selectedFeedbackCategory = $("#feedbackCategory")?.value;
+  if (selectedFeedbackCategory && $("#feedbackSelectedType")) {
+    const selectedButton = $$('[data-feedback-category]').find(button => button.dataset.feedbackCategory === selectedFeedbackCategory);
+    $("#feedbackSelectedType").textContent = tr(selectedButton?.dataset.feedbackI18n || "feedback.label");
+  }
+  if ($("#legalReviewInstruction")) {
+    $("#legalReviewInstruction").textContent = legalTermsAccepted() ? tr("legal.acceptedInstruction") : tr("legal.instruction");
+  }
+  if ($("#legalReviewAccept")) {
+    $("#legalReviewAccept").textContent = legalTermsAccepted() ? tr("checkout.legalAccepted") : tr("legal.accept");
+  }
+  syncStripeCheckoutDisplay();
+  syncCheckoutSubmitState();
+});
+
+window.addEventListener("pageshow", event => {
+  if (!isCheckoutPage || !event.persisted || (!paymentInProgress && !stripeEmbeddedCheckout && !checkoutSnapshot)) return;
+  paymentInProgress = false;
+  resetStripeCheckout();
+  releaseCheckoutSnapshot();
+  window.location.reload();
 });
 
 syncCheckoutPageState();

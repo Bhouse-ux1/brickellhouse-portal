@@ -988,6 +988,21 @@ function hasBoardContext(message, history) {
   return terms.some(term => text.includes(foldText(term)));
 }
 
+function clearResidentMessageLanguage(message, history = []) {
+  const preference = preferredLanguage(message, history);
+  if (preference) return preference;
+  if (isSpanish(message)) return "es";
+  const text = foldText(message);
+  return /\b(hello|hi|thanks|please|english|what|where|when|who|why|how|can|could|would|need|want|tell|explain|help|speak|answer|my|is|are|do|does|lost|hours|price|cost|email|phone|pool|parking|package|order|key|mailbox|unit|board|manager|management|amenity|service|store)\b/.test(text)
+    ? "en"
+    : null;
+}
+
+function applyInterfaceLanguagePreference(message, history = [], interfaceLanguage = "en") {
+  if (interfaceLanguage !== "es" || clearResidentMessageLanguage(message, history)) return message;
+  return `${message}\n\nPor favor, responde en español.`;
+}
+
 function boardContactRequest(message, history) {
   const text = foldText(message);
   const boardContext = hasBoardContext(message, history);
@@ -1964,11 +1979,12 @@ function freshConversationIdentity() {
   };
 }
 
-async function generateLunaTurn(message, trustedContext) {
+async function generateLunaTurn(message, trustedContext, interfaceLanguage = "en") {
   const history = validateTrustedHistory(trustedContext.messages);
-  const retrieval = retrieveKnowledge(message, history);
+  const generationMessage = applyInterfaceLanguagePreference(message, history, interfaceLanguage);
+  const retrieval = retrieveKnowledge(generationMessage, history);
   let publicProducts = [];
-  const needsCatalog = shouldLoadPublicCatalog(message, history, retrieval);
+  const needsCatalog = shouldLoadPublicCatalog(generationMessage, history, retrieval);
   let catalogStatus = needsCatalog ? "unavailable" : "not-requested";
   if (needsCatalog && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     try {
@@ -1979,9 +1995,9 @@ async function generateLunaTurn(message, trustedContext) {
     }
   }
 
-  const resolution = resolveConversationContext(message, history, publicProducts, trustedContext.state, retrieval);
+  const resolution = resolveConversationContext(generationMessage, history, publicProducts, trustedContext.state, retrieval);
   const structuredContext = structuredContextForModel(resolution);
-  const directReply = deterministicReply(message, history, publicProducts, {needsCatalog,catalogStatus,resolution});
+  const directReply = deterministicReply(generationMessage, history, publicProducts, {needsCatalog,catalogStatus,resolution});
   if (directReply) {
     logLunaRoute("deterministic", retrieval);
     return {success:true,httpStatus:200,reply:directReply,source:"deterministic",history,resolution,publicProducts};
@@ -2001,7 +2017,7 @@ async function generateLunaTurn(message, trustedContext) {
         "Authorization":`Bearer ${apiKey}`,
         "Content-Type":"application/json"
       },
-      body:JSON.stringify(buildOpenAiRequest(message, history, publicProducts, retrieval, structuredContext))
+      body:JSON.stringify(buildOpenAiRequest(generationMessage, history, publicProducts, retrieval, structuredContext))
     });
 
     const payload = await openAiResponse.json().catch(() => ({}));
@@ -2052,6 +2068,7 @@ module.exports = async function handler(request, response) {
   if (message.length > MAX_MESSAGE_LENGTH) {
     return send(response, 400, {success:false,message:`Please keep your message under ${MAX_MESSAGE_LENGTH} characters.`});
   }
+  const interfaceLanguage = request.body?.language === "es" ? "es" : "en";
 
   const contextConfigured = trustedContextConfigured();
   let conversationId = conversationIdFromRequest(request.body?.conversationId);
@@ -2123,7 +2140,7 @@ module.exports = async function handler(request, response) {
       }
     }
 
-    const generated = await generateLunaTurn(message, trustedContext);
+    const generated = await generateLunaTurn(message, trustedContext, interfaceLanguage);
     if (!trustedContext.available) {
       const identity = contextConfigured
         ? conversationIdentityPayload(conversationId, Date.now() + (2 * 60 * 60 * 1000))

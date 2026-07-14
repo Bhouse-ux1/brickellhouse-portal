@@ -162,7 +162,7 @@ function initResidentChat() {
   const sendButton = chatWidget.querySelector("#chatSend");
   const clearButton = chatWidget.querySelector("#chatClear");
   const teaser = chatWidget.querySelector("#chatTeaser");
-  const errorMessage = "Sorry, I could not respond right now. Please try again.";
+  const chatText = key => window.BH_I18N?.t(key) || key;
   const promptStorageKey = "bh_ai_prompt_seen";
   const promptDelay = 4200;
   const promptVisibleDuration = 7600;
@@ -293,7 +293,7 @@ function initResidentChat() {
     input.value = "";
     appendMessage("resident", message);
     remember("user", message);
-    const loading = appendMessage("assistant loading", "Thinking");
+    const loading = appendMessage("assistant loading", chatText("luna.thinking"));
     sendButton.disabled = true;
     const generation = requestGeneration.capture();
 
@@ -305,7 +305,13 @@ function initResidentChat() {
       const response = await fetch("/api/chat", {
         method:"POST",
         headers:{"Content-Type":"application/json","Accept":"application/json"},
-        body:JSON.stringify({message,conversationId,conversationToken,requestId})
+        body:JSON.stringify({
+          message,
+          conversationId,
+          conversationToken,
+          requestId,
+          language:window.BH_I18N?.getLanguage() || "en"
+        })
       });
       const payload = await response.json();
       if (!requestGeneration.isCurrent(generation)) return;
@@ -313,7 +319,11 @@ function initResidentChat() {
       conversationId = identity.conversationId;
       conversationToken = identity.conversationToken;
       conversationExpiresAt = identity.expiresAt || conversationExpiresAt;
-      if (!response.ok || !payload.success) throw new Error(payload.message || errorMessage);
+      if (!response.ok || !payload.success) {
+        const requestError = new Error(payload.message || chatText("luna.error"));
+        requestError.residentMessageKey = response.status === 429 ? "luna.rateLimit" : "luna.error";
+        throw requestError;
+      }
       loading.classList.remove("loading");
       loading.innerHTML = linkifyText(payload.reply);
       remember("assistant", payload.reply);
@@ -321,7 +331,7 @@ function initResidentChat() {
       if (!requestGeneration.isCurrent(generation)) return;
       loading.classList.remove("loading");
       loading.classList.add("error");
-      loading.textContent = errorMessage;
+      loading.textContent = chatText(error.residentMessageKey || "luna.error");
     } finally {
       if (requestGeneration.isCurrent(generation)) {
         sendButton.disabled = false;

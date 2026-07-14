@@ -218,8 +218,8 @@ function architectureChecks() {
     {name:"unrelated Store keyword skips catalog",pass:!luna.shouldLoadPublicCatalog("How much does a car battery cost?", [], unrelatedBatteryRetrieval)},
     {name:"valid product price loads Store catalog",pass:luna.shouldLoadPublicCatalog("How much is a mailbox key?", [], mailboxRetrieval)},
     {name:"catalog failure wording is temporary",pass:/unable to verify the current Resident Store catalog/i.test(catalogFailure) && !/not currently listed/i.test(catalogFailure)},
-    {name:"Luna stylesheet cache version current",pass:index.includes("styles.css?v=20260713-luna-phase1")},
-    {name:"Luna script cache version current",pass:index.includes("chat.js?v=20260713-luna-phase2-contextfix1")},
+    {name:"Luna stylesheet cache version current",pass:index.includes("styles.css?v=20260713-resident-i18n1")},
+    {name:"Luna script cache version current",pass:index.includes("chat.js?v=20260713-resident-i18n1")},
     {name:"resident-safe catalog context",pass:!/(gl_code|internal_name|privateAccounting|inventory)/i.test(serializedKnowledge)},
     {name:"Luna Review not read as memory",pass:!/(luna_conversation_reviews\?select|from\(["']luna_conversation_reviews["']\))/i.test(source)}
   ];
@@ -706,7 +706,7 @@ async function trustedContextChecks() {
     {name:"approved public building names remain available as facts",pass:preservedPublicNames === approvedPublicNames},
     {name:"storage failure fallback still answers current message",pass:fallback.success && /Manuel Agras/.test(fallback.reply || "")},
     {name:"reservation-integrity failure discards loaded context",pass:loadedThenReservationFailed.available === false && loadedThenReservationFailed.messages.length === 0 && loadedThenReservationFailed.state.activeTopic === "unknown"},
-    {name:"chat reserves request before model generation",pass:handlerSource.indexOf("reserveServerTrustedRequest(conversationId, requestId, reservationId)") >= 0 && handlerSource.indexOf("reserveServerTrustedRequest(conversationId, requestId, reservationId)") < handlerSource.indexOf("const generated = await generateLunaTurn(message, trustedContext)")},
+    {name:"chat reserves request before model generation",pass:handlerSource.indexOf("reserveServerTrustedRequest(conversationId, requestId, reservationId)") >= 0 && handlerSource.indexOf("reserveServerTrustedRequest(conversationId, requestId, reservationId)") < handlerSource.indexOf("const generated = await generateLunaTurn(message, trustedContext, interfaceLanguage)")},
     {name:"dedicated signing secret replaces service-role HMAC source",pass:contextSource.includes("process.env.LUNA_CONTEXT_SIGNING_SECRET") && !/tokenSecret[\s\S]{0,200}SUPABASE_SERVICE_ROLE_KEY/.test(contextSource)},
     {name:"trusted context migration creates normalized tables",pass:/create table if not exists public\.luna_conversation_turns/i.test(migration) && /create table if not exists public\.luna_conversation_request_keys/i.test(migration)},
     {name:"trusted context migration bounds fixed-role content",pass:/user_content text not null check \(char_length\(user_content\) between 1 and 900\)/i.test(migration) && /assistant_content text not null check \(char_length\(assistant_content\) between 1 and 900\)/i.test(migration)},

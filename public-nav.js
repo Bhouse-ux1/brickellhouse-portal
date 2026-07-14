@@ -7,7 +7,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const setOpen = open => {
     header.classList.toggle("mobile-menu-open", open);
     toggle.setAttribute("aria-expanded", String(open));
-    toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+    const key = open ? "nav.closeMenu" : "nav.openMenu";
+    toggle.setAttribute("aria-label", window.BH_I18N?.t(key) || (open ? "Close menu" : "Open menu"));
   };
 
   toggle.addEventListener("click", () => {
