@@ -8,6 +8,9 @@ let managementAuthClient = null;
 let managementProfile = null;
 let managementAccessPending = false;
 let managementDataLoaded = false;
+let managementSupabaseProductIds = new Set();
+
+const PRODUCT_TOGGLE_RECORD_ERROR = "This product could not be updated because no matching editable database record was found. Please refresh and try again.";
 
 const seedProducts = [
   {id:"svc1",name:"Mailbox Key Copy",category:"Keys & Access",description:"Replacement key for your assigned mailbox.",price:1,inventory:99,glCode:"40090",image:"offer-mailbox-key.webp",active:true},
@@ -607,14 +610,29 @@ function renderAdmin() {
   $$("[data-edit]").forEach(button => button.onclick = () => editProduct(button.dataset.edit));
   $$("[data-toggle]").forEach(button => button.onclick = async () => {
     const product = products.find(candidate => candidate.id === button.dataset.toggle);
+    if (!product) {
+      toast(PRODUCT_TOGGLE_RECORD_ERROR);
+      return;
+    }
     const before = {...product};
-    product.active = !product.active;
+    const nextActive = !product.active;
     try {
-      await saveProductStatusToSupabase(product);
+      const confirmedProduct = await saveProductStatusToSupabase(product, nextActive);
+      product.active = confirmedProduct.active;
       persist(); renderProducts(); renderAdmin();
       auditManagement("product_status_change", "product", product.id, before, product);
+      try {
+        await reloadManagementProductCatalog(product.id);
+        persist(); renderProducts(); renderAdmin();
+        await verifyResidentProductCatalog(product.id);
+      } catch (refreshError) {
+        console.warn("[Management product toggle] The database update was confirmed, but catalog refresh verification failed.", {
+          productId:product.id,
+          message:refreshError?.message || "Unknown refresh error"
+        });
+        toast("Product updated, but the catalog refresh could not be verified. Please refresh and check again.");
+      }
     } catch (error) {
-      Object.assign(product, before);
       toast(error.message || "Unable to update product");
     }
   });
@@ -1110,7 +1128,7 @@ async function approvedManagementSession() {
   if (userError || !user || user.id !== session.user.id) return null;
   const {data:profile, error:profileError} = await client
     .from("management_users")
-    .select("user_id,email,role,active")
+    .select("user_id,email,role,active,mfa_required")
     .eq("user_id", user.id)
     .eq("active", true)
     .maybeSingle();
@@ -1198,6 +1216,80 @@ function mergeManagedProductCatalog(supabaseProducts) {
   return merged;
 }
 
+function applyManagementProductRows(rows) {
+  const supabaseProducts = mapSupabaseProductRows(rows);
+  managementSupabaseProductIds = new Set(supabaseProducts.map(product => String(product.id)));
+  const seedOnlyIds = seedProducts
+    .map(product => String(product.id))
+    .filter(id => !managementSupabaseProductIds.has(id));
+  if (seedOnlyIds.length) {
+    console.info("[Management products] Seed-only products are not backed by editable Supabase rows.", {
+      productIds:seedOnlyIds
+    });
+  }
+  products = mergeManagedProductCatalog(supabaseProducts);
+  return supabaseProducts;
+}
+
+async function reloadManagementProductCatalog(requiredProductId = "") {
+  const {data, error} = await managementAuthClient
+    .from("products")
+    .select("*")
+    .order("resident_name", {ascending:true});
+  if (error) throw error;
+  const rows = Array.isArray(data) ? data : [];
+  if (requiredProductId && !rows.some(row => String(row.id) === String(requiredProductId))) {
+    throw new Error("The updated product was not returned when Management refreshed the catalog.");
+  }
+  applyManagementProductRows(rows);
+}
+
+async function logProductToggleDiagnostic({productId, rowCount, reason}) {
+  let assuranceLevel = "unknown";
+  let isManagementUser = "unknown";
+  try {
+    if (managementAuthClient?.auth?.mfa?.getAuthenticatorAssuranceLevel) {
+      const {data, error} = await managementAuthClient.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (!error && data?.currentLevel) assuranceLevel = data.currentLevel;
+    }
+  } catch {
+    assuranceLevel = "unknown";
+  }
+  try {
+    const {data, error} = await managementAuthClient.rpc("is_management_user");
+    if (!error) isManagementUser = data === true;
+  } catch {
+    isManagementUser = "unknown";
+  }
+  console.warn("[Management product toggle] Supabase did not confirm one editable product row.", {
+    productId:String(productId || ""),
+    source:managementSupabaseProductIds.has(String(productId)) ? "supabase" : "seed-fallback",
+    rowCount,
+    reason,
+    assuranceLevel,
+    profileRequiresMfa:managementProfile?.mfa_required ?? "unknown",
+    isManagementUser
+  });
+}
+
+async function verifyResidentProductCatalog(productId) {
+  const product = products.find(candidate => String(candidate.id) === String(productId));
+  if (!product) throw new Error("The updated product is missing from the refreshed Management catalog.");
+  const response = await fetch("/api/products", {
+    cache:"no-store",
+    headers:{"Accept":"application/json"}
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload.success || !Array.isArray(payload.products)) {
+    throw new Error("The resident catalog endpoint is unavailable.");
+  }
+  const isPubliclyVisible = payload.products.some(candidate => String(candidate.id) === String(productId));
+  const shouldBePubliclyVisible = Boolean(product.active) && Number(product.inventory || 0) > 0;
+  if (isPubliclyVisible !== shouldBePubliclyVisible) {
+    throw new Error("The resident catalog does not yet reflect the confirmed product status.");
+  }
+}
+
 async function loadManagementData() {
   if (!managementAuthClient || !window.managementAccessGranted) return;
   const [ordersResult, feedbackResult, productsResult, settingsResult] = await Promise.all([
@@ -1212,8 +1304,7 @@ async function loadManagementData() {
   if (settingsResult.error) throw settingsResult.error;
   orders = mapSupabaseOrderRows(ordersResult.data);
   if (typeof feedbackRecords !== "undefined") feedbackRecords = mapSupabaseFeedbackRows(feedbackResult.data);
-  const supabaseProducts = mapSupabaseProductRows(productsResult.data);
-  products = mergeManagedProductCatalog(supabaseProducts);
+  applyManagementProductRows(productsResult.data);
   const feeSetting = (settingsResult.data || []).find(setting => setting.key === "processing_fee");
   if (feeSetting?.value) feeSettings = {...feeSettings, ...feeSetting.value};
   await loadLunaInsights();
@@ -1288,13 +1379,42 @@ async function saveProductToSupabase(product) {
   const {error} = await managementAuthClient.from("products").upsert(payload, {onConflict:"id"});
   if (error) throw error;
 }
-async function saveProductStatusToSupabase(product) {
-  if (!managementAuthClient) return;
-  const {error} = await managementAuthClient.from("products").update({
-    active:Boolean(product.active),
+async function saveProductStatusToSupabase(product, nextActive) {
+  if (!managementAuthClient) throw new Error("Management authentication is unavailable.");
+  const productId = String(product?.id || "");
+  if (!managementSupabaseProductIds.has(productId)) {
+    await logProductToggleDiagnostic({
+      productId,
+      rowCount:0,
+      reason:"seed-only product"
+    });
+    throw new Error(PRODUCT_TOGGLE_RECORD_ERROR);
+  }
+  const expectedActive = Boolean(nextActive);
+  const {data, error} = await managementAuthClient.from("products").update({
+    active:expectedActive,
     updated_at:new Date().toISOString()
-  }).eq("id", product.id);
+  }).eq("id", productId).select("id,active,updated_at");
   if (error) throw error;
+  const rows = Array.isArray(data) ? data : [];
+  if (rows.length !== 1) {
+    await logProductToggleDiagnostic({
+      productId,
+      rowCount:rows.length,
+      reason:rows.length === 0 ? "zero-row update" : "multiple-row update"
+    });
+    throw new Error(PRODUCT_TOGGLE_RECORD_ERROR);
+  }
+  const confirmedProduct = rows[0];
+  if (String(confirmedProduct.id) !== productId || confirmedProduct.active !== expectedActive) {
+    await logProductToggleDiagnostic({
+      productId,
+      rowCount:rows.length,
+      reason:"returned row did not match the requested product status"
+    });
+    throw new Error("Supabase returned an unexpected product status. Please refresh and try again.");
+  }
+  return confirmedProduct;
 }
 async function deleteProductFromSupabase(id) {
   if (!managementAuthClient) return;
