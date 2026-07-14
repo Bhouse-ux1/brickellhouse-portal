@@ -1,4 +1,4 @@
-New Paid Resident Order
+New Order
 
 Order Number: BH-PREVIEW-1042
 Resident: Avery Example
@@ -28,4 +28,4 @@ Processing Fee: $1.41
 Total Paid: $48.41
 
 Next Action
-Review the order in the Management Dashboard and coordinate with the resident if fulfillment requires access, scheduling, or additional information.
+Review this order in the Management Dashboard. Contact the resident if access, scheduling, or more information is needed.

@@ -3,6 +3,8 @@ const path = require("path");
 const {buildResidentEmail, buildManagementEmail} = require("../api/order-emails");
 
 const outputDirectory = path.join(__dirname, "email-previews");
+const productionLogoUrl = "https://portal.brickellhouse.org/bh-logo-transparent.png";
+const localPreviewLogoUrl = "../../bh-logo-transparent.png";
 const fixture = Object.freeze({
   paymentId:"pi_preview_only",
   orderNumber:"BH-PREVIEW-1042",
@@ -31,7 +33,11 @@ function assert(condition, message) {
 }
 
 function writePreview(name, email) {
-  fs.writeFileSync(path.join(outputDirectory, `${name}.html`), email.html, "utf8");
+  const localHtml = email.html
+    .replace(productionLogoUrl, localPreviewLogoUrl)
+    .replace("<head>", "<head>\n  <!-- Local preview uses the checked-in logo; sent email uses the production asset URL. -->")
+    .replace(/[ \t]+$/gm, "");
+  fs.writeFileSync(path.join(outputDirectory, `${name}.html`), localHtml, "utf8");
   fs.writeFileSync(path.join(outputDirectory, `${name}.txt`), email.text, "utf8");
 }
 
@@ -67,10 +73,25 @@ function run() {
   assert(!/GL[-\s]?40090|internal name|accounting/i.test(`${resident.html}\n${resident.text}`), "resident output contains internal accounting data");
   assert(/GL 40090/.test(`${management.html}\n${management.text}`), "Management output is missing the authorized GL code");
   assert(/Mailbox Key Copy GL-40090/.test(`${management.html}\n${management.text}`), "Management output is missing the internal accounting name");
-  assert(!residentInjection.html.includes("<img"), "resident dynamic HTML was not escaped");
-  assert(!managementInjection.html.includes("<img"), "Management dynamic HTML was not escaped");
+  assert(!/<img\b[^>]*onerror/i.test(residentInjection.html), "resident dynamic HTML was not escaped");
+  assert(!/<img\b[^>]*onerror/i.test(managementInjection.html), "Management dynamic HTML was not escaped");
+  assert((resident.html.match(/<img\b/g) || []).length === 1, "resident email should contain only the approved logo image");
+  assert((management.html.match(/<img\b/g) || []).length === 1, "Management email should contain only the approved logo image");
+  assert(resident.html.includes('src="https://portal.brickellhouse.org/bh-logo-transparent.png"'), "resident email is missing the approved production logo URL");
+  assert(management.html.includes('src="https://portal.brickellhouse.org/bh-logo-transparent.png"'), "Management email is missing the approved production logo URL");
+  assert(/class="brand-highlight"[^>]*background-color:#a68b54/.test(resident.html), "static brand highlight fallback is missing");
+  assert(resident.html.includes("@keyframes brand-highlight") && resident.html.includes("prefers-reduced-motion:reduce"), "progressive brand highlight safeguards are missing");
   assert(resident.text.includes("Subtotal:") && resident.text.includes("Processing Fee:") && resident.text.includes("Total Paid:"), "resident plain text is incomplete");
   assert(management.text.includes("Next Action"), "Management plain text is incomplete");
+  assert(!/Order Status|Management Processing|Ready \/ Completed|Payment Confirmed/.test(resident.html), "resident status timeline was not fully removed");
+  assert(!/Payment Status:/.test(resident.text), "resident plain text still contains a payment-status line");
+  assert(/<h1[^>]*>New Order<\/h1>/.test(management.html), "Management visible heading is not New Order");
+  assert(management.text.startsWith("New Order\n"), "Management plain-text heading is not New Order");
+  assert(resident.html.includes("Management will contact you once your order is ready."), "resident next-step wording is incorrect");
+  assert(resident.text.includes("Management will contact you once your order is ready."), "resident plain-text next-step wording is incorrect");
+  assert(resident.html.includes("305-400-9661") && resident.html.includes("Extension 7002"), "Management phone or extension is incorrect");
+  assert(resident.html.includes("Extension 7000") && resident.text.includes("Extension 7000"), "Front Desk extension changed unexpectedly");
+  assert(resident.text.includes("Extension 7002"), "Management extension is missing from resident plain text");
   assert(!/payment (has been )?confirmed|payment status: paid|total paid/i.test(`${zeroDollar.html}\n${zeroDollar.text}`), "zero-dollar wording incorrectly implies payment");
   assert(/Order Received|order has been received/.test(`${zeroDollar.html}\n${zeroDollar.text}`), "zero-dollar wording is missing an order-received state");
 

@@ -2,12 +2,11 @@ Order Confirmed
 
 Hello Avery Example,
 
-Thank you. Your payment has been confirmed and your request has been sent to the BrickellHouse Management Office.
+Thank you. We received your payment and sent your order to Management.
 
 Order Number: BH-PREVIEW-1042
 Unit: 1204
 Order Date: July 14, 2026 at 10:30 AM EDT
-Payment Status: Paid
 
 Items:
 - Mailbox Key Copy x 2 at $1.00: $2.00
@@ -18,17 +17,18 @@ Processing Fee: $1.41
 Total Paid: $48.41
 
 What Happens Next
-The Management Office will review your request and contact you using the information provided if any coordination is required.
+Management will contact you once your order is ready.
 
-Management Office
+Management
 admin@brickellhouse.net
 305-400-9661
+Extension 7002
 
 Front Desk
 frontdesk@brickellhouse.net
 Extension 7000
 
-This automated email was generated for a resident-service order. Please do not reply; contact the Management Office directly with questions.
+This email was sent automatically for your BrickellHouse order. Please do not reply; contact Management directly with questions.
 
 BrickellHouse Condominium
 portal.brickellhouse.org
