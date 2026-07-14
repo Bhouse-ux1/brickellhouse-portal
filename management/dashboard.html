@@ -8,98 +8,180 @@
   <title>Management Dashboard | BrickellHouse</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=Playfair+Display:wght@500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../styles.css?v=20260707-luna-review1">
+  <link rel="stylesheet" href="dashboard.css?v=20260714-management-redesign1">
 </head>
 <body class="management-page">
   <div class="admin-shell open" id="adminShell">
-    <aside class="admin-sidebar">
-      <div class="footer-brand"><img class="official-logo logo-on-dark" src="../bh-logo-transparent.png" alt="Brickell House"></div>
-      <p>Management Portal</p>
-      <nav><button class="active" data-admin-view="overview">Overview</button><button data-admin-view="products">Products</button><button data-admin-view="orders">Orders</button><button data-admin-view="feedback">Feedback</button><button data-admin-view="insights">Luna Review</button><button data-admin-view="settings">Settings</button></nav>
-      <a class="admin-exit" href="../#home">← Resident portal</a>
+    <button class="admin-sidebar-backdrop" id="adminSidebarBackdrop" type="button" aria-label="Close navigation"></button>
+
+    <aside class="admin-sidebar" id="adminSidebar" aria-label="Management navigation">
+      <div class="admin-brand">
+        <img src="../bh-logo-transparent.png" alt="BrickellHouse">
+        <div>
+          <strong>BrickellHouse</strong>
+          <span>Management</span>
+        </div>
+      </div>
+
+      <nav class="admin-navigation">
+        <p class="admin-nav-label">Operations</p>
+        <button class="active" type="button" data-admin-view="overview"><span class="admin-nav-mark" aria-hidden="true"></span>Overview</button>
+        <button type="button" data-admin-view="orders"><span class="admin-nav-mark" aria-hidden="true"></span>Orders</button>
+        <button type="button" data-admin-view="products"><span class="admin-nav-mark" aria-hidden="true"></span>Products</button>
+        <button type="button" data-admin-view="feedback"><span class="admin-nav-mark" aria-hidden="true"></span>Feedback</button>
+        <p class="admin-nav-label admin-nav-label-secondary">Intelligence</p>
+        <button type="button" data-admin-view="insights"><span class="admin-nav-mark" aria-hidden="true"></span>Luna Review</button>
+        <button type="button" data-admin-view="settings"><span class="admin-nav-mark" aria-hidden="true"></span>Settings</button>
+      </nav>
+
+      <div class="admin-sidebar-footer">
+        <a class="admin-exit" href="../#home"><span aria-hidden="true">&larr;</span> Resident portal</a>
+        <p>Private operations workspace</p>
+      </div>
     </aside>
+
     <section class="admin-main">
-      <header><div><p class="eyebrow">Management</p><h2 id="adminTitle">Overview</h2></div><div class="admin-user"><span id="adminUserEmail">Checking access...</span><b>PM</b><button class="table-action" id="adminLogout">Sign out</button></div></header>
-      <div class="admin-view" id="adminOverview"></div>
-      <div class="admin-view hidden" id="adminProducts">
-        <div class="admin-toolbar"><p>Manage resident services, pricing, and inventory.</p><button class="primary-button" id="addProduct">+ Add product</button></div>
-        <div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>GL Code</th><th>Price</th><th>Inventory</th><th>Status</th><th></th></tr></thead><tbody id="productTable"></tbody></table></div>
-      </div>
-      <div class="admin-view hidden" id="adminOrders">
-        <div class="admin-toolbar"><p>Resident order history and accounting records.</p><button class="outline-button" id="exportOrders">↓ Export for Excel</button></div>
-        <div class="order-search">
-          <label><span>Look up by</span><select id="orderSearchField"><option value="unit">Unit number</option><option value="number">Order number</option><option value="name">Resident name</option><option value="email">Email</option><option value="phone">Phone</option><option value="product">Product</option><option value="glCode">GL code</option><option value="all">All information</option></select></label>
-          <label class="order-search-input"><span>Search</span><input id="orderSearchInput" type="search" placeholder="Enter unit number"></label>
-          <button class="outline-button" id="clearOrderSearch">Clear</button>
-          <small id="orderSearchCount"></small>
+      <header class="admin-topbar">
+        <button class="admin-menu-toggle" id="adminMenuToggle" type="button" aria-label="Open navigation" aria-controls="adminSidebar" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="admin-page-heading">
+          <p class="eyebrow">Operations console</p>
+          <h1 id="adminTitle">Overview</h1>
+          <p id="adminSubtitle">Property performance and resident service activity.</p>
         </div>
-        <div class="table-wrap"><table><thead><tr><th>Order</th><th>Resident / Unit</th><th>Product</th><th>Qty</th><th>Total</th><th>Payment</th><th>GL Code</th><th>Date</th><th>Status</th><th>Legal Acceptance</th><th>Notes</th></tr></thead><tbody id="orderTable"></tbody></table></div>
-      </div>
-      <div class="admin-view hidden" id="adminFeedback">
-        <div class="admin-toolbar"><p>Private resident feedback and management responses.</p><button class="outline-button" id="exportFeedback">↓ Export feedback</button></div>
-        <div class="feedback-filters">
-          <label><span>Search</span><input id="feedbackSearch" type="search" placeholder="Name, unit, email, phone, or message"></label>
-          <label><span>Status</span><select id="feedbackStatusFilter"><option value="All">All statuses</option><option>New</option><option>In Review</option><option>Completed</option><option>Closed</option></select></label>
-          <label><span>Category</span><select id="feedbackCategoryFilter"><option value="All">All categories</option><option>Suggestions</option><option>Questions</option><option>Compliments</option><option>Product Requests</option><option>General Feedback</option></select></label>
-          <label><span>Date</span><input id="feedbackDateFilter" type="date"></label>
+        <div class="admin-user">
+          <div class="admin-user-copy">
+            <small>Secure session</small>
+            <span id="adminUserEmail">Checking access...</span>
+          </div>
+          <b aria-hidden="true">BH</b>
+          <button class="table-action admin-logout" id="adminLogout" type="button">Sign out</button>
         </div>
-        <div class="feedback-admin-list" id="feedbackAdminList"></div>
-      </div>
-      <div class="admin-view hidden" id="adminInsights">
-        <div class="admin-toolbar"><p>Management-only 90-day review of Luna conversations.</p><button class="outline-button" id="exportLunaInsights">↓ Export review CSV</button></div>
-        <div class="feedback-filters luna-insight-filters">
-          <label><span>Search review queue</span><input id="lunaInsightSearch" type="search" placeholder="Preview, category, note, or ID"></label>
-          <label><span>Period</span><select id="lunaInsightPeriod"><option value="week">Last 7 days</option><option value="month">Last 30 days</option><option value="quarter">Last 90 days</option><option value="all">All loaded</option></select></label>
-          <label><span>Language</span><select id="lunaInsightLanguage"><option value="all">All languages</option><option value="en">English</option><option value="es">Spanish</option><option value="unknown">Unknown</option></select></label>
-          <label><span>Status</span><select id="lunaInsightOutcome"><option value="all">All statuses</option><option>New</option><option>Reviewed</option><option>Resolved</option><option>Ignored</option><option value="unknown">Unknown topics</option><option value="low">Low confidence</option></select></label>
-        </div>
-        <div id="lunaInsightsContent" class="luna-insights-content"><div class="inventory-ok">Loading Luna conversation review...</div></div>
-      </div>
-      <div class="admin-view hidden" id="adminSettings">
-        <div class="settings-card">
-          <p class="eyebrow">Checkout settings</p>
-          <h3>Processing fee</h3>
-          <p>Choose how the resident processing fee is calculated and shown in the checkout breakdown.</p>
-          <form id="feeSettingsForm">
-            <div class="field-grid">
-              <label><span>Fee type</span><select name="type"><option value="percent">Percentage</option><option value="fixed">Fixed amount</option></select></label>
-              <label><span>Fee amount</span><input name="amount" type="number" min="0" step="0.01" required></label>
-              <label><span>Fee label</span><input name="label" required></label>
-              <label><span>Internal GL code</span><input name="glCode" required></label>
+      </header>
+
+      <main class="admin-content">
+        <div class="admin-view" id="adminOverview"></div>
+
+        <div class="admin-view hidden" id="adminProducts">
+          <div class="admin-toolbar">
+            <div><p class="eyebrow">Resident services</p><h2>Product catalog</h2><p>Pricing, inventory, availability, and internal accounting.</p></div>
+            <button class="primary-button" id="addProduct" type="button">Add product</button>
+          </div>
+          <div class="admin-data-surface">
+            <div class="table-wrap">
+              <table class="admin-product-table">
+                <thead><tr><th>Product</th><th>Category</th><th>GL Code</th><th>Price</th><th>Inventory</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody id="productTable"></tbody>
+              </table>
             </div>
-            <label class="check-label"><input name="enabled" type="checkbox"> Charge processing fee at checkout</label>
-            <button class="primary-button" type="submit">Save fee settings</button>
-          </form>
+          </div>
         </div>
-      </div>
+
+        <div class="admin-view hidden" id="adminOrders">
+          <div class="admin-toolbar">
+            <div><p class="eyebrow">Resident requests</p><h2>Orders</h2><p>Payment, fulfillment, legal acceptance, and internal notes.</p></div>
+            <button class="outline-button" id="exportOrders" type="button">Export for Excel</button>
+          </div>
+          <div class="order-search admin-filter-bar">
+            <label><span>Look up by</span><select id="orderSearchField"><option value="unit">Unit number</option><option value="number">Order number</option><option value="name">Resident name</option><option value="email">Email</option><option value="phone">Phone</option><option value="product">Product</option><option value="glCode">GL code</option><option value="all">All information</option></select></label>
+            <label class="order-search-input"><span>Search</span><input id="orderSearchInput" type="search" placeholder="Enter unit number"></label>
+            <button class="outline-button" id="clearOrderSearch" type="button">Clear</button>
+            <small id="orderSearchCount" aria-live="polite"></small>
+          </div>
+          <div class="admin-data-surface">
+            <div class="table-wrap">
+              <table class="admin-order-table">
+                <thead><tr><th>Order</th><th>Resident / Unit</th><th>Product</th><th>Qty</th><th>Total</th><th>Payment</th><th>GL Code</th><th>Date</th><th>Status</th><th>Legal Acceptance</th><th>Notes</th></tr></thead>
+                <tbody id="orderTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-view hidden" id="adminFeedback">
+          <div class="admin-toolbar">
+            <div><p class="eyebrow">Resident voice</p><h2>Feedback</h2><p>Review messages, responses, and internal follow-up.</p></div>
+            <button class="outline-button" id="exportFeedback" type="button">Export feedback</button>
+          </div>
+          <div class="feedback-filters admin-filter-bar">
+            <label><span>Search</span><input id="feedbackSearch" type="search" placeholder="Name, unit, email, phone, or message"></label>
+            <label><span>Status</span><select id="feedbackStatusFilter"><option value="All">All statuses</option><option>New</option><option>In Review</option><option>Completed</option><option>Closed</option></select></label>
+            <label><span>Category</span><select id="feedbackCategoryFilter"><option value="All">All categories</option><option>Suggestions</option><option>Questions</option><option>Compliments</option><option>Product Requests</option><option>General Feedback</option></select></label>
+            <label><span>Date</span><input id="feedbackDateFilter" type="date"></label>
+          </div>
+          <div class="feedback-admin-list" id="feedbackAdminList"></div>
+        </div>
+
+        <div class="admin-view hidden" id="adminInsights">
+          <div class="admin-toolbar">
+            <div><p class="eyebrow">Conversation quality</p><h2>Luna Review</h2><p>Management-only review workspace with a 90-day retention window.</p></div>
+            <button class="outline-button" id="exportLunaInsights" type="button">Export review CSV</button>
+          </div>
+          <div class="feedback-filters luna-insight-filters admin-filter-bar">
+            <label><span>Search review queue</span><input id="lunaInsightSearch" type="search" placeholder="Preview, category, note, or ID"></label>
+            <label><span>Period</span><select id="lunaInsightPeriod"><option value="week">Last 7 days</option><option value="month">Last 30 days</option><option value="quarter">Last 90 days</option><option value="all">All loaded</option></select></label>
+            <label><span>Language</span><select id="lunaInsightLanguage"><option value="all">All languages</option><option value="en">English</option><option value="es">Spanish</option><option value="unknown">Unknown</option></select></label>
+            <label><span>Status</span><select id="lunaInsightOutcome"><option value="all">All statuses</option><option>New</option><option>Reviewed</option><option>Resolved</option><option>Ignored</option><option value="unknown">Unknown topics</option><option value="low">Low confidence</option></select></label>
+          </div>
+          <div id="lunaInsightsContent" class="luna-insights-content"><div class="inventory-ok">Loading Luna conversation review...</div></div>
+        </div>
+
+        <div class="admin-view hidden" id="adminSettings">
+          <div class="admin-toolbar admin-toolbar-static">
+            <div><p class="eyebrow">Portal configuration</p><h2>Settings</h2><p>Checkout presentation and internal processing-fee accounting.</p></div>
+          </div>
+          <div class="settings-card">
+            <div class="settings-card-heading">
+              <p class="eyebrow">Checkout settings</p>
+              <h3>Processing fee</h3>
+              <p>Configure the fee calculation shown in the resident checkout breakdown.</p>
+            </div>
+            <form id="feeSettingsForm">
+              <div class="field-grid">
+                <label><span>Fee type</span><select name="type"><option value="percent">Percentage</option><option value="fixed">Fixed amount</option></select></label>
+                <label><span>Fee amount</span><input name="amount" type="number" min="0" step="0.01" required></label>
+                <label><span>Fee label</span><input name="label" required></label>
+                <label><span>Internal GL code</span><input name="glCode" required></label>
+              </div>
+              <label class="check-label"><input name="enabled" type="checkbox"> Charge processing fee at checkout</label>
+              <div class="settings-actions"><button class="primary-button" type="submit">Save fee settings</button></div>
+            </form>
+          </div>
+        </div>
+      </main>
     </section>
   </div>
-  <div class="modal" id="productModal" role="dialog" aria-modal="true">
+
+  <div class="modal" id="productModal" role="dialog" aria-modal="true" aria-labelledby="productFormTitle">
     <div class="modal-card product-form-card">
-      <button class="icon-button modal-close" data-close="product">×</button>
-      <p class="eyebrow">Catalog management</p><h2 id="productFormTitle">Add product</h2>
+      <button class="icon-button modal-close" data-close="product" type="button" aria-label="Close product form">&times;</button>
+      <div class="modal-heading"><p class="eyebrow">Catalog management</p><h2 id="productFormTitle">Add product</h2><p>Resident-facing details and Management-only accounting fields.</p></div>
       <form id="productForm">
         <input type="hidden" name="id">
-        <label><span>Product name</span><input name="name" required></label>
-        <label><span>Internal / Stripe name</span><input name="internalName" required></label>
-        <label><span>Description</span><textarea name="description" required></textarea></label>
-        <div class="field-grid">
+        <div class="product-form-primary">
+          <label><span>Product name</span><input name="name" required></label>
+          <label><span>Internal / Stripe name</span><input name="internalName" required></label>
+          <label><span>Description</span><textarea name="description" required></textarea></label>
+        </div>
+        <div class="field-grid product-form-accounting">
           <label><span>Category</span><select name="category" required></select></label>
           <label><span>Price</span><input name="price" type="number" min="0" step=".01" required></label>
           <label><span>Inventory</span><input name="inventory" type="number" min="0" required></label>
           <label><span>Internal GL code</span><input name="glCode" required></label>
         </div>
         <label class="check-label"><input name="active" type="checkbox" checked> Active in resident store</label>
-        <button class="primary-button full" type="submit">Save product</button>
+        <div class="modal-actions"><button class="outline-button" data-close="product" type="button">Cancel</button><button class="primary-button" type="submit">Save product</button></div>
       </form>
     </div>
   </div>
-  <div class="modal" id="lunaReviewModal" role="dialog" aria-modal="true">
+
+  <div class="modal" id="lunaReviewModal" role="dialog" aria-modal="true" aria-labelledby="lunaReviewTitle">
     <div class="modal-card luna-review-modal-card">
-      <button class="icon-button modal-close" data-close="lunaReview">×</button>
-      <p class="eyebrow">Luna conversation review</p>
-      <h2>Conversation thread</h2>
+      <button class="icon-button modal-close" data-close="lunaReview" type="button" aria-label="Close conversation review">&times;</button>
+      <div class="modal-heading"><p class="eyebrow">Luna conversation review</p><h2 id="lunaReviewTitle">Conversation thread</h2><p>Privacy-sensitive Management workspace.</p></div>
       <p class="luna-review-id" id="lunaReviewId"></p>
       <p class="luna-review-meta" id="lunaReviewMeta"></p>
       <div class="luna-review-thread" id="lunaReviewMessages"></div>
@@ -107,11 +189,12 @@
         <label><span>Status</span><select id="lunaReviewStatus"><option>New</option><option>Reviewed</option><option>Resolved</option><option>Ignored</option></select></label>
         <label><span>Management note</span><textarea id="lunaReviewNote" maxlength="2000" placeholder="Internal review note"></textarea></label>
       </div>
-      <button class="primary-button full" id="saveLunaReview" type="button">Save review</button>
+      <div class="modal-actions"><button class="outline-button" data-close="lunaReview" type="button">Cancel</button><button class="primary-button" id="saveLunaReview" type="button">Save review</button></div>
     </div>
   </div>
-  <div class="toast" id="toast"></div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="../legal.js?v=20260615-legal1"></script>
-  <script src="dashboard.js?v=20260714-product-save1"></script>
+  <script src="dashboard.js?v=20260714-management-redesign1"></script>
 </body>
 </html>

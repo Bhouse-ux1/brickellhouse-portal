@@ -120,8 +120,8 @@ function productRowMarkup(product, index = 0) {
   const category = displayText(product.category, "Uncategorized");
   const glCode = displayText(product.glCode, "Not set");
   const status = product.active ? "Active" : "Inactive";
-  return `<tr class="admin-product-row" style="animation-delay:${Math.min(index * .035, .35)}s">
-    <td>
+  return `<tr class="admin-product-row ${product.active ? "" : "is-inactive"}" style="animation-delay:${Math.min(index * .035, .35)}s">
+    <td data-label="Product">
       <div class="admin-product-cell">
         ${productThumbnail(product)}
         <div>
@@ -131,12 +131,12 @@ function productRowMarkup(product, index = 0) {
         </div>
       </div>
     </td>
-    <td><span class="admin-category-pill">${escapeAdminHtml(category)}</span></td>
-    <td><span class="admin-gl-code">${escapeAdminHtml(glCode)}</span></td>
-    <td><strong class="admin-product-price">${product.price === 0 ? "Free" : money(product.price)}</strong></td>
-    <td><span class="admin-inventory-count">${Number(product.inventory || 0)}</span></td>
-    <td><span class="status admin-status ${product.active ? "" : "inactive"}">${status}</span></td>
-    <td>
+    <td data-label="Category"><span class="admin-category-pill">${escapeAdminHtml(category)}</span></td>
+    <td data-label="GL code"><span class="admin-gl-code">${escapeAdminHtml(glCode)}</span></td>
+    <td data-label="Price"><strong class="admin-product-price">${product.price === 0 ? "Free" : money(product.price)}</strong></td>
+    <td data-label="Inventory"><span class="admin-inventory-count">${Number(product.inventory || 0)}</span></td>
+    <td data-label="Status"><span class="status admin-status ${product.active ? "" : "inactive"}">${status}</span></td>
+    <td data-label="Actions">
       <div class="admin-action-group">
         <button class="admin-action primary" data-edit="${escapeAdminHtml(product.id)}">Edit</button>
         <button class="admin-action secondary" data-toggle="${escapeAdminHtml(product.id)}">${product.active ? "Deactivate" : "Activate"}</button>
@@ -568,9 +568,9 @@ function renderAdmin() {
 
   $("#adminOverview").innerHTML = `
     <div class="metric-grid">
-      <div class="metric"><span>Total orders</span><strong>${new Set(orders.map(order => order.number)).size}</strong></div>
-      <div class="metric"><span>Collected revenue</span><strong>${money(revenue)}</strong></div>
-      <div class="metric"><span>Resident units</span><strong>${units}</strong></div>
+      <div class="metric"><span>Total orders</span><strong>${new Set(orders.map(order => order.number)).size}</strong><small>Recorded resident requests</small></div>
+      <div class="metric"><span>Collected revenue</span><strong>${money(revenue)}</strong><small>Recorded order value</small></div>
+      <div class="metric"><span>Resident units</span><strong>${units}</strong><small>Units represented</small></div>
       <button class="metric metric-button" id="lowInventoryMetric"><span>Low inventory (15 or fewer)</span><strong>${lowInventory}</strong><small>View items</small></button>
     </div>
     <div class="admin-panel low-inventory-panel hidden" id="lowInventoryPanel">
@@ -1077,13 +1077,40 @@ function populateFeeSettings() {
   form.elements.enabled.checked = feeSettings.enabled;
 }
 
+function setAdminNavigationOpen(open) {
+  const shell = $("#adminShell");
+  const toggle = $("#adminMenuToggle");
+  if (!shell) return;
+  shell.classList.toggle("nav-open", Boolean(open));
+  document.body.classList.toggle("nav-open", Boolean(open));
+  if (toggle) {
+    toggle.setAttribute("aria-expanded", String(Boolean(open)));
+    toggle.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
+  }
+}
+
 function showAdminView(view) {
   if (!$(`#admin${view[0].toUpperCase() + view.slice(1)}`)) return;
+  const subtitles = {
+    overview:"Property performance and resident service activity.",
+    orders:"Payment, fulfillment, legal acceptance, and internal notes.",
+    products:"Pricing, inventory, availability, and internal accounting.",
+    feedback:"Resident messages, responses, and follow-up.",
+    insights:"Conversation quality review within the 90-day retention window.",
+    settings:"Portal configuration and checkout presentation."
+  };
   auditManagement("report_access", "management_view", view);
   $$(".admin-view").forEach(element => element.classList.add("hidden"));
   $(`#admin${view[0].toUpperCase() + view.slice(1)}`).classList.remove("hidden");
   $("#adminTitle").textContent = view === "insights" ? "Luna Review" : view[0].toUpperCase() + view.slice(1);
-  $$("[data-admin-view]").forEach(button => button.classList.toggle("active", button.dataset.adminView === view));
+  if ($("#adminSubtitle")) $("#adminSubtitle").textContent = subtitles[view] || "";
+  $$("[data-admin-view]").forEach(button => {
+    const active = button.dataset.adminView === view;
+    button.classList.toggle("active", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
+  setAdminNavigationOpen(false);
 }
 
 function loadScriptOnce(src) {
@@ -1486,7 +1513,22 @@ if ($("#adminLogout")) $("#adminLogout").onclick = async () => {
   toast("Signed out of management");
 };
 if (isManagementPage && $("#adminShell")) checkAndOpenManagement({silent:true});
-$$("[data-admin-view]").forEach(button => button.onclick = () => showAdminView(button.dataset.adminView));
+$$("[data-admin-view]").forEach(button => {
+  if (button.classList.contains("active")) button.setAttribute("aria-current", "page");
+  button.onclick = () => showAdminView(button.dataset.adminView);
+});
+if ($("#adminMenuToggle")) {
+  $("#adminMenuToggle").onclick = () => setAdminNavigationOpen(!$("#adminShell").classList.contains("nav-open"));
+}
+if ($("#adminSidebarBackdrop")) {
+  $("#adminSidebarBackdrop").onclick = () => setAdminNavigationOpen(false);
+}
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && $("#adminShell")?.classList.contains("nav-open")) setAdminNavigationOpen(false);
+});
+window.addEventListener("resize", () => {
+  if (window.innerWidth > 900 && $("#adminShell")?.classList.contains("nav-open")) setAdminNavigationOpen(false);
+});
 
 const categorySelect = $('#productForm select[name="category"]');
 if (categorySelect) categorySelect.innerHTML = CATEGORIES.map(category => `<option>${category}</option>`).join("");
@@ -1648,18 +1690,18 @@ function renderManagementOrderTable() {
       ? `<strong>Yes</strong>${escapeHtml(order.legalAcceptedAt)}<br><small>Version ${escapeHtml(order.legalNoticeVersion || "Not recorded")}</small>`
       : `<span class="acceptance-missing">Not recorded</span>`;
     const payment = `<span class="payment-pill ${orderPaymentClass(order.paymentStatus)}">${escapeHtml(order.paymentStatus || "Not recorded")}</span>${order.squareTransactionId ? `<br><small>${escapeHtml(order.squareTransactionId)}</small>` : ""}`;
-    return `<tr>
-      <td>${escapeHtml(order.number)}</td>
-      <td><strong>${escapeHtml(order.name)}</strong>Unit ${escapeHtml(order.unit)}</td>
-      <td>${escapeHtml(order.product)}<br><small>${escapeHtml(order.internalName || `${order.product} GL-${order.glCode}`)}</small></td>
-      <td>${order.quantity}</td>
-      <td>${money(subtotal + fee)}</td>
-      <td>${payment}</td>
-      <td>${escapeHtml(order.glCode)}</td>
-      <td>${formatDate(order.date)}</td>
-      <td><select class="order-status-select" data-order-status="${escapeHtml(order.number)}">${ORDER_STATUSES.map(status => `<option ${status === order.status ? "selected" : ""}>${status}</option>`).join("")}</select></td>
-      <td>${acceptance}</td>
-      <td class="order-notes">
+    return `<tr class="admin-order-row">
+      <td data-label="Order"><span class="admin-order-number">${escapeHtml(order.number)}</span></td>
+      <td data-label="Resident / Unit"><strong>${escapeHtml(order.name)}</strong>Unit ${escapeHtml(order.unit)}</td>
+      <td data-label="Product">${escapeHtml(order.product)}<br><small>${escapeHtml(order.internalName || `${order.product} GL-${order.glCode}`)}</small></td>
+      <td data-label="Quantity">${order.quantity}</td>
+      <td data-label="Total">${money(subtotal + fee)}</td>
+      <td data-label="Payment">${payment}</td>
+      <td data-label="GL code">${escapeHtml(order.glCode)}</td>
+      <td data-label="Date">${formatDate(order.date)}</td>
+      <td data-label="Status"><select class="order-status-select" data-order-status="${escapeHtml(order.number)}">${ORDER_STATUSES.map(status => `<option ${status === order.status ? "selected" : ""}>${status}</option>`).join("")}</select></td>
+      <td data-label="Legal acceptance">${acceptance}</td>
+      <td class="order-notes" data-label="Notes">
         <textarea data-public-note="${escapeHtml(order.number)}" placeholder="Public pickup note">${escapeHtml(order.publicNote)}</textarea>
         <textarea data-internal-note="${escapeHtml(order.number)}" placeholder="Internal management note">${escapeHtml(order.internalNote)}</textarea>
         <button class="table-action" data-save-order="${escapeHtml(order.number)}">Save notes</button>
