@@ -53,9 +53,16 @@ function accountingGlCode(product) {
 function accountingName(product) {
   return `${product.name} GL-${accountingGlCode(product)}`;
 }
+function preservedInternalName(product, fallbackProduct = null) {
+  const current = String(product?.internalName ?? "").trim();
+  if (current && !/^(undefined|null)$/i.test(current)) return current;
+  const fallback = String(fallbackProduct?.internalName ?? "").trim();
+  if (fallback && !/^(undefined|null)$/i.test(fallback)) return fallback;
+  return accountingName(product);
+}
 products.forEach(product => {
   product.glCode = accountingGlCode(product);
-  product.internalName = accountingName(product);
+  product.internalName = preservedInternalName(product);
 });
 orders.forEach(order => {
   order.status ||= "Received";
@@ -75,15 +82,15 @@ function escapeAdminHtml(value) {
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
   })[character]);
 }
-function normalizeProduct(product) {
+function normalizeProduct(product, fallbackProduct = null) {
   const normalized = {
     ...product,
     price:Number(product.price || 0),
     inventory:Number(product.inventory || 0),
     active:Boolean(product.active)
   };
+  normalized.internalName = preservedInternalName(normalized, fallbackProduct);
   normalized.glCode = accountingGlCode(normalized);
-  normalized.internalName = accountingName(normalized);
   return {
     ...normalized
   };
@@ -603,7 +610,7 @@ function renderAdmin() {
     const before = {...product};
     product.active = !product.active;
     try {
-      await saveProductToSupabase(product);
+      await saveProductStatusToSupabase(product);
       persist(); renderProducts(); renderAdmin();
       auditManagement("product_status_change", "product", product.id, before, product);
     } catch (error) {
@@ -1263,11 +1270,14 @@ async function deleteFeedbackFromSupabase(id) {
 }
 async function saveProductToSupabase(product) {
   if (!managementAuthClient) return;
+  const existingProduct = products.find(candidate => candidate.id === product.id);
+  const internalName = preservedInternalName(product, existingProduct);
+  const glCode = accountingGlCode({...product, internalName});
   const payload = {
     id:product.id,
     resident_name:product.name,
-    internal_name:product.internalName,
-    gl_code:product.glCode,
+    internal_name:internalName,
+    gl_code:glCode,
     description:product.description,
     category:product.category,
     price_cents:Math.round(Number(product.price || 0) * 100),
@@ -1276,6 +1286,14 @@ async function saveProductToSupabase(product) {
     updated_at:new Date().toISOString()
   };
   const {error} = await managementAuthClient.from("products").upsert(payload, {onConflict:"id"});
+  if (error) throw error;
+}
+async function saveProductStatusToSupabase(product) {
+  if (!managementAuthClient) return;
+  const {error} = await managementAuthClient.from("products").update({
+    active:Boolean(product.active),
+    updated_at:new Date().toISOString()
+  }).eq("id", product.id);
   if (error) throw error;
 }
 async function deleteProductFromSupabase(id) {
@@ -1384,7 +1402,7 @@ if ($("#productForm")) $("#productForm").onsubmit = async event => {
     id:data.id || `p${Date.now()}`,name:data.name,description:data.description,category:data.category,
     internalName:data.internalName,price:+data.price,inventory:+data.inventory,glCode:data.glCode,
     image:before?.image || "",active:form.elements.active.checked
-  });
+  }, before);
   try {
     await saveProductToSupabase(product);
     if (index >= 0) products[index] = product;
