@@ -1,0 +1,31 @@
+New Paid Resident Order
+
+Order Number: BH-PREVIEW-1042
+Resident: Avery Example
+Unit: 1204
+Email: resident@example.invalid
+Phone: +1 305 555 0100
+Submitted: July 14, 2026 at 10:30 AM EDT
+Payment Method: Stripe
+Payment Status: Paid
+
+Items:
+- Resident item: Mailbox Key Copy
+  Internal name: Mailbox Key Copy GL-40090
+  GL code: 40090
+  Quantity: 2
+  Unit price: $1.00
+  Line total: $2.00
+- Resident item: AC Drain Line Cleaning
+  Internal name: AC Drain Line Cleaning GL-40090
+  GL code: 40090
+  Quantity: 1
+  Unit price: $45.00
+  Line total: $45.00
+
+Subtotal: $47.00
+Processing Fee: $1.41
+Total Paid: $48.41
+
+Next Action
+Review the order in the Management Dashboard and coordinate with the resident if fulfillment requires access, scheduling, or additional information.
