@@ -40,7 +40,7 @@ let feeSettings = JSON.parse(localStorage.getItem("bh_fee_settings") || "null") 
   enabled:true,type:"percent",amount:3,label:"Processing fee",glCode:"4090-PROCESSING"
 };
 let activeCategory = "All";
-let orderSearchField = "unit";
+let orderSearchField = "all";
 let orderSearchQuery = "";
 let revenueChartYear = String(new Date().getFullYear());
 let lunaInsights = [];
@@ -48,6 +48,22 @@ let lunaInsightsError = "";
 let lunaInsightFilters = {period:"month",language:"all",outcome:"all",search:""};
 let selectedLunaConversationId = "";
 let feedbackRecords = [];
+let selectedOrderNumber = "";
+let selectedFeedbackId = "";
+let orderStatusFilter = "All";
+let orderPaymentFilter = "All";
+let orderDateFilter = "";
+let productFilters = {search:"",status:"All",category:"All",inventory:"All"};
+let currentAdminView = "overview";
+let lastManagementFocus = null;
+
+function safeManagementStorageGet(key) {
+  try { return window.localStorage.getItem(key); } catch (_) { return null; }
+}
+
+function safeManagementStorageSet(key, value) {
+  try { window.localStorage.setItem(key, value); } catch (_) { /* UI preferences remain optional. */ }
+}
 
 function accountingGlCode(product) {
   const label = `${product.id || ""} ${product.name || ""} ${product.internalName || ""}`.toLowerCase();
@@ -116,34 +132,31 @@ function productThumbnail(product) {
 function productRowMarkup(product, index = 0) {
   const name = displayText(product.name, "Unnamed product");
   const description = displayText(product.description, "No description available.");
-  const internalName = displayText(product.internalName);
+  const internalName = displayText(product.internalName, "Not set");
   const category = displayText(product.category, "Uncategorized");
   const glCode = displayText(product.glCode, "Not set");
   const status = product.active ? "Active" : "Inactive";
-  return `<tr class="admin-product-row ${product.active ? "" : "is-inactive"}" style="animation-delay:${Math.min(index * .035, .35)}s">
-    <td data-label="Product">
-      <div class="admin-product-cell">
-        ${productThumbnail(product)}
-        <div>
-          <strong class="admin-product-name">${escapeAdminHtml(name)}</strong>
-          <span class="admin-product-description">${escapeAdminHtml(description)}</span>
-          ${internalName ? `<span class="admin-product-meta">${escapeAdminHtml(internalName)}</span>` : ""}
-        </div>
-      </div>
-    </td>
-    <td data-label="Category"><span class="admin-category-pill">${escapeAdminHtml(category)}</span></td>
-    <td data-label="GL code"><span class="admin-gl-code">${escapeAdminHtml(glCode)}</span></td>
-    <td data-label="Price"><strong class="admin-product-price">${product.price === 0 ? "Free" : money(product.price)}</strong></td>
-    <td data-label="Inventory"><span class="admin-inventory-count">${Number(product.inventory || 0)}</span></td>
-    <td data-label="Status"><span class="status admin-status ${product.active ? "" : "inactive"}">${status}</span></td>
-    <td data-label="Actions">
+  return `<article class="product-record ${product.active ? "" : "is-inactive"}" data-product-record="${escapeAdminHtml(product.id)}" style="animation-delay:${Math.min(index * .025, .2)}s">
+    <div class="product-record-head">
+      ${productThumbnail(product)}
+      <div class="product-record-title"><strong>${escapeAdminHtml(name)}</strong><p>${escapeAdminHtml(description)}</p></div>
+      <span class="product-record-price">${product.price === 0 ? "Free" : money(product.price)}</span>
+    </div>
+    <div class="product-record-facts">
+      <div class="product-record-fact"><span>Internal name</span><strong>${escapeAdminHtml(internalName)}</strong></div>
+      <div class="product-record-fact"><span>GL code</span><strong>${escapeAdminHtml(glCode)}</strong></div>
+      <div class="product-record-fact"><span>Category</span><strong>${escapeAdminHtml(category)}</strong></div>
+      <div class="product-record-fact"><span>Inventory</span><strong>${Number(product.inventory || 0)}${Number(product.inventory || 0) <= 15 ? " · Needs attention" : " available"}</strong></div>
+    </div>
+    <div class="product-record-actions">
+      <span class="admin-status ${product.active ? "active" : "inactive"}">${status}</span>
       <div class="admin-action-group">
-        <button class="admin-action primary" data-edit="${escapeAdminHtml(product.id)}">Edit</button>
-        <button class="admin-action secondary" data-toggle="${escapeAdminHtml(product.id)}">${product.active ? "Deactivate" : "Activate"}</button>
-        <button class="admin-action danger" data-delete="${escapeAdminHtml(product.id)}">Remove</button>
+        <button class="admin-action secondary" type="button" data-edit="${escapeAdminHtml(product.id)}">Edit</button>
+        <button class="admin-action secondary" type="button" data-toggle="${escapeAdminHtml(product.id)}">${product.active ? "Deactivate" : "Activate"}</button>
+        <button class="admin-action danger" type="button" data-delete="${escapeAdminHtml(product.id)}">Remove</button>
       </div>
-    </td>
-  </tr>`;
+    </div>
+  </article>`;
 }
 const todayISO = () => {
   const date = new Date();
@@ -508,8 +521,32 @@ function setDrawer(open) {
   $("#drawerBackdrop").classList.toggle("open", open);
 }
 
-function openModal(selector) { $(selector)?.classList.add("open"); }
-function closeModal(selector) { $(selector)?.classList.remove("open"); }
+function syncManagementScrollLock() {
+  if (!isManagementPage) return;
+  const modalOpen = Boolean($(".modal.open") || $("#adminCommandPalette.open"));
+  const mobileNavigationOpen = window.innerWidth <= 900 && Boolean($("#adminShell.nav-open"));
+  document.body.classList.toggle("management-scroll-lock", modalOpen || mobileNavigationOpen);
+}
+
+function openModal(selector) {
+  const modal = $(selector);
+  if (!modal) return;
+  lastManagementFocus = document.activeElement;
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+  syncManagementScrollLock();
+  window.setTimeout(() => modal.querySelector("button, input, select, textarea, [tabindex]:not([tabindex='-1'])")?.focus(), 0);
+}
+
+function closeModal(selector) {
+  const modal = $(selector);
+  if (!modal) return;
+  modal.classList.remove("open");
+  modal.setAttribute("aria-hidden", "true");
+  syncManagementScrollLock();
+  if (lastManagementFocus?.isConnected) lastManagementFocus.focus();
+  lastManagementFocus = null;
+}
 function toast(message) {
   const element = $("#toast");
   if (!element) return;
@@ -553,67 +590,108 @@ $$("[data-close]").forEach(button => button.addEventListener("click", () => {
   if (button.dataset.close === "product") closeModal("#productModal");
   if (button.dataset.close === "legal") closeModal("#legalModal");
   if (button.dataset.close === "lunaReview") closeModal("#lunaReviewModal");
+  if (button.dataset.close === "command") closeManagementCommands();
 }));
 
-function renderAdmin() {
-  if (!$("#adminOverview")) return;
-  if (!window.managementAccessGranted) return;
-  auditManagement("report_access", "management_report", "overview");
-  const revenue = revenueFor(orders);
-  const units = new Set(orders.map(order => order.unit)).size;
-  const lowProducts = products.filter(product => product.active && product.inventory <= 15);
-  const lowInventory = lowProducts.length;
-  const years = revenueYears();
-  if (!years.includes(revenueChartYear)) revenueChartYear = years[0];
+function groupedOrders() {
+  const groups = new Map();
+  orders.forEach(order => {
+    const number = String(order.number || "");
+    if (!groups.has(number)) groups.set(number, {number, lines:[], first:order});
+    groups.get(number).lines.push(order);
+  });
+  return [...groups.values()];
+}
+
+function groupedOrderTotal(group) {
+  return group.lines.reduce((sum, line) => sum + Number(line.price || 0) * Number(line.quantity || 0) + Number(line.processingFee || 0), 0);
+}
+
+function currentMonthRevenue() {
+  const month = todayISO().slice(0, 7);
+  return revenueFor(orders.filter(order => String(order.date || "").startsWith(month)));
+}
+
+function renderOverviewCommandCenter() {
+  const groups = groupedOrders();
+  const today = todayISO();
+  const todayGroups = groups.filter(group => group.first.date === today);
+  const openGroups = groups.filter(group => !["Completed","Cancelled"].includes(group.first.status));
+  const paidAwaiting = groups.filter(group => String(group.first.paymentStatus || "").toLowerCase() === "paid" && !["Completed","Cancelled"].includes(group.first.status));
+  const lowProducts = products.filter(product => product.active && Number(product.inventory || 0) <= 15);
+  const activeProducts = products.filter(product => product.active);
+  const newFeedback = feedbackRecords.filter(record => ["New","In Review"].includes(normalizeFeedbackStatus(record.status)));
+  const newLuna = lunaInsights.filter(row => row.status === "New");
+  const dateLabel = new Intl.DateTimeFormat("en-US", {weekday:"long",month:"long",day:"numeric"}).format(new Date());
+  const recentActivity = [
+    ...groups.map(group => ({date:group.first.date,type:"Order",title:group.number,detail:`${group.first.name} · Unit ${group.first.unit}`})),
+    ...feedbackRecords.map(record => ({date:record.dateSubmitted,type:"Feedback",title:record.category,detail:`${record.name} · Unit ${record.unit}`})),
+    ...lunaInsights.map(row => ({date:row.last_message_at || row.created_at,type:"Luna",title:row.category || "Conversation",detail:conversationPreview(row)}))
+  ].filter(item => item.date).sort((a,b) => String(b.date).localeCompare(String(a.date))).slice(0, 7);
 
   $("#adminOverview").innerHTML = `
+    <div class="overview-hero"><div><p class="workspace-kicker">Operations command center</p><h1>Today at BrickellHouse</h1><p>Resident service activity, operational attention, and Management priorities using the latest loaded records.</p></div><div class="overview-date"><span>Current operating day</span><strong>${escapeAdminHtml(dateLabel)}</strong></div></div>
     <div class="metric-grid">
-      <div class="metric"><span>Total orders</span><strong>${new Set(orders.map(order => order.number)).size}</strong><small>Recorded resident requests</small></div>
-      <div class="metric"><span>Collected revenue</span><strong>${money(revenue)}</strong><small>Recorded order value</small></div>
-      <div class="metric"><span>Resident units</span><strong>${units}</strong><small>Units represented</small></div>
-      <button class="metric metric-button" id="lowInventoryMetric"><span>Low inventory (15 or fewer)</span><strong>${lowInventory}</strong><small>View items</small></button>
+      <button class="metric" type="button" data-quick-action="today-orders"><span>Orders today</span><strong>${todayGroups.length}</strong><small>Received this operating day</small></button>
+      <button class="metric attention" type="button" data-quick-action="pending-orders"><span>Open orders</span><strong>${openGroups.length}</strong><small>${paidAwaiting.length} paid and awaiting action</small></button>
+      <button class="metric success" type="button" data-quick-action="reports"><span>Revenue this month</span><strong>${money(currentMonthRevenue())}</strong><small>Recorded order value</small></button>
+      <button class="metric attention" type="button" id="lowInventoryMetric"><span>Low inventory</span><strong>${lowProducts.length}</strong><small>Active products at 15 or fewer</small></button>
+      <button class="metric" id="feedbackMetric" type="button" data-quick-action="feedback"><span>Feedback attention</span><strong>${newFeedback.length}</strong><small>New or currently in review</small></button>
+      <button class="metric" type="button" data-quick-action="luna"><span>Luna review queue</span><strong>${newLuna.length}</strong><small>Conversations awaiting review</small></button>
+      <button class="metric" type="button" data-quick-action="active-products"><span>Store availability</span><strong>${activeProducts.length}</strong><small>${products.length - activeProducts.length} inactive products</small></button>
     </div>
-    <div class="admin-panel low-inventory-panel hidden" id="lowInventoryPanel">
-      <h3>Low inventory items</h3>
-      ${lowProducts.length ? `<div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Remaining</th><th>Price</th><th></th></tr></thead><tbody>${lowProducts.map(product =>
-        `<tr><td><strong>${product.name}</strong></td><td>${product.category}</td><td><span class="inventory-count">${product.inventory}</span></td><td>${product.price === 0 ? "Free" : money(product.price)}</td><td><button class="table-action" data-low-edit="${product.id}">Edit inventory</button></td></tr>`
-      ).join("")}</tbody></table></div>` : `<div class="inventory-ok">All active products have more than 15 items available.</div>`}
-    </div>
-    ${revenueChartMarkup(revenueChartYear)}
-    <div class="admin-panel">
-      <h3>Recent resident orders</h3>
-      <div class="table-wrap">${orders.length ? `<table><thead><tr><th>Order</th><th>Resident</th><th>Product</th><th>Total</th><th>Date</th></tr></thead><tbody>${orders.slice(-5).reverse().map(order =>
-        `<tr><td>${order.number}</td><td><strong>${order.name}</strong>Unit ${order.unit}</td><td>${order.product}</td><td>${money(order.price * order.quantity + (+order.processingFee || 0))}</td><td>${formatDate(order.date)}</td></tr>`
-      ).join("")}</tbody></table>` : "<p>No orders yet.</p>"}</div>
+    <div class="command-center-grid">
+      <section class="operations-panel"><div class="panel-heading"><div><h2>Today’s operating picture</h2><p>Current work that may need Management attention.</p></div><button type="button" data-quick-action="refresh">Refresh data</button></div><div class="today-list">
+        <div class="today-item"><span>O</span><div><strong>${todayGroups.length ? `${todayGroups.length} order${todayGroups.length === 1 ? "" : "s"} received today` : "No orders received today"}</strong><small>${paidAwaiting.length} paid order${paidAwaiting.length === 1 ? "" : "s"} remain open across the queue.</small></div><b>${openGroups.length} open</b></div>
+        <div class="today-item"><span>F</span><div><strong>${newFeedback.length ? `${newFeedback.length} resident message${newFeedback.length === 1 ? "" : "s"} need attention` : "Resident feedback is current"}</strong><small>New and In Review records are included.</small></div><b>${newFeedback.length} active</b></div>
+        <div class="today-item"><span>P</span><div><strong>${lowProducts.length ? `${lowProducts.length} product${lowProducts.length === 1 ? "" : "s"} have low inventory` : "Product inventory has no low-stock alerts"}</strong><small>Only active Resident Store products are evaluated.</small></div><b>${lowProducts.length} alerts</b></div>
+        <div class="today-item"><span>L</span><div><strong>${newLuna.length ? `${newLuna.length} Luna conversation${newLuna.length === 1 ? "" : "s"} await review` : "Luna review queue is current"}</strong><small>Review records remain isolated from Luna knowledge and memory.</small></div><b>${newLuna.length} new</b></div>
+      </div></section>
+      <section class="operations-panel"><div class="panel-heading"><div><h2>Quick actions</h2><p>Go directly to a Management workflow.</p></div></div><div class="quick-action-grid">
+        <button class="quick-action" type="button" data-quick-action="create-product"><strong>Create product</strong><small>Open the catalog editor.</small></button>
+        <button class="quick-action" type="button" data-quick-action="pending-orders"><strong>View open orders</strong><small>Filter the fulfillment queue.</small></button>
+        <button class="quick-action" type="button" data-quick-action="feedback"><strong>Review feedback</strong><small>Open resident messages needing action.</small></button>
+        <button class="quick-action" type="button" data-quick-action="luna"><strong>Open Luna Review</strong><small>Inspect conversation quality records.</small></button>
+        <button class="quick-action" type="button" data-quick-action="reports"><strong>Reports and exports</strong><small>Revenue and CSV exports.</small></button>
+        <button class="quick-action" type="button" data-quick-action="settings"><strong>Processing fee</strong><small>Open the existing checkout setting.</small></button>
+      </div></section>
+      <section class="operations-panel"><div class="panel-heading"><div><h2>Recent activity</h2><p>Latest loaded operational records.</p></div></div><div class="activity-list">${recentActivity.length ? recentActivity.map(item => `<div class="activity-item"><span>${escapeAdminHtml(item.type.slice(0,1))}</span><div><strong>${escapeAdminHtml(item.title)}</strong><small>${escapeAdminHtml(item.detail)}</small></div><small>${formatResidentDateTime(item.date)}</small></div>`).join("") : `<div class="workspace-empty">No recent activity is available.</div>`}</div></section>
+      <section class="operations-panel"><div class="panel-heading"><div><h2>Inventory attention</h2><p>Active products at or below 15 units.</p></div><button type="button" data-quick-action="low-products">Open catalog</button></div><div class="alert-list">${lowProducts.length ? lowProducts.slice(0,7).map(product => `<div class="alert-item"><span>P</span><div><strong>${escapeAdminHtml(product.name)}</strong><small>${escapeAdminHtml(product.category)} · ${escapeAdminHtml(product.internalName)}</small></div><b>${Number(product.inventory || 0)} left</b></div>`).join("") : `<div class="workspace-empty">All active products are above the low-inventory threshold.</div>`}</div></section>
     </div>`;
+}
 
-  $("#productTable").innerHTML = products.map(productRowMarkup).join("");
-
-  renderOrderTable();
-  renderLunaInsights();
-
-  bindRevenueControls();
-  bindLunaInsightControls();
-  populateFeeSettings();
-  bindOrderSearch();
-  const lowMetric = $("#lowInventoryMetric");
-  if (lowMetric) lowMetric.onclick = () => {
-    const panel = $("#lowInventoryPanel");
-    panel.classList.toggle("hidden");
-    if (!panel.classList.contains("hidden")) panel.scrollIntoView({behavior:"smooth",block:"start"});
-  };
-  $$("[data-low-edit]").forEach(button => button.onclick = () => {
-    auditManagement("report_access", "management_report", "low_inventory");
-    showAdminView("products");
-    editProduct(button.dataset.lowEdit);
+function filteredManagementProducts() {
+  const search = productFilters.search.trim().toLowerCase();
+  return products.filter(product => {
+    const matchesSearch = !search || [product.name,product.internalName,product.description,product.glCode].some(value => String(value || "").toLowerCase().includes(search));
+    const matchesStatus = productFilters.status === "All" || (productFilters.status === "Active" ? product.active : !product.active);
+    const matchesCategory = productFilters.category === "All" || product.category === productFilters.category;
+    const inventory = Number(product.inventory || 0);
+    const matchesInventory = productFilters.inventory === "All" || (productFilters.inventory === "Low" ? inventory > 0 && inventory <= 15 : inventory === 0);
+    return matchesSearch && matchesStatus && matchesCategory && matchesInventory;
   });
+}
+
+function renderProductWorkspace() {
+  const list = $("#productTable");
+  if (!list) return;
+  const matches = filteredManagementProducts();
+  const active = products.filter(product => product.active).length;
+  const low = products.filter(product => product.active && Number(product.inventory || 0) <= 15).length;
+  const out = products.filter(product => Number(product.inventory || 0) === 0).length;
+  $("#productSummaryBar").innerHTML = `<div class="summary-stat"><span>Catalog records</span><strong>${products.length}</strong><small>Database and preserved catalog records</small></div><div class="summary-stat success"><span>Resident Store active</span><strong>${active}</strong><small>Available to residents when in stock</small></div><div class="summary-stat attention"><span>Low inventory</span><strong>${low}</strong><small>Active products at 15 or fewer</small></div><div class="summary-stat"><span>Out of stock</span><strong>${out}</strong><small>Inventory currently recorded as zero</small></div>`;
+  list.innerHTML = matches.map(productRowMarkup).join("");
+  $("#productEmptyState")?.classList.toggle("hidden", matches.length > 0);
+  const category = $("#productCategoryFilter");
+  if (category && category.options.length <= 1) category.insertAdjacentHTML("beforeend", CATEGORIES.map(value => `<option>${escapeAdminHtml(value)}</option>`).join(""));
+  bindProductManagementActions();
+}
+
+function bindProductManagementActions() {
   $$("[data-edit]").forEach(button => button.onclick = () => editProduct(button.dataset.edit));
   $$("[data-toggle]").forEach(button => button.onclick = async () => {
     const product = products.find(candidate => candidate.id === button.dataset.toggle);
-    if (!product) {
-      toast(PRODUCT_TOGGLE_RECORD_ERROR);
-      return;
-    }
+    if (!product) return toast(PRODUCT_TOGGLE_RECORD_ERROR);
     const before = {...product};
     const nextActive = !product.active;
     try {
@@ -626,29 +704,45 @@ function renderAdmin() {
         persist(); renderProducts(); renderAdmin();
         await verifyResidentProductCatalog(product.id);
       } catch (refreshError) {
-        console.warn("[Management product toggle] The database update was confirmed, but catalog refresh verification failed.", {
-          productId:product.id,
-          message:refreshError?.message || "Unknown refresh error"
-        });
+        console.warn("[Management product toggle] Catalog refresh verification failed after a confirmed update.", {productId:product.id,message:refreshError?.message || "Unknown refresh error"});
         toast("Product updated, but the catalog refresh could not be verified. Please refresh and check again.");
       }
-    } catch (error) {
-      toast(error.message || "Unable to update product");
-    }
+    } catch (error) { toast(error.message || "Unable to update product"); }
   });
   $$("[data-delete]").forEach(button => button.onclick = async () => {
-    if (confirm("Remove this product from the catalog?")) {
-      const removed = products.find(product => product.id === button.dataset.delete);
-      try {
-        await deleteProductFromSupabase(button.dataset.delete);
-        products = products.filter(product => product.id !== button.dataset.delete);
-        persist(); renderProducts(); renderAdmin();
-        auditManagement("product_delete", "product", button.dataset.delete, removed, null);
-      } catch (error) {
-        toast(error.message || "Unable to remove product");
-      }
-    }
+    if (!confirm("Remove this product from the catalog?")) return;
+    const removed = products.find(product => product.id === button.dataset.delete);
+    try {
+      await deleteProductFromSupabase(button.dataset.delete);
+      products = products.filter(product => product.id !== button.dataset.delete);
+      persist(); renderProducts(); renderAdmin();
+      auditManagement("product_delete", "product", button.dataset.delete, removed, null);
+    } catch (error) { toast(error.message || "Unable to remove product"); }
   });
+}
+
+function bindOverviewActions() {
+  $$('[data-quick-action]').forEach(button => button.onclick = () => runManagementAction(button.dataset.quickAction));
+  const lowMetric = $("#lowInventoryMetric");
+  if (lowMetric) lowMetric.onclick = () => runManagementAction("low-products");
+}
+
+function renderAdmin() {
+  if (!$("#adminOverview") || !window.managementAccessGranted) return;
+  auditManagement("report_access", "management_report", "overview");
+  const years = revenueYears();
+  if (!years.includes(revenueChartYear)) revenueChartYear = years[0];
+  renderOverviewCommandCenter();
+  renderProductWorkspace();
+  renderOrderTable();
+  renderLunaInsights();
+  if ($("#adminReportsContent")) $("#adminReportsContent").innerHTML = revenueChartMarkup(revenueChartYear);
+  bindRevenueControls();
+  bindLunaInsightControls();
+  populateFeeSettings();
+  bindOrderSearch();
+  bindOverviewActions();
+  updateManagementNavigationBadges();
 }
 
 function insightDate(row) {
@@ -844,7 +938,7 @@ function conversationById(id) {
   return lunaInsights.find(row => row.conversation_id === id);
 }
 
-function renderLunaInsights() {
+function renderLunaInsightsPrevious() {
   const container = $("#lunaInsightsContent");
   if (!container) return;
   if (lunaInsightsError) {
@@ -896,6 +990,47 @@ function renderLunaInsights() {
   bindLunaReviewCards();
 }
 
+function renderLunaInsights() {
+  const container = $("#lunaInsightsContent");
+  if (!container) return;
+  if (lunaInsightsError) {
+    container.innerHTML = `<div class="inventory-ok">${escapeAdminHtml(lunaInsightsError)}</div>`;
+    return;
+  }
+  const rows = filteredLunaInsights();
+  const now = Date.now();
+  const activeRows = lunaInsights.filter(row => {
+    const date = insightDate(row);
+    return date && now - date.getTime() <= 90 * 24 * 60 * 60 * 1000;
+  });
+  const newCount = activeRows.filter(row => row.status === "New").length;
+  const reviewedCount = activeRows.filter(row => row.status === "Reviewed").length;
+  const resolvedCount = activeRows.filter(row => row.status === "Resolved").length;
+  const spanishCount = activeRows.filter(row => row.detected_language === "es").length;
+  const unknownCount = activeRows.filter(row => (row.detected_topic || "unknown") === "unknown" || row.category === "Unknown").length;
+  const lowConfidenceCount = activeRows.filter(row => Number(row.confidence || 0) < 60).length;
+  const categoryCounts = Object.entries(countBy(activeRows, "category")).sort((a,b) => b[1] - a[1]).slice(0, 7);
+  container.innerHTML = `
+    <div class="metric-grid luna-insight-grid">
+      ${insightMetric("Conversations", activeRows.length, "inside the 90-day window")}
+      ${insightMetric("New", newCount, "awaiting Management review")}
+      ${insightMetric("Reviewed", reviewedCount, "Management touched")}
+      ${insightMetric("Resolved", resolvedCount, "quality items closed")}
+    </div>
+    <div class="luna-review-workbench">
+      <section class="luna-conversation-panel">
+        <div class="luna-panel-heading"><h2>Conversation queue</h2><p>${rows.length} matching &middot; ${spanishCount} Spanish &middot; ${unknownCount} unknown topic &middot; ${lowConfidenceCount} low confidence</p></div>
+        ${rows.length ? `<div class="luna-review-list">${rows.map(row => `<button class="luna-review-card" type="button" data-luna-review="${escapeAdminHtml(row.conversation_id)}"><div><strong>${escapeAdminHtml(conversationPreview(row))}</strong><small>${escapeAdminHtml(row.category || "Unknown")} &middot; ${escapeAdminHtml(row.detected_language || "unknown")} &middot; ${formatInsightDate(row.last_message_at || row.created_at)}</small></div><span class="status-pill ${statusClass(row.status)}">${escapeAdminHtml(row.status || "New")}</span></button>`).join("")}</div>` : `<div class="inventory-ok">No conversations match the current filters.</div>`}
+      </section>
+      <aside class="luna-summary-panel">
+        <div class="luna-panel-heading"><h2>90-day topics</h2><p>Categories in the active review window.</p></div>
+        ${categoryCounts.length ? `<div class="luna-category-list">${categoryCounts.map(([category,count]) => `<div><span>${escapeAdminHtml(category)}</span><strong>${count}</strong></div>`).join("")}</div>` : `<div class="inventory-ok">No category activity is available.</div>`}
+      </aside>
+    </div>
+    <div class="inventory-ok luna-review-guardrail">Management review only. These temporary records cannot update Luna knowledge, prompts, model, or behavior.</div>`;
+  bindLunaReviewCards();
+}
+
 function bindLunaReviewCards() {
   $$("[data-luna-review]").forEach(button => {
     button.onclick = () => openLunaReview(button.dataset.lunaReview);
@@ -917,7 +1052,7 @@ function openLunaReview(conversationId) {
       <span>${escapeAdminHtml(message.role === "luna" ? "Luna" : "Resident")}</span>
       <p>${escapeAdminHtml(message.text || message.redacted_text || "")}</p>
     </div>`).join("") : `<div class="inventory-ok">No messages are available for this conversation.</div>`;
-  modal.classList.add("open");
+  openModal("#lunaReviewModal");
 }
 
 async function saveLunaConversationReview() {
@@ -1019,9 +1154,32 @@ function bindOrderSearch() {
     orderSearchQuery = input.value;
     renderOrderTable();
   };
+  const statusFilter = $("#orderStatusFilter");
+  const paymentFilter = $("#orderPaymentFilter");
+  const dateFilter = $("#orderDateFilter");
+  if (statusFilter) {
+    statusFilter.value = orderStatusFilter;
+    statusFilter.onchange = () => { orderStatusFilter = statusFilter.value; renderOrderTable(); };
+  }
+  if (paymentFilter) {
+    paymentFilter.value = orderPaymentFilter;
+    paymentFilter.onchange = () => { orderPaymentFilter = paymentFilter.value; renderOrderTable(); };
+  }
+  if (dateFilter) {
+    dateFilter.value = orderDateFilter;
+    dateFilter.onchange = () => { orderDateFilter = dateFilter.value; renderOrderTable(); };
+  }
   $("#clearOrderSearch").onclick = () => {
     orderSearchQuery = "";
+    orderSearchField = "all";
+    orderStatusFilter = "All";
+    orderPaymentFilter = "All";
+    orderDateFilter = "";
     input.value = "";
+    field.value = "all";
+    if (statusFilter) statusFilter.value = "All";
+    if (paymentFilter) paymentFilter.value = "All";
+    if (dateFilter) dateFilter.value = "";
     renderOrderTable();
   };
 }
@@ -1082,11 +1240,11 @@ function setAdminNavigationOpen(open) {
   const toggle = $("#adminMenuToggle");
   if (!shell) return;
   shell.classList.toggle("nav-open", Boolean(open));
-  document.body.classList.toggle("nav-open", Boolean(open));
   if (toggle) {
     toggle.setAttribute("aria-expanded", String(Boolean(open)));
     toggle.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
   }
+  syncManagementScrollLock();
 }
 
 function showAdminView(view) {
@@ -1097,8 +1255,10 @@ function showAdminView(view) {
     products:"Pricing, inventory, availability, and internal accounting.",
     feedback:"Resident messages, responses, and follow-up.",
     insights:"Conversation quality review within the 90-day retention window.",
+    reports:"Revenue intelligence and existing Management exports.",
     settings:"Portal configuration and checkout presentation."
   };
+  currentAdminView = view;
   auditManagement("report_access", "management_view", view);
   $$(".admin-view").forEach(element => element.classList.add("hidden"));
   $(`#admin${view[0].toUpperCase() + view.slice(1)}`).classList.remove("hidden");
@@ -1111,6 +1271,147 @@ function showAdminView(view) {
     else button.removeAttribute("aria-current");
   });
   setAdminNavigationOpen(false);
+  window.scrollTo({top:0,behavior:"auto"});
+}
+
+function updateManagementNavigationBadges() {
+  const openOrders = groupedOrders().filter(group => !["Completed","Cancelled"].includes(group.first.status)).length;
+  const lowProducts = products.filter(product => product.active && Number(product.inventory || 0) <= 15).length;
+  const openFeedback = feedbackRecords.filter(record => ["New","In Review"].includes(normalizeFeedbackStatus(record.status))).length;
+  const newLuna = lunaInsights.filter(row => row.status === "New").length;
+  if ($("#navOrdersBadge")) $("#navOrdersBadge").textContent = openOrders || "";
+  if ($("#navProductsBadge")) $("#navProductsBadge").textContent = lowProducts || "";
+  if ($("#navFeedbackBadge")) $("#navFeedbackBadge").textContent = openFeedback || "";
+  if ($("#navLunaBadge")) $("#navLunaBadge").textContent = newLuna || "";
+}
+
+async function refreshManagementWorkspace() {
+  if (!managementAuthClient) return;
+  const button = $("#adminRefresh");
+  if (button) button.disabled = true;
+  try {
+    await loadManagementData();
+    renderAdmin();
+    toast("Management data refreshed");
+  } catch (error) {
+    toast(error.message || "Unable to refresh Management data");
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+function runManagementAction(action) {
+  if (action === "create-product") {
+    showAdminView("products");
+    $("#addProduct")?.click();
+    return;
+  }
+  if (action === "today-orders") {
+    orderDateFilter = todayISO();
+    orderStatusFilter = "All";
+    showAdminView("orders");
+    bindOrderSearch();
+    renderOrderTable();
+    return;
+  }
+  if (action === "pending-orders") {
+    orderDateFilter = "";
+    orderStatusFilter = "Open";
+    showAdminView("orders");
+    bindOrderSearch();
+    renderOrderTable();
+    return;
+  }
+  if (["active-products","low-products"].includes(action)) {
+    productFilters.status = "Active";
+    productFilters.inventory = action === "low-products" ? "Low" : "All";
+    showAdminView("products");
+    syncProductFilterControls();
+    renderProductWorkspace();
+    return;
+  }
+  if (action === "feedback") {
+    showAdminView("feedback");
+    if ($("#feedbackStatusFilter")) $("#feedbackStatusFilter").value = "New";
+    renderManagementFeedback();
+    return;
+  }
+  if (action === "luna") {
+    lunaInsightFilters.outcome = "New";
+    showAdminView("insights");
+    bindLunaInsightControls();
+    renderLunaInsights();
+    return;
+  }
+  if (["reports","settings"].includes(action)) {
+    showAdminView(action);
+    return;
+  }
+  if (action === "refresh") refreshManagementWorkspace();
+}
+
+function managementCommandItems(query = "") {
+  const navigation = [
+    ["overview","Overview","Operations command center"],["orders","Orders","Resident fulfillment queue"],["products","Products","Resident Store catalog"],
+    ["feedback","Feedback","Resident relations inbox"],["insights","Luna Review","Conversation quality workspace"],["reports","Reports","Revenue and exports"],["settings","Settings","Processing fee and session"]
+  ].map(([value,label,detail]) => ({kind:"view",value,label,detail,group:"Navigation"}));
+  const actions = [
+    ["create-product","Create product","Open the catalog editor"],["pending-orders","View open orders","Filter the fulfillment queue"],["low-products","View low inventory","Filter active products at 15 or fewer"],
+    ["refresh","Refresh Management data","Reload current authenticated records"]
+  ].map(([value,label,detail]) => ({kind:"action",value,label,detail,group:"Actions"}));
+  const records = [
+    ...groupedOrders().map(group => ({kind:"order",value:group.number,label:group.number,detail:`${group.first.name} · Unit ${group.first.unit}`,group:"Orders"})),
+    ...products.map(product => ({kind:"product",value:product.id,label:product.name,detail:`${product.internalName} · GL ${product.glCode}`,group:"Products"})),
+    ...feedbackRecords.map(record => ({kind:"feedback",value:record.id,label:`${record.name} · Unit ${record.unit}`,detail:record.message,group:"Feedback"})),
+    ...lunaInsights.map(row => ({kind:"luna",value:row.conversation_id,label:row.category || "Luna conversation",detail:conversationPreview(row),group:"Luna Review"}))
+  ];
+  const needle = query.trim().toLowerCase();
+  return [...navigation,...actions,...records].filter(item => !needle || [item.label,item.detail,item.group,item.value].some(value => String(value || "").toLowerCase().includes(needle))).slice(0, 40);
+}
+
+function renderManagementCommands() {
+  const container = $("#adminCommandResults");
+  if (!container) return;
+  const items = managementCommandItems($("#adminCommandInput")?.value || "");
+  const groups = new Map();
+  items.forEach(item => {
+    if (!groups.has(item.group)) groups.set(item.group, []);
+    groups.get(item.group).push(item);
+  });
+  container.innerHTML = items.length ? [...groups.entries()].map(([group,rows]) => `<div class="command-group-label">${escapeAdminHtml(group)}</div>${rows.map(item => `<button class="command-result" type="button" data-command-kind="${item.kind}" data-command-value="${escapeAdminHtml(item.value)}"><div><strong>${escapeAdminHtml(item.label)}</strong><small>${escapeAdminHtml(item.detail)}</small></div><b>Open</b></button>`).join("")}`).join("") : `<div class="workspace-empty">No Management records or actions match this search.</div>`;
+  $$('[data-command-kind]').forEach(button => button.onclick = () => executeManagementCommand(button.dataset.commandKind, button.dataset.commandValue));
+}
+
+function openManagementCommands() {
+  const palette = $("#adminCommandPalette");
+  if (!palette) return;
+  lastManagementFocus = document.activeElement;
+  palette.classList.add("open");
+  palette.setAttribute("aria-hidden", "false");
+  $("#adminCommandInput").value = "";
+  renderManagementCommands();
+  syncManagementScrollLock();
+  window.setTimeout(() => $("#adminCommandInput")?.focus(), 0);
+}
+
+function closeManagementCommands() {
+  const palette = $("#adminCommandPalette");
+  if (!palette) return;
+  palette.classList.remove("open");
+  palette.setAttribute("aria-hidden", "true");
+  syncManagementScrollLock();
+  if (lastManagementFocus?.isConnected) lastManagementFocus.focus();
+  lastManagementFocus = null;
+}
+
+function executeManagementCommand(kind, value) {
+  closeManagementCommands();
+  if (kind === "view") return showAdminView(value);
+  if (kind === "action") return runManagementAction(value);
+  if (kind === "order") { selectedOrderNumber = value; showAdminView("orders"); renderManagementOrderTable(); return; }
+  if (kind === "product") { showAdminView("products"); editProduct(value); return; }
+  if (kind === "feedback") { selectedFeedbackId = value; showAdminView("feedback"); renderManagementFeedback(); return; }
+  if (kind === "luna") { showAdminView("insights"); openLunaReview(value); }
 }
 
 function loadScriptOnce(src) {
@@ -1469,7 +1770,10 @@ function openManagementLogin() {
 async function openAdminShell() {
   window.managementAccessGranted = true;
   $("#adminShell")?.classList.add("open");
-  if (managementProfile?.email) $("#adminUserEmail").textContent = managementProfile.email;
+  if (managementProfile?.email) {
+    ["adminUserEmail","adminSidebarEmail","settingsUserEmail"].forEach(id => { if ($(`#${id}`)) $(`#${id}`).textContent = managementProfile.email; });
+  }
+  if ($("#settingsMfaState")) $("#settingsMfaState").textContent = managementProfile?.mfa_required ? "MFA is required for this Management profile." : "Management authentication is active.";
   if (managementAuthClient) await loadManagementData();
   renderAdmin();
 }
@@ -1512,7 +1816,10 @@ if ($("#adminLogout")) $("#adminLogout").onclick = async () => {
   $("#adminUserEmail").textContent = "Property Management";
   toast("Signed out of management");
 };
-if (isManagementPage && $("#adminShell")) checkAndOpenManagement({silent:true});
+if (isManagementPage && $("#adminShell")) {
+  if (safeManagementStorageGet("bh_management_rail") === "collapsed" && window.innerWidth > 900) $("#adminShell").classList.add("rail-collapsed");
+  checkAndOpenManagement({silent:true});
+}
 $$("[data-admin-view]").forEach(button => {
   if (button.classList.contains("active")) button.setAttribute("aria-current", "page");
   button.onclick = () => showAdminView(button.dataset.adminView);
@@ -1523,12 +1830,76 @@ if ($("#adminMenuToggle")) {
 if ($("#adminSidebarBackdrop")) {
   $("#adminSidebarBackdrop").onclick = () => setAdminNavigationOpen(false);
 }
+if ($("#adminSidebarCollapse")) {
+  $("#adminSidebarCollapse").onclick = () => {
+    const collapsed = $("#adminShell").classList.toggle("rail-collapsed");
+    $("#adminSidebarCollapse").setAttribute("aria-expanded", String(!collapsed));
+    $("#adminSidebarCollapse").setAttribute("aria-label", collapsed ? "Expand navigation" : "Collapse navigation");
+    safeManagementStorageSet("bh_management_rail", collapsed ? "collapsed" : "expanded");
+  };
+}
+if ($("#adminCommandOpen")) $("#adminCommandOpen").onclick = openManagementCommands;
+if ($("#adminCommandInput")) $("#adminCommandInput").oninput = renderManagementCommands;
+if ($("#adminRefresh")) $("#adminRefresh").onclick = refreshManagementWorkspace;
+if ($("#adminCommandPalette")) $("#adminCommandPalette").onclick = event => { if (event.target === $("#adminCommandPalette")) closeManagementCommands(); };
+$$('.modal.side-sheet').forEach(modal => modal.addEventListener("mousedown", event => { if (event.target === modal) closeModal(`#${modal.id}`); }));
+
+function syncProductFilterControls() {
+  const mapping = {productSearchFilter:"search",productStatusFilter:"status",productCategoryFilter:"category",productInventoryFilter:"inventory"};
+  Object.entries(mapping).forEach(([id,key]) => { if ($(`#${id}`)) $(`#${id}`).value = productFilters[key]; });
+}
+
+function bindProductFilters() {
+  const mapping = {productSearchFilter:"search",productStatusFilter:"status",productCategoryFilter:"category",productInventoryFilter:"inventory"};
+  Object.entries(mapping).forEach(([id,key]) => {
+    const control = $(`#${id}`);
+    if (!control) return;
+    control.addEventListener(id === "productSearchFilter" ? "input" : "change", () => {
+      productFilters[key] = control.value;
+      renderProductWorkspace();
+    });
+  });
+  syncProductFilterControls();
+}
+
+bindProductFilters();
+$$('[data-report-action]').forEach(button => button.onclick = () => {
+  if (button.dataset.reportAction === "orders") $("#exportOrders")?.click();
+  if (button.dataset.reportAction === "feedback") $("#exportFeedback")?.click();
+  if (button.dataset.reportAction === "luna") exportLunaInsightsCsv();
+});
+
+function trapManagementFocus(event, container) {
+  if (event.key !== "Tab" || !container) return false;
+  const focusable = [...container.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])')].filter(element => element.offsetParent !== null);
+  if (!focusable.length) return false;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); return true; }
+  if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); return true; }
+  return false;
+}
+
 document.addEventListener("keydown", event => {
-  if (event.key === "Escape" && $("#adminShell")?.classList.contains("nav-open")) setAdminNavigationOpen(false);
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k" && isManagementPage) {
+    event.preventDefault();
+    if ($("#adminCommandPalette")?.classList.contains("open")) closeManagementCommands();
+    else openManagementCommands();
+    return;
+  }
+  const activeDialog = $("#adminCommandPalette.open") || $(".modal.open");
+  if (trapManagementFocus(event, activeDialog)) return;
+  if (event.key !== "Escape") return;
+  if ($("#adminCommandPalette")?.classList.contains("open")) return closeManagementCommands();
+  const openModalElement = $(".modal.open");
+  if (openModalElement) return closeModal(`#${openModalElement.id}`);
+  if ($("#adminShell")?.classList.contains("nav-open")) setAdminNavigationOpen(false);
 });
 window.addEventListener("resize", () => {
   if (window.innerWidth > 900 && $("#adminShell")?.classList.contains("nav-open")) setAdminNavigationOpen(false);
+  else syncManagementScrollLock();
 });
+window.addEventListener("pagehide", () => document.body.classList.remove("management-scroll-lock"));
 
 const categorySelect = $('#productForm select[name="category"]');
 if (categorySelect) categorySelect.innerHTML = CATEGORIES.map(category => `<option>${category}</option>`).join("");
@@ -1538,6 +1909,7 @@ if ($("#addProduct")) $("#addProduct").onclick = () => {
   $("#productForm [name=id]").value = "";
   $("#productForm [name=active]").checked = true;
   $("#productFormTitle").textContent = "Add product";
+  if ($("#productEditorImage")) $("#productEditorImage").innerHTML = `<div class="admin-product-thumb placeholder">BH</div><div><strong>No image selected</strong><p>The existing product image is preserved by this editor.</p></div>`;
   openModal("#productModal");
 };
 
@@ -1551,6 +1923,7 @@ function editProduct(id) {
     }
   });
   $("#productFormTitle").textContent = "Edit product";
+  if ($("#productEditorImage")) $("#productEditorImage").innerHTML = `${productThumbnail(product)}<div><strong>${escapeAdminHtml(product.name)}</strong><p>${product.image ? "Current Resident Store image. This editor preserves the stored image URL." : "No stored image. The safe catalog fallback remains active."}</p></div>`;
   openModal("#productModal");
 }
 
@@ -1576,7 +1949,11 @@ if ($("#productForm")) $("#productForm").onsubmit = async event => {
   }
 };
 
-if ($("#feeSettingsForm")) $("#feeSettingsForm").onsubmit = async event => {
+if ($("#feeSettingsForm")) {
+  $("#feeSettingsForm").addEventListener("input", () => {
+    if ($("#settingsSaveState")) $("#settingsSaveState").textContent = "Unsaved changes";
+  });
+  $("#feeSettingsForm").onsubmit = async event => {
   event.preventDefault();
   const form = event.target;
   const data = Object.fromEntries(new FormData(form));
@@ -1585,12 +1962,15 @@ if ($("#feeSettingsForm")) $("#feeSettingsForm").onsubmit = async event => {
   try {
     await saveFeeSettingsToSupabase(feeSettings);
     persist(); renderCart(); renderAdmin(); toast("Processing fee settings saved");
+    if ($("#settingsSaveState")) $("#settingsSaveState").textContent = "Saved just now";
     auditManagement("checkout_settings_update", "portal_settings", "processing_fee", before, feeSettings);
   } catch (error) {
     feeSettings = before;
+    if ($("#settingsSaveState")) $("#settingsSaveState").textContent = "Save failed. Review the message and try again.";
     toast(error.message || "Unable to save processing fee settings");
   }
-};
+  };
+}
 
 if ($("#exportOrders")) $("#exportOrders").onclick = () => {
   const rows = [
@@ -1680,7 +2060,7 @@ function orderPaymentClass(status) {
   return "";
 }
 
-function renderManagementOrderTable() {
+function renderManagementOrderTablePrevious() {
   if (!$("#orderTable")) return;
   const matches = matchingOrders();
   $("#orderTable").innerHTML = matches.slice().reverse().map(order => {
@@ -1736,6 +2116,103 @@ function renderManagementOrderTable() {
   });
 }
 
+function matchingOrderGroups() {
+  const matchingLines = matchingOrders();
+  const allowedNumbers = new Set(matchingLines.map(order => order.number));
+  return groupedOrders().filter(group => {
+    const order = group.first;
+    const payment = String(order.paymentStatus || "").toLowerCase();
+    const matchesStatus = orderStatusFilter === "All"
+      || (orderStatusFilter === "Open" ? !["Completed","Cancelled"].includes(order.status) : order.status === orderStatusFilter);
+    const matchesPayment = orderPaymentFilter === "All"
+      || (orderPaymentFilter === "Paid" && payment === "paid")
+      || (orderPaymentFilter === "Pending" && payment.includes("pending"))
+      || (orderPaymentFilter === "Failed" && payment.includes("fail"));
+    return allowedNumbers.has(group.number) && matchesStatus && matchesPayment && (!orderDateFilter || order.date === orderDateFilter);
+  }).sort((a,b) => String(b.first.date || "").localeCompare(String(a.first.date || "")) || String(b.number).localeCompare(String(a.number)));
+}
+
+function orderProvider(order) {
+  const reference = String(order.squareTransactionId || "");
+  if (/^(pi_|cs_|ch_)/i.test(reference)) return "Stripe";
+  if (reference) return "Historical / Square";
+  return "Not recorded";
+}
+
+function relativeRecordAge(value) {
+  if (!value) return "Date not recorded";
+  const date = new Date(value.length === 10 ? `${value}T12:00:00` : value);
+  if (Number.isNaN(date.getTime())) return formatDate(value);
+  const days = Math.max(0, Math.floor((Date.now() - date.getTime()) / 86400000));
+  if (days === 0) return "Today";
+  if (days === 1) return "1 day ago";
+  return `${days} days ago`;
+}
+
+function renderOrderSummary(groups) {
+  const allGroups = groupedOrders();
+  const open = allGroups.filter(group => !["Completed","Cancelled"].includes(group.first.status)).length;
+  const paid = allGroups.filter(group => String(group.first.paymentStatus || "").toLowerCase() === "paid").length;
+  const completed = allGroups.filter(group => group.first.status === "Completed").length;
+  const visibleRevenue = groups.reduce((sum, group) => sum + groupedOrderTotal(group), 0);
+  $("#orderSummaryBar").innerHTML = `<div class="summary-stat"><span>Orders loaded</span><strong>${allGroups.length}</strong><small>${groups.length} currently visible</small></div><div class="summary-stat attention"><span>Open fulfillment</span><strong>${open}</strong><small>Not completed or cancelled</small></div><div class="summary-stat success"><span>Paid orders</span><strong>${paid}</strong><small>Server-verified payment status</small></div><div class="summary-stat"><span>Visible order value</span><strong>${money(visibleRevenue)}</strong><small>${completed} completed orders loaded</small></div>`;
+}
+
+function renderOrderDetail(group) {
+  const panel = $("#orderDetailPanel");
+  if (!panel) return;
+  if (!group) {
+    panel.innerHTML = `<div class="detail-empty"><span>BH</span><h2>Select an order</h2><p>Resident details, line items, accounting, legal acceptance, and fulfillment controls will appear here.</p></div>`;
+    return;
+  }
+  const order = group.first;
+  const subtotal = group.lines.reduce((sum,line) => sum + Number(line.price || 0) * Number(line.quantity || 0), 0);
+  const fee = group.lines.reduce((sum,line) => sum + Number(line.processingFee || 0), 0);
+  panel.innerHTML = `
+    <div class="detail-header"><div><span class="admin-order-number">${escapeHtml(group.number)}</span><h2>Unit ${escapeHtml(order.unit)}</h2><p>${escapeHtml(order.name)} &middot; ${relativeRecordAge(order.date)}</p></div><div class="detail-total"><span>Order total</span><strong>${money(subtotal + fee)}</strong><span class="payment-pill ${orderPaymentClass(order.paymentStatus)}">${escapeHtml(order.paymentStatus || "Not recorded")}</span></div></div>
+    <section class="detail-section"><h3>Resident contact</h3><div class="detail-facts"><div class="detail-fact"><span>Resident</span><strong>${escapeHtml(order.name)}</strong></div><div class="detail-fact"><span>Unit</span><strong>${escapeHtml(order.unit)}</strong></div><div class="detail-fact"><span>Email</span><strong>${escapeHtml(order.email || "Not provided")}</strong></div><div class="detail-fact"><span>Phone</span><strong>${escapeHtml(order.phone || "Not provided")}</strong></div></div></section>
+    <section class="detail-section"><h3>Line items and accounting</h3><div class="detail-items">${group.lines.map(line => `<div class="detail-line-item"><div><strong>${escapeHtml(line.product)}</strong><small>${escapeHtml(line.internalName || "Internal name not recorded")} &middot; GL ${escapeHtml(line.glCode || "Not recorded")} &middot; Qty ${Number(line.quantity || 0)}</small></div><b>${money(Number(line.price || 0) * Number(line.quantity || 0))}</b></div>`).join("")}</div></section>
+    <section class="detail-section"><h3>Payment and totals</h3><div class="detail-facts"><div class="detail-fact"><span>Provider</span><strong>${orderProvider(order)}</strong></div><div class="detail-fact"><span>Processor reference</span><strong>${escapeHtml(order.squareTransactionId || "Not recorded")}</strong></div><div class="detail-fact"><span>Payment date/time</span><strong>${escapeHtml(order.paymentDateTime ? formatResidentDateTime(order.paymentDateTime) : "Not recorded")}</strong></div><div class="detail-fact"><span>Payment status</span><strong>${escapeHtml(order.paymentStatus || "Not recorded")}</strong></div></div><div class="detail-financials"><div><span>Subtotal</span><b>${money(subtotal)}</b></div><div><span>${escapeHtml(order.feeLabel || "Processing fee")}${order.feeGlCode ? ` · ${escapeHtml(order.feeGlCode)}` : ""}</span><b>${money(fee)}</b></div><div><span>Total</span><b>${money(subtotal + fee)}</b></div></div></section>
+    <section class="detail-section"><h3>Legal acceptance</h3><div class="detail-facts"><div class="detail-fact"><span>Accepted</span><strong>${order.legalAccepted ? "Yes" : "Not recorded"}</strong></div><div class="detail-fact"><span>Accepted at</span><strong>${escapeHtml(order.legalAcceptedAt ? formatResidentDateTime(order.legalAcceptedAt) : "Not recorded")}</strong></div><div class="detail-fact"><span>Legal notice</span><strong>${escapeHtml(order.legalNoticeVersion || "Not recorded")}</strong></div><div class="detail-fact"><span>Terms / privacy</span><strong>${escapeHtml([order.termsVersion,order.privacyPolicyVersion].filter(Boolean).join(" / ") || "Not recorded")}</strong></div></div></section>
+    <section class="detail-section"><h3>Fulfillment</h3><label><span>Order status</span><select data-order-status="${escapeHtml(group.number)}">${ORDER_STATUSES.map(status => `<option ${status === order.status ? "selected" : ""}>${status}</option>`).join("")}</select></label><div class="detail-notes"><label><span>Public pickup note</span><textarea data-public-note="${escapeHtml(group.number)}" placeholder="Visible resident pickup note">${escapeHtml(order.publicNote)}</textarea></label><label><span>Internal Management note</span><textarea data-internal-note="${escapeHtml(group.number)}" placeholder="Private Management note">${escapeHtml(order.internalNote)}</textarea></label></div></section>
+    <div class="detail-actions"><button class="secondary-command" type="button" data-copy-order="${escapeHtml(group.number)}">Copy order number</button><button class="primary-command" type="button" data-save-order="${escapeHtml(group.number)}">Save status and notes</button></div>`;
+}
+
+function renderManagementOrderTable() {
+  const container = $("#orderTable");
+  if (!container) return;
+  const groups = matchingOrderGroups();
+  if (selectedOrderNumber && !groups.some(group => group.number === selectedOrderNumber)) selectedOrderNumber = "";
+  container.innerHTML = groups.length ? groups.map(group => {
+    const order = group.first;
+    const itemLabel = group.lines.length === 1 ? group.lines[0].product : `${group.lines.length} line items`;
+    return `<button class="order-record ${selectedOrderNumber === group.number ? "selected" : ""}" type="button" data-order-select="${escapeHtml(group.number)}"><div class="order-record-main"><div class="order-record-head"><span class="admin-order-number">${escapeHtml(group.number)}</span><span class="status-pill ${statusClass(order.status)}">${escapeHtml(order.status || "Received")}</span></div><strong>${escapeHtml(order.name)} · Unit ${escapeHtml(order.unit)}</strong><p>${escapeHtml(itemLabel)} · ${escapeHtml(orderProvider(order))}</p></div><div class="order-record-side"><strong>${money(groupedOrderTotal(group))}</strong><span class="payment-pill ${orderPaymentClass(order.paymentStatus)}">${escapeHtml(order.paymentStatus || "Not recorded")}</span><small>${relativeRecordAge(order.date)}</small></div></button>`;
+  }).join("") : `<div class="workspace-empty">No orders match the current filters.</div>`;
+  $("#orderSearchCount").textContent = `${groups.length} order${groups.length === 1 ? "" : "s"} shown`;
+  renderOrderSummary(groups);
+  renderOrderDetail(groups.find(group => group.number === selectedOrderNumber));
+
+  $$('[data-order-select]').forEach(button => button.onclick = () => {
+    selectedOrderNumber = button.dataset.orderSelect;
+    renderManagementOrderTable();
+    if (window.innerWidth <= 900) $("#orderDetailPanel")?.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",block:"start"});
+  });
+  $$('[data-copy-order]').forEach(button => button.onclick = async () => {
+    try { await navigator.clipboard.writeText(button.dataset.copyOrder); toast("Order number copied"); } catch (_) { toast("Unable to copy the order number"); }
+  });
+  $$('[data-save-order]').forEach(button => button.onclick = async () => {
+    const number = button.dataset.saveOrder;
+    const status = $(`[data-order-status="${CSS.escape(number)}"]`).value;
+    const publicNote = $(`[data-public-note="${CSS.escape(number)}"]`).value.trim();
+    const internalNote = $(`[data-internal-note="${CSS.escape(number)}"]`).value.trim();
+    try {
+      await updateOrder(number, {status,publicNote,internalNote});
+      toast("Order status and notes saved");
+      renderManagementOrderTable();
+    } catch (error) { toast(error.message || "Unable to update the order"); }
+  });
+}
+
 renderOrderTable = renderManagementOrderTable;
 
 function normalizeFeedbackStatus(status) {
@@ -1769,7 +2246,7 @@ function formatResidentDateTime(value) {
   }).format(new Date(value));
 }
 
-function renderManagementFeedback() {
+function renderManagementFeedbackPrevious() {
   const container = $("#feedbackAdminList");
   if (!container) return;
   const matches = matchingFeedback().sort((a, b) => b.dateSubmitted.localeCompare(a.dateSubmitted));
@@ -1846,6 +2323,75 @@ function renderManagementFeedback() {
         toast(error.message || "Unable to delete feedback record");
       }
     };
+  });
+}
+
+function renderFeedbackDetail(record) {
+  const panel = $("#feedbackDetailPanel");
+  if (!panel) return;
+  if (!record) {
+    panel.innerHTML = `<div class="detail-empty"><span>BH</span><h2>Select a resident message</h2><p>Contact information, the full message, notes, and response controls will appear here.</p></div>`;
+    return;
+  }
+  const status = normalizeFeedbackStatus(record.status);
+  panel.innerHTML = `
+    <div class="detail-header"><div><span class="status-pill ${feedbackStatusClass(status)}">${escapeHtml(status)}</span><h2>${escapeHtml(record.category)}</h2><p>Submitted ${formatResidentDateTime(record.dateSubmitted)}</p></div><div class="detail-total"><span>Resident unit</span><strong>${escapeHtml(record.unit)}</strong></div></div>
+    <section class="detail-section"><h3>Resident contact</h3><div class="detail-facts"><div class="detail-fact"><span>Resident</span><strong>${escapeHtml(record.name)}</strong></div><div class="detail-fact"><span>Unit</span><strong>${escapeHtml(record.unit)}</strong></div><div class="detail-fact"><span>Email</span><strong>${escapeHtml(record.email || "Not provided")}</strong></div><div class="detail-fact"><span>Phone</span><strong>${escapeHtml(record.phone || "Not provided")}</strong></div></div></section>
+    <section class="detail-section"><h3>Resident message</h3><p class="feedback-detail-message">${escapeHtml(record.message)}</p></section>
+    <section class="detail-section"><h3>Management follow-up</h3><label><span>Status</span><select data-feedback-status="${record.id}">${FEEDBACK_STATUSES.map(option => `<option ${option === status ? "selected" : ""}>${option}</option>`).join("")}</select></label><div class="detail-notes"><label><span>Management response</span><textarea data-feedback-response="${record.id}" placeholder="Response recorded for this resident message">${escapeHtml(record.managementResponse)}</textarea></label><label><span>Internal notes</span><textarea data-feedback-notes="${record.id}" placeholder="Private Management follow-up">${escapeHtml(record.internalNotes)}</textarea></label></div></section>
+    <div class="detail-actions"><button class="admin-action danger" type="button" data-delete-feedback="${record.id}">Delete record</button><button class="primary-command" type="button" data-save-feedback="${record.id}">Save feedback record</button></div>`;
+}
+
+function renderManagementFeedback() {
+  const container = $("#feedbackAdminList");
+  if (!container) return;
+  const matches = matchingFeedback().sort((a,b) => b.dateSubmitted.localeCompare(a.dateSubmitted));
+  if (selectedFeedbackId && !matches.some(record => record.id === selectedFeedbackId)) selectedFeedbackId = "";
+  const newCount = feedbackRecords.filter(record => normalizeFeedbackStatus(record.status) === "New").length;
+  const reviewCount = feedbackRecords.filter(record => normalizeFeedbackStatus(record.status) === "In Review").length;
+  const completedCount = feedbackRecords.filter(record => normalizeFeedbackStatus(record.status) === "Completed").length;
+  $("#feedbackSummaryBar").innerHTML = `<div class="summary-stat attention"><span>New messages</span><strong>${newCount}</strong><small>Awaiting initial Management review</small></div><div class="summary-stat"><span>In review</span><strong>${reviewCount}</strong><small>Follow-up currently in progress</small></div><div class="summary-stat success"><span>Completed</span><strong>${completedCount}</strong><small>Resident issues with completed status</small></div><div class="summary-stat"><span>Visible records</span><strong>${matches.length}</strong><small>Matching the current inbox filters</small></div>`;
+  container.innerHTML = matches.length ? `<div class="feedback-inbox-list">${matches.map(record => {
+    const status = normalizeFeedbackStatus(record.status);
+    return `<article class="feedback-record ${selectedFeedbackId === record.id ? "selected" : ""}" data-feedback-record="${record.id}"><button class="feedback-record-toggle" type="button" data-feedback-select="${record.id}"><div><strong>${escapeHtml(record.name)} · Unit ${escapeHtml(record.unit)}</strong><p>${escapeHtml(record.message)}</p><small>${escapeHtml(record.category)} · ${formatResidentDateTime(record.dateSubmitted)}</small></div><span><b class="status-pill ${feedbackStatusClass(status)}">${escapeHtml(status)}</b><small>${record.email ? escapeHtml(record.email) : "No email"}</small></span></button></article>`;
+  }).join("")}</div>` : `<div class="workspace-empty">No feedback matches the current filters.</div>`;
+  const selected = feedbackRecords.find(record => record.id === selectedFeedbackId);
+  renderFeedbackDetail(selected);
+  $$('[data-feedback-select]').forEach(button => button.onclick = () => {
+    selectedFeedbackId = button.dataset.feedbackSelect;
+    renderManagementFeedback();
+    if (window.innerWidth <= 900) $("#feedbackDetailPanel")?.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",block:"start"});
+  });
+  $$('[data-save-feedback]').forEach(button => button.onclick = async () => {
+    const record = feedbackRecords.find(item => item.id === button.dataset.saveFeedback);
+    if (!record) return;
+    const before = {...record};
+    const status = $(`[data-feedback-status="${CSS.escape(record.id)}"]`).value;
+    const response = $(`[data-feedback-response="${CSS.escape(record.id)}"]`).value.trim();
+    const changes = {status,managementResponse:response,internalNotes:$(`[data-feedback-notes="${CSS.escape(record.id)}"]`).value.trim(),dateResponded:status === "Completed" && response ? new Date().toISOString() : record.dateResponded};
+    try {
+      await saveFeedbackToSupabase(record.id, changes);
+      Object.assign(record, changes);
+      renderManagementFeedback();
+      renderFeedbackMetric();
+      updateManagementNavigationBadges();
+      toast("Feedback record saved");
+      auditManagement("feedback_response_update", "feedback", record.id, before, record);
+    } catch (error) { toast(error.message || "Unable to save feedback record"); }
+  });
+  $$('[data-delete-feedback]').forEach(button => button.onclick = async () => {
+    if (!confirm("Delete this feedback record?")) return;
+    const deleted = feedbackRecords.find(record => record.id === button.dataset.deleteFeedback);
+    try {
+      await deleteFeedbackFromSupabase(button.dataset.deleteFeedback);
+      feedbackRecords = feedbackRecords.filter(record => record.id !== button.dataset.deleteFeedback);
+      selectedFeedbackId = "";
+      renderManagementFeedback();
+      renderFeedbackMetric();
+      updateManagementNavigationBadges();
+      toast("Feedback record deleted");
+      auditManagement("feedback_delete", "feedback", button.dataset.deleteFeedback, deleted, null);
+    } catch (error) { toast(error.message || "Unable to delete feedback record"); }
   });
 }
 
