@@ -3,8 +3,6 @@ const path = require("path");
 const {buildResidentEmail, buildManagementEmail} = require("../api/order-emails");
 
 const outputDirectory = path.join(__dirname, "email-previews");
-const productionLogoUrl = "https://portal.brickellhouse.org/bh-logo-transparent.png";
-const localPreviewLogoUrl = "../../bh-logo-transparent.png";
 const fixture = Object.freeze({
   paymentId:"pi_preview_only",
   orderNumber:"BH-PREVIEW-1042",
@@ -43,8 +41,7 @@ function localPreviewHtml(email, simulateAutomaticDarkMode = false) {
     : "";
 
   return email.html
-    .replace(productionLogoUrl, localPreviewLogoUrl)
-    .replace("<head>", "<head>\n  <!-- Local preview uses the checked-in logo; sent email uses the production asset URL. -->")
+    .replace("<head>", "<head>\n  <!-- Local preview generated from the production transactional email builder. -->")
     .replace("</head>", `${darkModeSimulation}\n</head>`)
     .replace(/[ \t]+$/gm, "");
 }
@@ -91,14 +88,17 @@ function run() {
   assert(/Mailbox Key Copy GL-40090/.test(`${management.html}\n${management.text}`), "Management output is missing the internal accounting name");
   assert(!/<img\b[^>]*onerror/i.test(residentInjection.html), "resident dynamic HTML was not escaped");
   assert(!/<img\b[^>]*onerror/i.test(managementInjection.html), "Management dynamic HTML was not escaped");
-  assert((resident.html.match(/<img\b/g) || []).length === 1, "resident email should contain only the approved logo image");
-  assert((management.html.match(/<img\b/g) || []).length === 1, "Management email should contain only the approved logo image");
-  assert(resident.html.includes('src="https://portal.brickellhouse.org/bh-logo-transparent.png"'), "resident email is missing the approved production logo URL");
-  assert(management.html.includes('src="https://portal.brickellhouse.org/bh-logo-transparent.png"'), "Management email is missing the approved production logo URL");
+  assert(!/<img\b/i.test(resident.html) && !/<img\b/i.test(management.html), "transactional email still contains an image-based logo");
+  assert(!/bh-logo-transparent\.png|<svg\b|<canvas\b/i.test(`${resident.html}\n${management.html}`), "transactional email contains a prohibited logo asset or drawing surface");
+  assert(/class="brand-monogram"[^>]*>\s*<a[^>]*>BH<\/a>/.test(resident.html), "resident email is missing the HTML BH monogram");
+  assert(/class="brand-wordmark"[^>]*>BrickellHouse<\/a>/.test(resident.html), "resident email is missing the HTML BrickellHouse wordmark");
+  assert(/class="brand-wordmark"[^>]*>BrickellHouse<\/a>/.test(management.html), "Management email is missing the HTML BrickellHouse wordmark");
+  assert(!/Brickell House/.test(`${resident.html}\n${management.html}`), "BrickellHouse is incorrectly separated in the wordmark");
+  assert(resident.html.includes(">Resident Services</div>") && management.html.includes(">Management</div>"), "template-specific wordmark subtitle is missing");
   assert(resident.html.includes('<meta name="color-scheme" content="light dark">'), "supported color-scheme metadata is missing");
   assert(resident.html.includes(":root{color-scheme:light dark;supported-color-schemes:light dark}"), "supported color-scheme declaration is missing");
   assert(!resident.html.includes("prefers-color-scheme:dark") && !resident.html.includes("[data-ogsc]"), "sent email contains a forced custom dark theme");
-  assert(!/class="brand-logo"[^>]*style="[^"]*(?:background-color|padding:)/i.test(resident.html), "logo still has a boxed background or padding tile");
+  assert(!/class="brand-monogram"[^>]*(?:background-color|box-shadow|linear-gradient)/i.test(resident.html), "HTML monogram has a prohibited tile, shadow, or gradient");
   assert(/class="item-head"[^>]*bgcolor="#111111"/.test(resident.html), "order table is missing its resilient black header");
   assert(/class="[^"]*footer-surface[^"]*"[^>]*bgcolor="#111111"/.test(resident.html), "footer is missing its resilient black surface");
   assert(resident.html.includes("@media screen and (max-width:600px)") && resident.html.includes(".email-wrap{width:100%!important}"), "320px mobile fallback rules are missing");

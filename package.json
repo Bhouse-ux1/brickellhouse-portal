@@ -5,7 +5,8 @@
   "description": "BrickellHouse resident services portal",
   "scripts": {
     "test:luna": "node scripts/luna-eval.js",
-    "preview:emails": "node scripts/preview-emails.js"
+    "preview:emails": "node scripts/preview-emails.js",
+    "send:test-email": "node scripts/send-test-email.js"
   },
   "dependencies": {
     "resend": "^6.14.0"
