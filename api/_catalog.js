@@ -3,18 +3,24 @@ const products = {
   svc2:{name:"Unit Key Copy",priceCents:3000},
   svc3:{name:"Smoke Detector Battery Replacement",priceCents:2500},
   svc4:{name:"AC Filter Replacement",priceCents:5500},
-  svc5:{name:"Trash Compactor Replacement",priceCents:20000},
+  svc5:{name:"Trash Compactor Replacement",priceCents:20000,active:false},
   svc6:{name:"Toilet or Sink Unclogged Service",priceCents:3000},
-  svc7:{name:"Lockout Assistance",priceCents:5000},
-  svc8:{name:"Faucet Repair",priceCents:12500},
+  svc7:{name:"Lockout Assistance",priceCents:5000,active:false},
+  svc8:{name:"Faucet Repair",priceCents:12500,active:false},
   svc9:{name:"Thermostat Reset or System Check",priceCents:4000},
-  svc10:{name:"Portable AC Unit Rental",priceCents:30000},
+  svc10:{name:"Portable AC Unit Rental",priceCents:30000,active:false},
   svc11:{name:"Thermostat Replacement",priceCents:0},
-  svc12:{name:"Annual AC Filter Subscription",priceCents:36000},
+  svc12:{name:"Annual AC Filter Subscription",priceCents:36000,active:false},
   svc13:{name:"Valet Service Subscription",priceCents:25000},
   svc14:{name:"AC Drain Line Cleaning",priceCents:4500},
-  svc15:{name:"Premium Resident Care Plan",priceCents:96000}
+  svc15:{name:"Premium Resident Care Plan",priceCents:96000,active:false}
 };
+
+const RESIDENT_DISABLED_PRODUCT_IDS = new Set(
+  Object.entries(products)
+    .filter(([, product]) => product.active === false)
+    .map(([id]) => id)
+);
 
 function accountingGlCode(id, product = {}) {
   const label = `${id || ""} ${product.name || ""} ${product.internalName || ""}`.toLowerCase();
@@ -59,7 +65,7 @@ async function getTrustedProductCatalog() {
   const catalog = {};
   for (const [id, product] of Object.entries(products)) {
     const glCode = accountingGlCode(id, product);
-    catalog[id] = {...product, internalName:accountingName(product.name, glCode), glCode, inventory:99, active:true};
+    catalog[id] = {...product, internalName:accountingName(product.name, glCode), glCode, inventory:99, active:product.active !== false};
   }
   const rows = await loadSupabaseProductRows();
   for (const row of rows) {
@@ -67,6 +73,7 @@ async function getTrustedProductCatalog() {
       ...(catalog[row.id] || {}),
       ...normalizeProductRow(row)
     };
+    if (RESIDENT_DISABLED_PRODUCT_IDS.has(row.id)) catalog[row.id].active = false;
   }
   return catalog;
 }

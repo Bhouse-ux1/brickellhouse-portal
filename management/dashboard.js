@@ -17,17 +17,17 @@ const seedProducts = [
   {id:"svc2",name:"Unit Key Copy",category:"Keys & Access",description:"Replacement of your unit door key.",price:30,inventory:99,glCode:"40090",image:"offer-unit-key.webp",active:true},
   {id:"svc3",name:"Smoke Detector Battery Replacement",category:"Maintenance Services",description:"Includes battery and labor.",price:25,inventory:99,glCode:"40090",image:"offer-smoke-battery.webp",active:true},
   {id:"svc4",name:"AC Filter Replacement",category:"HVAC Services",description:"Includes filter and labor.",price:55,inventory:99,glCode:"40090",image:"offer-filter-replacement.webp",active:true},
-  {id:"svc5",name:"Trash Compactor Replacement",category:"Maintenance Services",description:"Includes parts and labor.",price:200,inventory:99,glCode:"40090",image:"offer-trash-compactor.webp",active:true},
+  {id:"svc5",name:"Trash Compactor Replacement",category:"Maintenance Services",description:"Includes parts and labor.",price:200,inventory:99,glCode:"40090",image:"offer-trash-compactor.webp",active:false},
   {id:"svc6",name:"Toilet or Sink Unclogged Service",category:"Maintenance Services",description:"Includes unclogging and labor for each individual sink or toilet.",price:30,inventory:99,glCode:"40090",image:"offer-unclog-service.webp",active:true},
-  {id:"svc7",name:"Lockout Assistance",category:"Keys & Access",description:"Includes access and labor.",price:50,inventory:99,glCode:"40090",image:"offer-lockout.webp",active:true},
-  {id:"svc8",name:"Faucet Repair",category:"Maintenance Services",description:"Includes parts and labor.",price:125,inventory:99,glCode:"40090",image:"offer-faucet-repair.webp",active:true},
+  {id:"svc7",name:"Lockout Assistance",category:"Keys & Access",description:"Includes access and labor.",price:50,inventory:99,glCode:"40090",image:"offer-lockout.webp",active:false},
+  {id:"svc8",name:"Faucet Repair",category:"Maintenance Services",description:"Includes parts and labor.",price:125,inventory:99,glCode:"40090",image:"offer-faucet-repair.webp",active:false},
   {id:"svc9",name:"Thermostat Reset or System Check",category:"HVAC Services",description:"Includes minor adjustments and labor.",price:40,inventory:99,glCode:"40090",image:"offer-thermostat-check.webp",active:true},
-  {id:"svc10",name:"Portable AC Unit Rental",category:"HVAC Services",description:"$25.00 per day; requires a $300 refundable security deposit payable in advance.",price:300,inventory:10,glCode:"40090",image:"offer-portable-ac.webp",active:true},
+  {id:"svc10",name:"Portable AC Unit Rental",category:"HVAC Services",description:"$25.00 per day; requires a $300 refundable security deposit payable in advance.",price:300,inventory:10,glCode:"40090",image:"offer-portable-ac.webp",active:false},
   {id:"svc11",name:"Thermostat Replacement",category:"HVAC Services",description:"Thermostat replacement provided at no charge.",price:0,inventory:99,glCode:"40090",image:"offer-thermostat-replacement.webp",active:true},
-  {id:"svc12",name:"Annual AC Filter Subscription",category:"Subscriptions & Plans",description:"Includes 12 scheduled AC filter replacements per year, one per month.",price:360,inventory:99,glCode:"40090",image:"offer-annual-filter.webp",active:true},
+  {id:"svc12",name:"Annual AC Filter Subscription",category:"Subscriptions & Plans",description:"Includes 12 scheduled AC filter replacements per year, one per month.",price:360,inventory:99,glCode:"40090",image:"offer-annual-filter.webp",active:false},
   {id:"svc13",name:"Valet Service Subscription",category:"Subscriptions & Plans",description:"Includes unlimited valet parking for one month for each registered vehicle per unit.",price:250,inventory:99,glCode:"40033",image:"offer-valet-subscription.webp",active:true},
   {id:"svc14",name:"AC Drain Line Cleaning",category:"HVAC Services",description:"Includes cleaning and flushing the AC drain line to prevent overflow.",price:45,inventory:99,glCode:"40090",image:"offer-drain-cleaning.webp",active:true},
-  {id:"svc15",name:"Premium Resident Care Plan",category:"Subscriptions & Plans",description:"Billed annually. Covers basic in-unit maintenance labor, including light bulbs, AC maintenance, filters, thermostat checks, unclogging, minor touch-ups, and general inspections.",price:960,inventory:99,glCode:"40090",image:"offer-resident-care.webp",active:true}
+  {id:"svc15",name:"Premium Resident Care Plan",category:"Subscriptions & Plans",description:"Billed annually. Covers basic in-unit maintenance labor, including light bulbs, AC maintenance, filters, thermostat checks, unclogging, minor touch-ups, and general inspections.",price:960,inventory:99,glCode:"40090",image:"offer-resident-care.webp",active:false}
 ];
 
 const sampleOrders = [];
