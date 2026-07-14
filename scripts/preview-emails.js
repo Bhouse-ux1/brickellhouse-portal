@@ -32,12 +32,28 @@ function assert(condition, message) {
   if (!condition) throw new Error(`Email preview safety check failed: ${message}`);
 }
 
-function writePreview(name, email) {
-  const localHtml = email.html
+function localPreviewHtml(email, simulateAutomaticDarkMode = false) {
+  const darkModeSimulation = simulateAutomaticDarkMode
+    ? `
+  <!-- Preview-only approximation of automatic client inversion. This is not sent in production email. -->
+  <style id="preview-auto-dark-simulation">
+    html{background-color:#000000!important}
+    body{filter:invert(1) hue-rotate(180deg)}
+  </style>`
+    : "";
+
+  return email.html
     .replace(productionLogoUrl, localPreviewLogoUrl)
     .replace("<head>", "<head>\n  <!-- Local preview uses the checked-in logo; sent email uses the production asset URL. -->")
+    .replace("</head>", `${darkModeSimulation}\n</head>`)
     .replace(/[ \t]+$/gm, "");
+}
+
+function writePreview(name, email) {
+  const localHtml = localPreviewHtml(email);
+  const darkHtml = localPreviewHtml(email, true);
   fs.writeFileSync(path.join(outputDirectory, `${name}.html`), localHtml, "utf8");
+  fs.writeFileSync(path.join(outputDirectory, `${name}-dark.html`), darkHtml, "utf8");
   fs.writeFileSync(path.join(outputDirectory, `${name}.txt`), email.text, "utf8");
 }
 
@@ -79,6 +95,14 @@ function run() {
   assert((management.html.match(/<img\b/g) || []).length === 1, "Management email should contain only the approved logo image");
   assert(resident.html.includes('src="https://portal.brickellhouse.org/bh-logo-transparent.png"'), "resident email is missing the approved production logo URL");
   assert(management.html.includes('src="https://portal.brickellhouse.org/bh-logo-transparent.png"'), "Management email is missing the approved production logo URL");
+  assert(resident.html.includes('<meta name="color-scheme" content="light dark">'), "supported color-scheme metadata is missing");
+  assert(resident.html.includes(":root{color-scheme:light dark;supported-color-schemes:light dark}"), "supported color-scheme declaration is missing");
+  assert(!resident.html.includes("prefers-color-scheme:dark") && !resident.html.includes("[data-ogsc]"), "sent email contains a forced custom dark theme");
+  assert(!/class="brand-logo"[^>]*style="[^"]*(?:background-color|padding:)/i.test(resident.html), "logo still has a boxed background or padding tile");
+  assert(/class="item-head"[^>]*bgcolor="#111111"/.test(resident.html), "order table is missing its resilient black header");
+  assert(/class="[^"]*footer-surface[^"]*"[^>]*bgcolor="#111111"/.test(resident.html), "footer is missing its resilient black surface");
+  assert(resident.html.includes("@media screen and (max-width:600px)") && resident.html.includes(".email-wrap{width:100%!important}"), "320px mobile fallback rules are missing");
+  assert(localPreviewHtml(resident, true).includes('id="preview-auto-dark-simulation"'), "simulated automatic-dark preview is missing");
   assert(/class="brand-highlight"[^>]*background-color:#a68b54/.test(resident.html), "static brand highlight fallback is missing");
   assert(resident.html.includes("@keyframes brand-highlight") && resident.html.includes("prefers-reduced-motion:reduce"), "progressive brand highlight safeguards are missing");
   assert(resident.text.includes("Subtotal:") && resident.text.includes("Processing Fee:") && resident.text.includes("Total Paid:"), "resident plain text is incomplete");

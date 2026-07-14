@@ -118,10 +118,11 @@ function emailShell({preheader,serviceLabel,title,content,footerNote}) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="color-scheme" content="light">
-  <meta name="supported-color-schemes" content="light">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
   <title>${escapeHtml(title)}</title>
   <style>
+    :root{color-scheme:light dark;supported-color-schemes:light dark}
     body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
     table,td{mso-table-lspace:0pt;mso-table-rspace:0pt}
     table{border-collapse:collapse!important}
@@ -141,25 +142,26 @@ function emailShell({preheader,serviceLabel,title,content,footerNote}) {
       .item-table th,.item-table td{padding-left:4px!important;padding-right:4px!important}
     }
   </style>
+  <!--[if mso]><style type="text/css">.neutral-header{background-color:#ffffff!important}.item-head,.footer-surface{background-color:#111111!important;color:#ffffff!important}</style><![endif]-->
 </head>
-<body style="margin:0;padding:0;width:100%;background-color:#f4f1e8;color:#292b28;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
+<body style="margin:0;padding:0;width:100%;background-color:#f5f5f5;color:#111111;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
   <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all;">${escapeHtml(preheader)}&#847;&zwnj;&#160;&#847;&zwnj;&#160;&#847;&zwnj;&#160;</div>
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background-color:#f4f1e8;">
+  <table role="presentation" class="email-bg" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#f5f5f5" style="width:100%;background-color:#f5f5f5;">
     <tr><td align="center" style="padding:24px 12px;">
       <!--[if mso]><table role="presentation" width="640" cellspacing="0" cellpadding="0" border="0"><tr><td><![endif]-->
-      <table role="presentation" class="email-wrap" width="640" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:640px;background-color:#fffdf8;border:1px solid #d9d2c2;">
-        <tr><td class="header-pad" style="padding:18px 34px;background-color:#29382e;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
-            <td width="185" style="width:185px;"><a href="${PORTAL_URL}" style="display:inline-block;background-color:#fffdf8;text-decoration:none;"><img class="brand-logo" src="${LOGO_URL}" width="162" height="47" alt="BrickellHouse" style="display:block;width:162px;height:auto;padding:5px 8px;background-color:#fffdf8;color:#29382e;font-family:Arial,sans-serif;font-size:16px;line-height:47px;"></a></td>
-            <td class="service-label" align="right" style="font-size:11px;line-height:16px;color:#d8ddcf;text-transform:uppercase;letter-spacing:1.2px;">${escapeHtml(serviceLabel)}</td>
+      <table role="presentation" class="email-wrap" width="640" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="width:100%;max-width:640px;background-color:#ffffff;border:1px solid #d0d0d0;">
+        <tr><td class="header-pad neutral-header" bgcolor="#ffffff" style="padding:20px 34px;background-color:#ffffff;border-bottom:1px solid #d0d0d0;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;"><tr>
+            <td width="185" style="width:185px;"><a href="${PORTAL_URL}" style="display:inline-block;text-decoration:none;"><img class="brand-logo" src="${LOGO_URL}" width="162" height="47" alt="BrickellHouse" style="display:block;width:162px;height:auto;color:#111111;font-family:Arial,sans-serif;font-size:16px;line-height:47px;"></a></td>
+            <td class="service-label" align="right" style="font-size:11px;line-height:16px;color:#314334;text-transform:uppercase;letter-spacing:1.2px;font-weight:600;">${escapeHtml(serviceLabel)}</td>
           </tr></table>
         </td></tr>
         <tr><td class="brand-highlight" height="3" style="height:3px;background-color:#a68b54;font-size:0;line-height:0;">&nbsp;</td></tr>
         ${content}
-        <tr><td class="mobile-pad" style="padding:25px 34px;background-color:#ece8de;border-top:1px solid #d7d0c2;color:#625f56;font-size:12px;line-height:19px;">
-          <p style="margin:0 0 8px;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:#29382e;">BrickellHouse Condominium</p>
-          <p style="margin:0 0 8px;">${escapeHtml(footerNote)}</p>
-          <p style="margin:0;"><a href="${PORTAL_URL}" style="color:#405d48;text-decoration:underline;">portal.brickellhouse.org</a>&nbsp;&nbsp;&middot;&nbsp;&nbsp;&copy; ${year} BrickellHouse</p>
+        <tr><td class="mobile-pad footer-surface" bgcolor="#111111" style="padding:25px 34px;background-color:#111111;border-top:1px solid #111111;color:#ffffff;font-size:12px;line-height:19px;">
+          <p class="footer-title" style="margin:0 0 8px;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:#ffffff;">BrickellHouse Condominium</p>
+          <p class="footer-text" style="margin:0 0 8px;color:#ffffff;">${escapeHtml(footerNote)}</p>
+          <p class="footer-text" style="margin:0;color:#ffffff;"><a class="footer-link" href="${PORTAL_URL}" style="color:#d8bd7b;text-decoration:underline;">portal.brickellhouse.org</a>&nbsp;&nbsp;&middot;&nbsp;&nbsp;&copy; ${year} BrickellHouse</p>
         </td></tr>
       </table>
       <!--[if mso]></td></tr></table><![endif]-->
@@ -176,17 +178,17 @@ function statusHero(order, presentation, management = false) {
       ? "Thank you. We received your order and sent it to Management."
       : "Thank you. We received your payment and sent your order to Management.");
   const icon = presentation.tone === "warning" ? "!" : "&#10003;";
-  const iconColor = presentation.tone === "warning" ? "#8a6432" : "#416149";
+  const iconColor = presentation.tone === "warning" ? "#8a5a16" : "#3f5b43";
 
-  return `<tr><td class="mobile-pad" style="padding:38px 34px 30px;background-color:#fffdf8;">
+  return `<tr><td class="mobile-pad content-surface" bgcolor="#ffffff" style="padding:38px 34px 30px;background-color:#ffffff;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
       <td width="58" valign="top" style="width:58px;padding-right:17px;">
         <div style="width:48px;height:48px;border-radius:24px;background-color:${iconColor};color:#ffffff;font-size:25px;line-height:48px;text-align:center;font-family:Arial,sans-serif;">${icon}</div>
       </td>
       <td valign="top">
-        <div style="margin:0 0 8px;color:#8b7447;font-size:11px;line-height:16px;text-transform:uppercase;letter-spacing:1.1px;">${management ? "Management" : "Resident Services"}</div>
-        <h1 class="hero-title" style="margin:0 0 11px;font-family:Georgia,'Times New Roman',serif;font-size:34px;line-height:40px;font-weight:400;color:#29382e;">${escapeHtml(management ? "New Order" : presentation.headline)}</h1>
-        <p style="margin:0;color:#55574f;font-size:15px;line-height:24px;">${escapeHtml(intro)}</p>
+        <div class="muted-text" style="margin:0 0 8px;color:#76571d;font-size:11px;line-height:16px;text-transform:uppercase;letter-spacing:1.1px;font-weight:600;">${management ? "Management" : "Resident Services"}</div>
+        <h1 class="hero-title heading-text" style="margin:0 0 11px;font-family:Georgia,'Times New Roman',serif;font-size:34px;line-height:40px;font-weight:400;color:#111111;">${escapeHtml(management ? "New Order" : presentation.headline)}</h1>
+        <p class="body-text" style="margin:0;color:#222222;font-size:15px;line-height:24px;">${escapeHtml(intro)}</p>
       </td>
     </tr></table>
   </td></tr>`;
@@ -194,19 +196,19 @@ function statusHero(order, presentation, management = false) {
 
 function orderIdentity(order, presentation, management = false) {
   const statusCell = management ? `<td class="detail-column" width="38%" valign="top" style="padding:18px 20px 18px 14px;">
-    <div style="font-size:10px;line-height:15px;text-transform:uppercase;letter-spacing:1px;color:#777a70;">Status</div>
-    <div style="display:inline-block;margin-top:5px;padding:4px 9px;background-color:#dbe5d9;color:#36503b;font-size:12px;line-height:16px;font-weight:600;">${escapeHtml(presentation.label)}</div>
+    <div class="info-label" style="font-size:10px;line-height:15px;text-transform:uppercase;letter-spacing:1px;color:#333333;">Status</div>
+    <div style="display:inline-block;margin-top:5px;padding:4px 9px;background-color:#3f5b43;color:#ffffff;font-size:12px;line-height:16px;font-weight:600;">${escapeHtml(presentation.label)}</div>
   </td>` : "";
   return `<tr><td class="mobile-pad" style="padding:0 34px 30px;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f0f2eb;border:1px solid #d4dacd;">
+    <table role="presentation" class="info-card" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border:1px solid #c8c8c8;">
       <tr>
         <td class="detail-column" width="${management ? "34%" : "55%"}" valign="top" style="padding:18px 14px 18px 20px;">
-          <div style="font-size:10px;line-height:15px;text-transform:uppercase;letter-spacing:1px;color:#777a70;">Order number</div>
-          <div style="margin-top:5px;font-size:17px;line-height:22px;font-weight:600;color:#29382e;">${escapeHtml(order.orderNumber)}</div>
+          <div class="info-label" style="font-size:10px;line-height:15px;text-transform:uppercase;letter-spacing:1px;color:#333333;">Order number</div>
+          <div class="info-value" style="margin-top:5px;font-size:17px;line-height:22px;font-weight:600;color:#111111;">${escapeHtml(order.orderNumber)}</div>
         </td>
         <td class="detail-column" width="${management ? "28%" : "45%"}" valign="top" style="padding:18px ${management ? "14px" : "20px"} 18px 14px;">
-          <div style="font-size:10px;line-height:15px;text-transform:uppercase;letter-spacing:1px;color:#777a70;">${management ? "Resident unit" : "Unit"}</div>
-          <div style="margin-top:5px;font-size:15px;line-height:22px;color:#29382e;">${escapeHtml(order.unit)}</div>
+          <div class="info-label" style="font-size:10px;line-height:15px;text-transform:uppercase;letter-spacing:1px;color:#333333;">${management ? "Resident unit" : "Unit"}</div>
+          <div class="info-value" style="margin-top:5px;font-size:15px;line-height:22px;color:#111111;">${escapeHtml(order.unit)}</div>
         </td>
         ${statusCell}
       </tr>
@@ -215,15 +217,15 @@ function orderIdentity(order, presentation, management = false) {
 }
 
 function residentItemsTable(order) {
-  const rows = order.items.map(item => `<tr>
-    <td style="padding:13px 7px;border-bottom:1px solid #e2ddd1;color:#30332f;">${escapeHtml(item.name)}</td>
-    <td align="center" style="padding:13px 4px;border-bottom:1px solid #e2ddd1;color:#30332f;">${item.quantity}</td>
-    <td align="right" style="padding:13px 4px;border-bottom:1px solid #e2ddd1;color:#30332f;white-space:nowrap;">${money(item.unitPriceCents)}</td>
-    <td align="right" style="padding:13px 7px;border-bottom:1px solid #e2ddd1;color:#30332f;white-space:nowrap;">${money(item.unitPriceCents * item.quantity)}</td>
+  const rows = order.items.map(item => `<tr class="item-row">
+    <td class="item-text" style="padding:13px 7px;border-bottom:1px solid #d0d0d0;color:#111111;">${escapeHtml(item.name)}</td>
+    <td class="item-text" align="center" style="padding:13px 4px;border-bottom:1px solid #d0d0d0;color:#111111;">${item.quantity}</td>
+    <td class="item-text" align="right" style="padding:13px 4px;border-bottom:1px solid #d0d0d0;color:#111111;white-space:nowrap;">${money(item.unitPriceCents)}</td>
+    <td class="item-text" align="right" style="padding:13px 7px;border-bottom:1px solid #d0d0d0;color:#111111;white-space:nowrap;">${money(item.unitPriceCents * item.quantity)}</td>
   </tr>`).join("");
 
   return `<table role="presentation" class="item-table" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;table-layout:fixed;font-size:12px;line-height:18px;">
-    <thead><tr style="background-color:#29382e;color:#ffffff;">
+    <thead><tr class="item-head" bgcolor="#111111" style="background-color:#111111;color:#ffffff;">
       <th width="46%" align="left" style="padding:11px 7px;font-size:10px;line-height:15px;text-transform:uppercase;letter-spacing:.6px;font-weight:600;">Item</th>
       <th width="10%" align="center" style="padding:11px 4px;font-size:10px;line-height:15px;text-transform:uppercase;letter-spacing:.6px;font-weight:600;">Qty</th>
       <th width="20%" align="right" style="padding:11px 4px;font-size:10px;line-height:15px;text-transform:uppercase;letter-spacing:.6px;font-weight:600;">Price</th>
@@ -234,19 +236,19 @@ function residentItemsTable(order) {
 }
 
 function managementItemsTable(order) {
-  const rows = order.managementItems.map(item => `<tr>
-    <td style="padding:14px 7px;border-bottom:1px solid #e2ddd1;color:#30332f;">
+  const rows = order.managementItems.map(item => `<tr class="item-row">
+    <td class="item-text" style="padding:14px 7px;border-bottom:1px solid #d0d0d0;color:#111111;">
       <div style="font-weight:600;">${escapeHtml(item.residentName)}</div>
-      <div style="margin-top:4px;color:#666960;font-size:11px;line-height:16px;">Internal: ${escapeHtml(item.accounting.name)}</div>
-      <div style="margin-top:5px;display:inline-block;padding:2px 6px;background-color:#ece5d4;color:#69562f;font-size:10px;line-height:14px;">GL ${escapeHtml(item.accounting.glCode)}</div>
+      <div class="accounting-meta" style="margin-top:4px;color:#333333;font-size:11px;line-height:16px;">Internal: ${escapeHtml(item.accounting.name)}</div>
+      <div style="margin-top:5px;display:inline-block;padding:3px 7px;background-color:#111111;color:#ffffff;font-size:10px;line-height:14px;">GL ${escapeHtml(item.accounting.glCode)}</div>
     </td>
-    <td align="center" style="padding:14px 4px;border-bottom:1px solid #e2ddd1;color:#30332f;">${item.quantity}</td>
-    <td align="right" style="padding:14px 4px;border-bottom:1px solid #e2ddd1;color:#30332f;white-space:nowrap;">${money(item.unitPriceCents)}</td>
-    <td align="right" style="padding:14px 7px;border-bottom:1px solid #e2ddd1;color:#30332f;white-space:nowrap;">${money(item.unitPriceCents * item.quantity)}</td>
+    <td class="item-text" align="center" style="padding:14px 4px;border-bottom:1px solid #d0d0d0;color:#111111;">${item.quantity}</td>
+    <td class="item-text" align="right" style="padding:14px 4px;border-bottom:1px solid #d0d0d0;color:#111111;white-space:nowrap;">${money(item.unitPriceCents)}</td>
+    <td class="item-text" align="right" style="padding:14px 7px;border-bottom:1px solid #d0d0d0;color:#111111;white-space:nowrap;">${money(item.unitPriceCents * item.quantity)}</td>
   </tr>`).join("");
 
   return `<table role="presentation" class="item-table" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;table-layout:fixed;font-size:12px;line-height:18px;">
-    <thead><tr style="background-color:#29382e;color:#ffffff;">
+    <thead><tr class="item-head" bgcolor="#111111" style="background-color:#111111;color:#ffffff;">
       <th width="52%" align="left" style="padding:11px 7px;font-size:10px;line-height:15px;text-transform:uppercase;letter-spacing:.6px;font-weight:600;">Resident / Accounting Item</th>
       <th width="10%" align="center" style="padding:11px 4px;font-size:10px;line-height:15px;text-transform:uppercase;letter-spacing:.6px;font-weight:600;">Qty</th>
       <th width="18%" align="right" style="padding:11px 4px;font-size:10px;line-height:15px;text-transform:uppercase;letter-spacing:.6px;font-weight:600;">Price</th>
@@ -258,10 +260,10 @@ function managementItemsTable(order) {
 
 function totals(order, management = false) {
   const totalLabel = order.noPaymentRequired ? "Order total" : management ? "Total paid" : "Total Paid";
-  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:16px;background-color:#f6f3eb;border:1px solid #ded8ca;">
-    <tr><td style="padding:14px 18px 5px;color:#686a62;font-size:12px;">Subtotal</td><td align="right" style="padding:14px 18px 5px;color:#30332f;font-size:12px;">${money(order.subtotalCents)}</td></tr>
-    <tr><td style="padding:5px 18px 13px;color:#686a62;font-size:12px;">Processing fee</td><td align="right" style="padding:5px 18px 13px;color:#30332f;font-size:12px;">${money(order.processingFeeCents)}</td></tr>
-    <tr><td style="padding:15px 18px;border-top:1px solid #d7d0c2;color:#29382e;font-family:Georgia,'Times New Roman',serif;font-size:18px;">${escapeHtml(totalLabel)}</td><td align="right" style="padding:15px 18px;border-top:1px solid #d7d0c2;color:#29382e;font-size:18px;font-weight:600;">${money(order.totalCents)}</td></tr>
+  return `<table role="presentation" class="total-card" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="margin-top:16px;background-color:#ffffff;border:1px solid #c8c8c8;">
+    <tr><td class="muted-text" style="padding:14px 18px 5px;color:#333333;font-size:12px;">Subtotal</td><td class="item-text" align="right" style="padding:14px 18px 5px;color:#111111;font-size:12px;">${money(order.subtotalCents)}</td></tr>
+    <tr><td class="muted-text" style="padding:5px 18px 13px;color:#333333;font-size:12px;">Processing fee</td><td class="item-text" align="right" style="padding:5px 18px 13px;color:#111111;font-size:12px;">${money(order.processingFeeCents)}</td></tr>
+    <tr><td class="heading-text" style="padding:15px 18px;border-top:1px solid #c8c8c8;color:#111111;font-family:Georgia,'Times New Roman',serif;font-size:18px;">${escapeHtml(totalLabel)}</td><td class="heading-text" align="right" style="padding:15px 18px;border-top:1px solid #c8c8c8;color:#111111;font-size:18px;font-weight:600;">${money(order.totalCents)}</td></tr>
   </table>`;
 }
 
@@ -277,29 +279,29 @@ function detailsCard(order, management = false) {
   if (management && order.legalNoticeVersion) rows.push(["Legal notice",order.legalNoticeVersion]);
   if (management && order.legalAcceptedAt) rows.push(["Legal accepted",dateTime(order.legalAcceptedAt)]);
 
-  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f6f3eb;border:1px solid #ded8ca;">
-    ${rows.map(([label,value]) => `<tr><td valign="top" style="padding:8px 16px;color:#707168;font-size:12px;line-height:18px;">${escapeHtml(label)}</td><td valign="top" align="right" style="padding:8px 16px;color:#30332f;font-size:12px;line-height:18px;word-break:break-word;">${escapeHtml(value)}</td></tr>`).join("")}
+  return `<table role="presentation" class="info-card" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border:1px solid #c8c8c8;">
+    ${rows.map(([label,value]) => `<tr><td class="info-label" valign="top" style="padding:8px 16px;color:#333333;font-size:12px;line-height:18px;">${escapeHtml(label)}</td><td class="info-value" valign="top" align="right" style="padding:8px 16px;color:#111111;font-size:12px;line-height:18px;word-break:break-word;">${escapeHtml(value)}</td></tr>`).join("")}
   </table>`;
 }
 
 function residentContactCard() {
-  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#eef1e9;border-left:4px solid #6d856f;">
+  return `<table role="presentation" class="contact-card" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border:1px solid #c8c8c8;border-left:4px solid #4d5f49;">
     <tr>
       <td class="detail-column" width="50%" valign="top" style="padding:18px 18px 18px 20px;">
-        <div style="margin-bottom:5px;color:#29382e;font-size:13px;font-weight:600;">Management</div>
-        <div style="color:#5c5f57;font-size:12px;line-height:19px;"><a href="mailto:${CONTACTS.managementEmail}" style="color:#405d48;text-decoration:underline;">${CONTACTS.managementEmail}</a><br><a href="tel:+13054009661" style="color:#405d48;text-decoration:none;">${CONTACTS.managementPhone}</a><br>Extension ${CONTACTS.managementExtension}</div>
+        <div class="info-value" style="margin-bottom:5px;color:#111111;font-size:13px;font-weight:600;">Management</div>
+        <div class="body-text" style="color:#222222;font-size:12px;line-height:19px;"><a class="contact-link" href="mailto:${CONTACTS.managementEmail}" style="color:#314f38;text-decoration:underline;">${CONTACTS.managementEmail}</a><br><a class="contact-link" href="tel:+13054009661" style="color:#314f38;text-decoration:none;">${CONTACTS.managementPhone}</a><br>Extension ${CONTACTS.managementExtension}</div>
       </td>
       <td class="detail-column" width="50%" valign="top" style="padding:18px 20px 18px 18px;">
-        <div style="margin-bottom:5px;color:#29382e;font-size:13px;font-weight:600;">Front Desk</div>
-        <div style="color:#5c5f57;font-size:12px;line-height:19px;"><a href="mailto:${CONTACTS.frontDeskEmail}" style="color:#405d48;text-decoration:underline;">${CONTACTS.frontDeskEmail}</a><br>Extension ${CONTACTS.frontDeskExtension}</div>
+        <div class="info-value" style="margin-bottom:5px;color:#111111;font-size:13px;font-weight:600;">Front Desk</div>
+        <div class="body-text" style="color:#222222;font-size:12px;line-height:19px;"><a class="contact-link" href="mailto:${CONTACTS.frontDeskEmail}" style="color:#314f38;text-decoration:underline;">${CONTACTS.frontDeskEmail}</a><br>Extension ${CONTACTS.frontDeskExtension}</div>
       </td>
     </tr>
   </table>`;
 }
 
 function contentSection(title, content, last = false) {
-  return `<tr><td class="mobile-pad" style="padding:0 34px ${last ? "38px" : "32px"};">
-    <h2 style="margin:0 0 14px;font-family:Georgia,'Times New Roman',serif;font-size:20px;line-height:26px;font-weight:400;color:#29382e;">${escapeHtml(title)}</h2>
+  return `<tr><td class="mobile-pad content-surface" bgcolor="#ffffff" style="padding:0 34px ${last ? "38px" : "32px"};background-color:#ffffff;">
+    <h2 class="heading-text" style="margin:0 0 14px;font-family:Georgia,'Times New Roman',serif;font-size:20px;line-height:26px;font-weight:400;color:#111111;">${escapeHtml(title)}</h2>
     ${content}
   </td></tr>`;
 }
@@ -330,7 +332,7 @@ function buildResidentEmail(rawOrder) {
     orderIdentity(order, presentation),
     contentSection("Order Summary", `${residentItemsTable(order)}${totals(order)}`),
     contentSection("Resident Details", detailsCard(order)),
-    contentSection("What Happens Next", `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f6f0e1;border-left:4px solid #a68b54;"><tr><td style="padding:18px 20px;color:#4f504a;font-size:14px;line-height:23px;">Management will contact you once your order is ready.</td></tr></table>`),
+    contentSection("What Happens Next", `<table role="presentation" class="next-card" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border:1px solid #c8c8c8;border-left:4px solid #a68b54;"><tr><td class="body-text" style="padding:18px 20px;color:#222222;font-size:14px;line-height:23px;">Management will contact you once your order is ready.</td></tr></table>`),
     contentSection("Contact BrickellHouse", residentContactCard(), true)
   ].join("");
 
@@ -357,7 +359,7 @@ function buildManagementEmail(rawOrder) {
     orderIdentity(order, presentation, true),
     contentSection("Order Details", detailsCard(order, true)),
     contentSection("Items and Accounting", `${managementItemsTable(order)}${totals(order, true)}`),
-    contentSection("Next Action", `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#eef1e9;border-left:4px solid #6d856f;"><tr><td style="padding:18px 20px;color:#4f504a;font-size:14px;line-height:23px;"><strong style="color:#29382e;">Review this order in the Management Dashboard.</strong><br>Contact the resident if access, scheduling, or more information is needed.</td></tr></table>`, true)
+    contentSection("Next Action", `<table role="presentation" class="next-card" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border:1px solid #c8c8c8;border-left:4px solid #4d5f49;"><tr><td class="body-text" style="padding:18px 20px;color:#222222;font-size:14px;line-height:23px;"><strong class="heading-text" style="color:#111111;">Review this order in the Management Dashboard.</strong><br>Contact the resident if access, scheduling, or more information is needed.</td></tr></table>`, true)
   ].join("");
 
   return {
