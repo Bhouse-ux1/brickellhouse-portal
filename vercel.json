@@ -27,7 +27,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy-Report-Only",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self'; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; worker-src 'self'; media-src 'self'; manifest-src 'self'; upgrade-insecure-requests;"
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self'; script-src-elem 'self' https://static.cloudflareinsights.com; script-src-attr 'none'; style-src 'self'; style-src-elem 'self' https://fonts.googleapis.com; style-src-attr 'unsafe-inline'; img-src 'self'; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; worker-src 'self'; media-src 'self'; manifest-src 'self';"
         }
       ]
     },
@@ -36,7 +36,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy-Report-Only",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self'; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; worker-src 'self'; media-src 'self'; manifest-src 'self'; upgrade-insecure-requests;"
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self'; script-src-elem 'self' https://static.cloudflareinsights.com; script-src-attr 'none'; style-src 'self'; style-src-elem 'self' https://fonts.googleapis.com; style-src-attr 'unsafe-inline'; img-src 'self'; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; worker-src 'self'; media-src 'self'; manifest-src 'self';"
         }
       ]
     },
@@ -45,7 +45,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy-Report-Only",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self'; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; worker-src 'self'; media-src 'self'; manifest-src 'self'; upgrade-insecure-requests;"
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self'; script-src-elem 'self' https://static.cloudflareinsights.com; script-src-attr 'none'; style-src 'self'; style-src-elem 'self' https://fonts.googleapis.com; style-src-attr 'none'; img-src 'self'; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; worker-src 'self'; media-src 'self'; manifest-src 'self';"
         }
       ]
     },
@@ -54,7 +54,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy-Report-Only",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self'; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; worker-src 'self'; media-src 'self'; manifest-src 'self'; upgrade-insecure-requests;"
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self'; script-src-elem 'self' https://static.cloudflareinsights.com; script-src-attr 'none'; style-src 'self'; style-src-elem 'self' https://fonts.googleapis.com; style-src-attr 'none'; img-src 'self'; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; worker-src 'self'; media-src 'self'; manifest-src 'self';"
         }
       ]
     },
@@ -63,7 +63,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy-Report-Only",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self'; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; worker-src 'self'; media-src 'self'; manifest-src 'self'; upgrade-insecure-requests;"
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self'; script-src-elem 'self' https://static.cloudflareinsights.com; script-src-attr 'none'; style-src 'self'; style-src-elem 'self' https://fonts.googleapis.com; style-src-attr 'none'; img-src 'self'; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; worker-src 'self'; media-src 'self'; manifest-src 'self';"
         }
       ]
     },
@@ -72,7 +72,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy-Report-Only",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' 'sha256-UyjtWOc8zIOgBOxtYhDY3LWP1poOvECtUCOr6DGiSZI='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self'; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; worker-src 'self'; media-src 'self'; manifest-src 'self'; upgrade-insecure-requests;"
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' 'sha256-UyjtWOc8zIOgBOxtYhDY3LWP1poOvECtUCOr6DGiSZI='; script-src-elem 'self' 'sha256-UyjtWOc8zIOgBOxtYhDY3LWP1poOvECtUCOr6DGiSZI=' https://static.cloudflareinsights.com; script-src-attr 'none'; style-src 'self'; style-src-elem 'self' https://fonts.googleapis.com; style-src-attr 'none'; img-src 'self'; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; worker-src 'self'; media-src 'self'; manifest-src 'self';"
         }
       ]
     },
@@ -81,7 +81,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy-Report-Only",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' https://js.stripe.com https://*.js.stripe.com https://checkout.stripe.com; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' https://*.stripe.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.stripe.com https://checkout.stripe.com; frame-src 'self' https://js.stripe.com https://*.js.stripe.com https://checkout.stripe.com https://hooks.stripe.com; worker-src 'self'; media-src 'self'; manifest-src 'self'; upgrade-insecure-requests;"
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' https://js.stripe.com https://*.js.stripe.com https://checkout.stripe.com; script-src-elem 'self' https://js.stripe.com https://*.js.stripe.com https://checkout.stripe.com https://static.cloudflareinsights.com; script-src-attr 'none'; style-src 'self'; style-src-elem 'self' https://fonts.googleapis.com; style-src-attr 'none'; img-src 'self' https://*.stripe.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.stripe.com https://checkout.stripe.com; frame-src 'self' https://js.stripe.com https://*.js.stripe.com https://checkout.stripe.com https://hooks.stripe.com; worker-src 'self'; media-src 'self'; manifest-src 'self';"
         }
       ]
     },
@@ -90,7 +90,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy-Report-Only",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' https://cdn.jsdelivr.net; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self'; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://ekugigjageoriuftspao.supabase.co; worker-src 'self'; media-src 'self'; manifest-src 'self'; upgrade-insecure-requests;"
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' https://cdn.jsdelivr.net; script-src-elem 'self' https://cdn.jsdelivr.net https://static.cloudflareinsights.com; script-src-attr 'none'; style-src 'self'; style-src-elem 'self' https://fonts.googleapis.com; style-src-attr 'none'; img-src 'self'; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://ekugigjageoriuftspao.supabase.co; worker-src 'self'; media-src 'self'; manifest-src 'self';"
         }
       ]
     },
@@ -99,7 +99,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy-Report-Only",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' https://cdn.jsdelivr.net; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self'; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://ekugigjageoriuftspao.supabase.co; worker-src 'self'; media-src 'self'; manifest-src 'self'; upgrade-insecure-requests;"
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' https://cdn.jsdelivr.net; script-src-elem 'self' https://cdn.jsdelivr.net https://static.cloudflareinsights.com; script-src-attr 'none'; style-src 'self'; style-src-elem 'self' https://fonts.googleapis.com; style-src-attr 'none'; img-src 'self'; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://ekugigjageoriuftspao.supabase.co; worker-src 'self'; media-src 'self'; manifest-src 'self';"
         }
       ]
     },
@@ -108,7 +108,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy-Report-Only",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' https://cdn.jsdelivr.net; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self'; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://ekugigjageoriuftspao.supabase.co; worker-src 'self'; media-src 'self'; manifest-src 'self'; upgrade-insecure-requests;"
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' https://cdn.jsdelivr.net; script-src-elem 'self' https://cdn.jsdelivr.net https://static.cloudflareinsights.com; script-src-attr 'none'; style-src 'self'; style-src-elem 'self' https://fonts.googleapis.com; style-src-attr 'none'; img-src 'self'; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://ekugigjageoriuftspao.supabase.co; worker-src 'self'; media-src 'self'; manifest-src 'self';"
         }
       ]
     },
@@ -117,7 +117,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy-Report-Only",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' https://cdn.jsdelivr.net; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self'; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://ekugigjageoriuftspao.supabase.co; worker-src 'self'; media-src 'self'; manifest-src 'self'; upgrade-insecure-requests;"
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' https://cdn.jsdelivr.net; script-src-elem 'self' https://cdn.jsdelivr.net https://static.cloudflareinsights.com; script-src-attr 'none'; style-src 'self'; style-src-elem 'self' https://fonts.googleapis.com; style-src-attr 'none'; img-src 'self'; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://ekugigjageoriuftspao.supabase.co; worker-src 'self'; media-src 'self'; manifest-src 'self';"
         }
       ]
     }
