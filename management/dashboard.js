@@ -349,19 +349,6 @@ function centsToDollars(value) {
   return +(Number(value || 0) / 100).toFixed(2);
 }
 
-function generateOrderNumber() {
-  const date = new Date();
-  const prefix = `BH-${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}${date.getFullYear()}-`;
-  const existing = new Set(orders.map(order => order.number));
-  let number;
-  do {
-    const random = crypto.getRandomValues(new Uint32Array(2));
-    const suffix = [...random].map(value => value.toString(36).padStart(7, "0")).join("").slice(0, 10).toUpperCase();
-    number = prefix + suffix;
-  } while (existing.has(number));
-  return number;
-}
-
 function iconFor(category) {
   const paths = {
     "Access Devices":'<rect x="21" y="18" width="48" height="74" rx="9"/><circle cx="45" cy="39" r="9"/><path d="M45 48v25M35 66h20"/>',

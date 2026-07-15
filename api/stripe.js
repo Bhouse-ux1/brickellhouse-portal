@@ -12,6 +12,20 @@ const {
 } = require("./_stripe-checkout");
 const {enforceRateLimit} = require("./_rate-limit");
 
+const PUBLIC_ORDER_FAILURE_MESSAGE = "Your order could not be completed at this time. Please try again shortly or contact Management.";
+const ORDER_NUMBER_EXHAUSTION_MESSAGE = "Unable to allocate an order reference. Please try again.";
+const RESIDENT_SAFE_SESSION_MESSAGES = new Set([
+  "Too many requests. Please try again later.",
+  "Missing required checkout data",
+  "Enter a valid email address before payment",
+  "Enter a valid U.S. phone number before payment",
+  "Legal acceptance evidence is required",
+  "Cart is empty",
+  "One of the selected items is no longer available",
+  "Invalid quantity for one of the selected items",
+  "Stripe checkout is only used for paid orders"
+]);
+
 module.exports.config = {
   api:{bodyParser:false}
 };
@@ -24,6 +38,21 @@ function normalizedCheckoutProvider() {
 function send(response, status, payload) {
   response.setHeader("Cache-Control", "no-store");
   return response.status(status).json(payload);
+}
+
+function logOrderCreationError(action, error) {
+  console.error("Order creation failed", {
+    action,
+    status:Number.isInteger(error?.status) ? error.status : 500,
+    category:error?.payload ? "upstream" : "server",
+    databaseCode:typeof error?.payload?.code === "string" ? error.payload.code : null
+  });
+}
+
+function publicSessionErrorMessage(error) {
+  if (error?.message === ORDER_NUMBER_EXHAUSTION_MESSAGE) return ORDER_NUMBER_EXHAUSTION_MESSAGE;
+  if (!error?.payload && RESIDENT_SAFE_SESSION_MESSAGES.has(error?.message)) return error.message;
+  return PUBLIC_ORDER_FAILURE_MESSAGE;
 }
 
 function safeStripeConfig() {
@@ -67,19 +96,21 @@ async function createSession(request, response) {
     await assertStripeStorageReady();
     const checkout = await buildTrustedCheckout(await jsonBody(request));
     const pendingOrder = await createPendingStripeOrder(checkout);
-    const session = await createCheckoutSession(checkout, originFromRequest(request));
+    const trustedCheckout = {...checkout, orderNumber:pendingOrder.order_number};
+    const session = await createCheckoutSession(trustedCheckout, originFromRequest(request));
     await attachStripeSessionToPendingOrder(pendingOrder.id, session);
     return send(response, 200, {
       success:true,
       provider:"stripe",
-      orderNumber:checkout.orderNumber,
+      orderNumber:pendingOrder.order_number,
       sessionId:session.id,
       clientSecret:session.client_secret || ""
     });
   } catch (error) {
+    logOrderCreationError("stripe_session_create", error);
     return send(response, error.status || 500, {
       success:false,
-      message:error.status ? error.message : "Stripe checkout could not be started"
+      message:publicSessionErrorMessage(error)
     });
   }
 }

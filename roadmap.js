@@ -453,18 +453,18 @@ async function initializePaymentProvider() {
   syncStripeCheckoutDisplay();
 }
 
-async function createStripeCheckoutSession({number, resident, acceptedAt, snapshot}) {
+async function createStripeCheckoutSession({resident, acceptedAt, snapshot}) {
   const response = await fetch("/api/stripe?action=session", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
-      orderNumber:number,resident,
+      resident,
       items:snapshot.items.map(item => ({id:item.id,quantity:item.quantity})),
       legalAccepted:true,legalNoticeVersion:LEGAL_NOTICE_VERSION,legalAcceptedAt:acceptedAt
     })
   });
   const result = await response.json();
-  if (!response.ok || !result.success || !result.clientSecret) throw new Error(result.message || "Stripe checkout could not be started");
+  if (!response.ok || !result.success || !result.clientSecret || !result.orderNumber) throw new Error(result.message || "Stripe checkout could not be started");
   return result;
 }
 
@@ -680,7 +680,6 @@ if ($("#checkoutForm")) {
   submit.textContent = checkoutProvider === "stripe" ? tr("checkout.preparing") : tr("checkout.recording");
   clearPaymentMessage();
 
-  const number = generateOrderNumber();
   const subtotal = cartSubtotal();
   const fee = processingFee(subtotal);
   const requiresPayment = subtotal + fee > 0;
@@ -716,22 +715,25 @@ if ($("#checkoutForm")) {
 
   try {
     let payment;
+    let orderNumber = "";
     if (!requiresPayment) {
       const response = await fetch("/api/create-order", {
         method:"POST",
         headers:{"Content-Type":"application/json","Accept":"application/json"},
         body:JSON.stringify({
-          orderNumber:number,resident,
+          resident,
           items:snapshot.items.map(item => ({id:item.id,quantity:item.quantity})),
           legalAccepted:true,legalNoticeVersion:LEGAL_NOTICE_VERSION,legalAcceptedAt:acceptedAt
         })
       });
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.message || "Order could not be saved");
+      orderNumber = result.order?.orderNumber || "";
+      if (!orderNumber) throw new Error("Order reference was not returned");
       payment = {status:"No Payment Required",id:"",createdAt:acceptedAt};
     } else if (checkoutProvider === "stripe") {
-      const session = await createStripeCheckoutSession({number,resident,acceptedAt,snapshot});
-      await mountStripeCheckout(session, records, resident, number);
+      const session = await createStripeCheckoutSession({resident,acceptedAt,snapshot});
+      await mountStripeCheckout(session, records, resident, session.orderNumber);
       submit.textContent = tr("checkout.completeBelow");
       paymentInProgress = false;
       return;
@@ -742,7 +744,7 @@ if ($("#checkoutForm")) {
     closeModal("#checkoutModal");
     showResidentOrderConfirmation({
       name:resident.name.trim().split(" ")[0],
-      orderNumber:number,
+      orderNumber,
       note:!requiresPayment
         ? tr("checkout.noPayment")
         : tr("checkout.paymentConfirmed")

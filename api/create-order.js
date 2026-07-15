@@ -1,9 +1,22 @@
 const {getTrustedProductCatalog} = require("./_catalog");
 const {supabaseRequest} = require("./_supabase");
+const {insertOrderWithGeneratedNumber} = require("../server/order-number");
+
+const PUBLIC_ORDER_FAILURE_MESSAGE = "Your order could not be completed at this time. Please try again shortly or contact Management.";
+const ORDER_NUMBER_EXHAUSTION_MESSAGE = "Unable to allocate an order reference. Please try again.";
 
 function send(response, status, payload) {
   response.setHeader("Cache-Control", "no-store");
   return response.status(status).json(payload);
+}
+
+function logOrderCreationError(error) {
+  console.error("Order creation failed", {
+    action:"zero_dollar_order_create",
+    status:Number.isInteger(error?.status) ? error.status : 500,
+    category:error?.payload ? "database" : "server",
+    databaseCode:typeof error?.payload?.code === "string" ? error.payload.code : null
+  });
 }
 
 function normalizeUsPhone(value) {
@@ -23,8 +36,8 @@ module.exports = async function handler(request, response) {
     return send(response, 405, {success:false,message:"Method not allowed"});
   }
 
-  const {orderNumber,resident,items,legalAccepted,legalNoticeVersion,legalAcceptedAt} = request.body || {};
-  if (!orderNumber || !resident?.name || !resident?.unit || !resident?.email) {
+  const {resident,items,legalAccepted,legalNoticeVersion,legalAcceptedAt} = request.body || {};
+  if (!resident?.name || !resident?.unit || !resident?.email) {
     return send(response, 400, {success:false,message:"Missing required resident order data"});
   }
   const phone = normalizeUsPhone(resident.phone);
@@ -60,10 +73,10 @@ module.exports = async function handler(request, response) {
 
   try {
     const now = new Date().toISOString();
-    const orderRows = await supabaseRequest("orders", {
+    const {result:orderRows} = await insertOrderWithGeneratedNumber(orderNumber => supabaseRequest("orders", {
       method:"POST",
       body:[{
-        order_number:String(orderNumber),
+        order_number:orderNumber,
         resident_name:String(resident.name).trim(),
         unit_number:String(resident.unit).trim(),
         email:String(resident.email).trim().toLowerCase(),
@@ -81,7 +94,7 @@ module.exports = async function handler(request, response) {
         terms_version:null,
         privacy_policy_version:null
       }]
-    });
+    }));
     const order = Array.isArray(orderRows) ? orderRows[0] : orderRows;
     await supabaseRequest("order_items", {
       method:"POST",
@@ -98,7 +111,7 @@ module.exports = async function handler(request, response) {
     await supabaseRequest("payment_events", {
       method:"POST",
       body:[{
-        order_number:String(orderNumber),
+        order_number:order.order_number,
         square_payment_id:null,
         status:"NO_PAYMENT_REQUIRED",
         amount_cents:0,
@@ -107,6 +120,10 @@ module.exports = async function handler(request, response) {
     });
     return send(response, 200, {success:true,order:{id:order.id,orderNumber:order.order_number}});
   } catch (error) {
-    return send(response, error.status || 500, {success:false,message:error.message || "Unable to save order"});
+    logOrderCreationError(error);
+    const message = error?.message === ORDER_NUMBER_EXHAUSTION_MESSAGE
+      ? ORDER_NUMBER_EXHAUSTION_MESSAGE
+      : PUBLIC_ORDER_FAILURE_MESSAGE;
+    return send(response, error.status || 500, {success:false,message});
   }
 };

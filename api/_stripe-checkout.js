@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const {getTrustedProductCatalog} = require("./_catalog");
 const {supabaseRequest} = require("./_supabase");
 const {sendOrderEmails} = require("./order-emails");
+const {insertOrderWithGeneratedNumber} = require("../server/order-number");
 
 const STRIPE_API_BASE = "https://api.stripe.com/v1";
 const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || "2025-06-30.basil";
@@ -95,13 +96,13 @@ function parseBody(body) {
 
 async function buildTrustedCheckout(rawBody) {
   const body = parseBody(rawBody);
-  const {orderNumber, resident = {}, items = [], legalAccepted, legalNoticeVersion, legalAcceptedAt} = body;
+  const {resident = {}, items = [], legalAccepted, legalNoticeVersion, legalAcceptedAt} = body;
   const phone = normalizeUsPhone(resident.phone);
   const email = String(resident.email || "").trim();
   const name = String(resident.name || "").trim();
   const unit = String(resident.unit || "").trim().toUpperCase();
 
-  if (!orderNumber || !name || !unit || !email) {
+  if (!name || !unit || !email) {
     const error = new Error("Missing required checkout data");
     error.status = 400;
     throw error;
@@ -166,7 +167,6 @@ async function buildTrustedCheckout(rawBody) {
   }
 
   return {
-    orderNumber:String(orderNumber),
     resident:{name, unit, email, phone},
     legal:{acceptedAt:legalAcceptedAt || new Date().toISOString(), noticeVersion:String(legalNoticeVersion)},
     accounting,
@@ -256,14 +256,6 @@ function latestChargeId(paymentIntent) {
   return typeof paymentIntent.latest_charge === "string" ? paymentIntent.latest_charge : paymentIntent.latest_charge?.id || "";
 }
 
-async function orderExists(orderNumber) {
-  const rows = await supabaseRequest(`orders?order_number=eq.${encodeURIComponent(orderNumber)}&select=id,order_number,payment_status&limit=1`, {
-    method:"GET",
-    prefer:""
-  });
-  return Array.isArray(rows) ? rows[0] : null;
-}
-
 async function pendingStripeOrder(orderNumber) {
   const rows = await supabaseRequest(`orders?order_number=eq.${encodeURIComponent(orderNumber)}&select=*,order_items(*)&limit=1`, {
     method:"GET",
@@ -284,18 +276,11 @@ async function deletePendingOrder(orderId) {
   }
 }
 
-async function createPendingStripeOrder(checkout, session) {
-  const existing = await orderExists(checkout.orderNumber);
-  if (existing) {
-    const error = new Error("Order number already exists");
-    error.status = 409;
-    throw error;
-  }
-
-  const orderRows = await supabaseRequest("orders", {
+async function createPendingStripeOrder(checkout) {
+  const {result:orderRows} = await insertOrderWithGeneratedNumber(orderNumber => supabaseRequest("orders", {
     method:"POST",
     body:[{
-      order_number:checkout.orderNumber,
+      order_number:orderNumber,
       resident_name:checkout.resident.name,
       unit_number:checkout.resident.unit,
       email:checkout.resident.email,
@@ -318,7 +303,7 @@ async function createPendingStripeOrder(checkout, session) {
       terms_version:null,
       privacy_policy_version:null
     }]
-  });
+  }));
   const order = orderRows?.[0];
   try {
     await supabaseRequest("order_items", {

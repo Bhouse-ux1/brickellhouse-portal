@@ -147,14 +147,6 @@ function processingFee(subtotal) {
   return +amount.toFixed(2);
 }
 
-function generateOrderNumber() {
-  const date = new Date();
-  const prefix = `BH-${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}${date.getFullYear()}-`;
-  const random = crypto.getRandomValues(new Uint32Array(2));
-  const suffix = [...random].map(value => value.toString(36).padStart(7, "0")).join("").slice(0, 10).toUpperCase();
-  return prefix + suffix;
-}
-
 function renderTabs() {
   const tabs = $("#categoryTabs");
   if (!tabs) return;
