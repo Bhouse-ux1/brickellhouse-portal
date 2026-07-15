@@ -1,0 +1,10 @@
+# Local development tools and generated previews
+scripts/
+
+# Archived source snapshots and oversized originals
+restore-backup-20260616-125800/
+oversized-backup/
+
+# Local database migrations and technical handoff documentation
+supabase/
+*.md
