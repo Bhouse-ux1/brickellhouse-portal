@@ -6,9 +6,11 @@
   "scripts": {
     "test:luna": "node scripts/luna-eval.js",
     "preview:emails": "node scripts/preview-emails.js",
+    "preview:financial-report": "node scripts/preview-financial-report.js",
     "send:test-email": "node scripts/send-test-email.js"
   },
   "dependencies": {
+    "pdfkit": "0.19.1",
     "resend": "^6.14.0"
   }
 }

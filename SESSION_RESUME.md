@@ -1,573 +1,666 @@
-# BrickellHouse Portal Permanent Technical Handoff
+# BrickellHouse Portal Master Project Handoff
 
-Last rewritten: 2026-07-13
+Last repository verification: 2026-07-16
 
 Project folder: `C:\Users\Admin\Documents\brickellhouse-portal`
 
 Production site: `https://portal.brickellhouse.org/`
 
-This is the authoritative project memory for the BrickellHouse Portal. A new Codex conversation must read this file completely before making changes. Treat it as a technical handoff, but verify relevant source and current Git status before editing.
+This is the authoritative technical handoff and single source of truth for the BrickellHouse Portal. Every new Codex conversation must read this file completely, then verify the current Git status and the source relevant to its task before making changes. This document records the current verified repository and production state; it is not a changelog or roadmap.
 
-## 1. Current Production State
+## 1. Current State
 
-BrickellHouse Portal is a live production resident-services application. It is in post-launch hardening and operational improvement, not prototype development.
+BrickellHouse Portal is a live resident-services application in production hardening and operational refinement.
 
 Current major systems:
 
-- Resident Portal and Supabase-backed Resident Store.
-- Dedicated checkout page at `checkout.html`.
-- Live Stripe Embedded Checkout.
-- Live Stripe card payments and Apple Pay working in production.
-- Google Pay enabled where Stripe, browser, device, and wallet eligibility allow it.
-- Trusted server-side pricing and payment verification.
-- Supabase orders, order items, payment events, products, settings, feedback, audit data, Auth/RLS, legacy Luna Insights schema, and active Luna Review.
-- Resend resident and Management paid-order emails.
-- Management Portal with products, orders, revenue, feedback, settings, exports, audit behavior, and Luna Review.
-- Luna assistant with deterministic routing, approved server-side knowledge, OpenAI fallback, Spanish support, typo normalization, Concierge Brain behavior, privacy rules, and rate protection.
-- Cloudflare in front of `portal.brickellhouse.org`.
-- Vercel Hobby hosting/functions, with payment-route consolidation to conserve function count.
+- Public Resident Portal with English and Spanish interfaces.
+- Supabase-backed Resident Store with a sanitized public catalog.
+- Dedicated legal-gated checkout page.
+- Live Stripe Embedded Checkout with working card and Apple Pay flows.
+- Supabase orders, order items, payment events, products, settings, feedback, audit data, Auth/RLS, and Luna Review data.
+- Resend transactional emails for paid orders.
+- Authenticated Management operations portal.
+- Luna resident assistant with deterministic routing, approved server knowledge, OpenAI fallback, Spanish support, typo/alias normalization, privacy rules, and abuse protection.
+- Vercel Hobby hosting/functions, Cloudflare edge services, and enforced route-specific CSP.
 
-Square is retired from the active application. The Square routes and frontend SDK integration were removed. Historical Square database fields and Management reporting compatibility remain intentionally.
+### Applied migration state
 
-Owner-confirmed production migration state:
+- Migrations `001` through `012`: applied.
+- Migration `014_restore_management_product_privileges.sql`: applied.
 
-- `008_luna_insights_redacted.sql`: applied successfully.
-- `009_luna_insights_service_role_grants.sql`: applied successfully.
-- `010_luna_conversation_reviews.sql`: applied successfully.
-- `011_stripe_parallel_foundation.sql`: applied successfully.
-- `012_lock_down_public_product_columns.sql`: applied successfully.
+Do not run any migration without explicit approval and target-database verification.
 
-None of migrations 009-012 is pending.
+## Active Production Systems
 
-## 2. Highest-Priority Continuation Rules
+The current live production systems are:
 
-1. Do not casually change working Stripe payment verification, Session creation, webhook handling, confirmation, idempotency, or paid-order fulfillment.
-2. Do not change trusted server-side pricing or accept client prices/totals/GL values.
-3. Do not weaken Supabase RLS, grants, Management approval checks, or service-role boundaries.
-4. Do not expose GL codes, internal names, private accounting fields, service-role data, resident records, or secrets publicly.
-5. Do not merge resident and Management browser bundles.
-6. Do not switch production back to test keys or Square.
-7. Do not run migrations or deploy without explicit approval.
-8. Do not make Luna read reviewed conversations, learn automatically, create resident profiles, or use review records as memory/knowledge/training.
-9. Do not expose Stripe secret keys, webhook secrets, Supabase service-role keys, Resend keys, OpenAI keys, passwords, or real environment values.
-10. Preserve historical Square schema/reporting compatibility even though Square is inactive.
-11. Preserve mandatory legal review and acceptance before checkout submission.
-12. Start future work by reading this file, inspecting Git status, and reading the relevant implementation.
+- Stripe Embedded Checkout.
+- Stripe card payments.
+- Apple Pay.
+- Server-authoritative order creation and fulfillment.
+- Resend transactional emails.
+- Supabase database, Auth, RLS, REST, and server-side service-role access.
+- Luna resident assistant.
+- Resident Portal.
+- Management Portal.
+- Route-specific enforced Content Security Policy.
+- Cloudflare edge services.
+- Server-generated `BH-XXXXX` order references.
+- Vercel Hobby static hosting and serverless functions.
 
-## 3. Technology And Architecture
+Stripe is the only active payment system. Browser-submitted prices, totals, product state, accounting data, and payment state are never authoritative.
 
-The project uses plain HTML, CSS, vanilla JavaScript, and Node.js CommonJS serverless handlers. There is no React, Vue, Next.js, module bundler, or application build step.
+## Legacy Compatibility
 
-Infrastructure:
+Legacy compatibility preserves historical records; it does not identify systems to use for new development.
 
-- Vercel Hobby: static hosting and serverless API execution.
-- Supabase: Postgres, Auth, RLS, browser anon access for approved Management workflows, and server-side service-role access.
-- Stripe: Embedded Checkout, PaymentIntent/Checkout Session data, webhook fulfillment, cards, and eligible wallets.
-- Resend: resident and Management paid-order emails.
-- OpenAI: Luna model fallback after deterministic routing.
-- Cloudflare: production domain/edge layer and Luna abuse protection.
+### Payments and records
 
-High-level flow:
+- Square is inactive and must not be used for new payments. Stripe is the only active payment system.
+- Historical Square-related database fields, exports, records, identifiers, and compatibility paths must remain intact unless their removal is explicitly approved.
+- Do not restore Square Sandbox configuration.
+- Do not reintroduce Square environment variables, SDKs, checkout logic, API routes, or active setup instructions.
+- Stripe identifiers must continue to use Stripe or provider-neutral fields and must never be written to `square_payment_id`.
 
-1. Resident loads `index.html`.
-2. Resident-safe `app.js` renders cached/fallback catalog state and refreshes `/api/products`.
-3. Cart stores product IDs/quantities in localStorage.
-4. Continue navigates to `checkout.html`.
-5. Checkout refreshes `/api/products`, reconciles the cart, validates resident details, and requires legal review/acceptance.
-6. Paid checkout calls the consolidated `/api/stripe?action=session` route.
-7. Server reloads trusted products, recalculates amounts, creates Pending order/order items, then creates and links a Stripe Session.
-8. Stripe Embedded Checkout mounts in the resident page.
-9. Confirm or signed webhook retrieves Stripe state and fulfills only a verified paid matching order.
-10. Supabase records payment status/events and Resend sends paid-order emails.
-11. Management uses Supabase Auth plus active `management_users` approval and RLS.
-12. Luna calls `/api/chat`; deterministic logic answers first, otherwise OpenAI receives only selected approved server-side knowledge and temporary validated history.
-13. Each current Luna resident message/reply pair is appended to the Management-only 90-day Luna Review under an anonymous conversation UUID.
+### Order references
 
-## 4. Frontend Ownership And Script Separation
+- New orders use server-generated `BH-XXXXX` references.
+- Historical long-form order numbers must remain supported for tracking, Management display, exports, and stored records.
+- Existing historical records must never be rewritten merely for cosmetic consistency.
 
-### Resident home
+### Archived and retired material
 
-`index.html` loads, in order:
+- Archived restore backups, including `restore-backup-20260616-125800/` and `oversized-backup/`, are excluded from deployment and are not current production code or architecture.
+- Retired implementation notes are historical reference only and are not active setup instructions.
+- Legacy Luna Insights migrations 008 and 009, schema, aggregate/redaction helpers, and naming remain only for compatibility. The active Management workflow is Luna Review, served by `api/luna-insights.js` under its retained filename.
 
-- `legal.js`
-- `public-nav.js`
-- `app.js`
-- `roadmap.js`
-- `chat.js`
+### Unapplied migration
 
-Responsibilities:
+- Migration `013_luna_trusted_conversation_context.sql` exists in the repository but remains unapplied in production unless the owner separately confirms otherwise.
+- Do not assume an unapplied migration is active because its SQL or related application code exists.
+- Related Phase 2 code in `api/_luna-context.js` and `api/chat.js` is repository implementation, not confirmation of production activation.
+- The deferred design uses anonymous UUID-bound context, a two-hour sliding TTL, a maximum of 10 trusted turns / 20 messages, server-side redaction, fixed safe context state, approved references, HMAC-signed conversation tokens, and atomic request reservation.
+- Activation requires explicit approval for the migration and `LUNA_CONTEXT_SIGNING_SECRET`, applied in the verified target environment and correct order. Missing prerequisites must continue to disable persistence safely while basic Luna remains operational.
+- If applied later, migration 013 forces RLS on its context tables, revokes direct public/browser access, and permits only the required service-role reads and RPC execution.
 
-- `app.js`: resident-only catalog, product rendering, search/categories, cart, localStorage, catalog reconciliation, general resident UI, and legal-content rendering helpers.
-- `roadmap.js`: resident-only checkout client, Stripe UI, return confirmation, order tracking, feedback, legal-review state, and payment-focused state.
-- `chat.js`: Luna resident client, temporary in-memory conversation history, and anonymous conversation UUID in sessionStorage.
+Never infer that a legacy-compatible field, file, migration, backup, or historical code path is currently active.
+
+Before modifying anything marked legacy:
+
+1. Inspect its present runtime use.
+2. Confirm whether it is still required for historical records.
+3. Stop and report before deleting or modernizing it.
+
+## Current Launch Checklist
+
+### Completed
+
+- Resident Portal.
+- Management Portal redesign.
+- Bilingual interface.
+- Stripe card payments.
+- Apple Pay.
+- Secure checkout.
+- Mandatory legal review.
+- Trusted server-side pricing.
+- Server-generated `BH-XXXXX` order references.
+- Premium transactional emails.
+- Luna.
+- CSP enforcement.
+- Security headers.
+- Deployment exclusions.
+- Lifestyle video optimization.
+
+### Pending or deferred
+
+- Google Pay eligibility verification.
+- Final feature inventory and product audit.
+- Monthly accounting automation.
+- Migration `013_luna_trusted_conversation_context.sql` remains unapplied unless separately approved.
+
+## 2. Non-Negotiable Continuation Rules
+
+1. Do not casually change working Stripe Session creation, verification, webhook handling, confirmation, idempotency, email triggering, or paid-order fulfillment.
+2. Never trust browser prices, totals, fees, product availability, GL codes, payment state, or order state.
+3. Do not weaken Supabase RLS, grants, Management approval checks, MFA-aware rules, or service-role boundaries.
+4. Do not expose internal product names, GL/accounting fields, resident records, Management records, service-role data, or secrets to public code or responses.
+5. Keep resident and Management browser code separated.
+6. Preserve mandatory legal review and explicit acceptance before creating a paid checkout Session.
+7. Preserve every requirement in the Legacy Compatibility section.
+8. Luna Review must never become Luna memory, retrieval, training, knowledge, or an automatic behavior-update path.
+9. Do not deploy, run migrations, change production configuration, or submit a payment without explicit authorization.
+10. Keep changes narrow. Verify the diff, tests, and protected-system boundaries before reporting completion.
+
+## 3. Architecture
+
+### Stack
+
+- Frontend: static HTML, CSS, and vanilla JavaScript.
+- Backend: Node.js CommonJS Vercel serverless handlers.
+- Hosting: Vercel Hobby.
+- Edge/DNS/analytics: Cloudflare.
+- Database/Auth: Supabase Postgres, Auth, RLS, REST, and service-role server access.
+- Payments: Stripe Embedded Checkout.
+- Email: Resend.
+- AI: OpenAI Responses API plus deterministic server-side Luna routing and JSON knowledge.
+- Package manager: npm; runtime dependency currently includes `resend`.
+- Build system: none. There is no React, Next.js, Vue, bundler, or application build step.
+
+### System communication
+
+1. Resident pages load static assets from Vercel.
+2. The Store requests `/api/products`, which reads Supabase with the service role and returns only resident-safe active catalog fields.
+3. The resident cart stores only public product data and quantities locally.
+4. Checkout reconciles the cart against the current public catalog, validates resident details, and requires legal review and acceptance.
+5. `/api/stripe?action=session` reloads the trusted server catalog, calculates all amounts, creates a Pending order and order items, then creates Stripe Embedded Checkout.
+6. Stripe confirmation or a signed webhook retrieves and verifies processor state before fulfillment.
+7. Fulfillment updates Supabase and sends resident and Management emails through Resend.
+8. Management uses a Supabase Auth JWT plus active Management approval and RLS to access private data.
+9. Luna calls `/api/chat`; deterministic rules answer first, and OpenAI receives only the current request and selected approved server knowledge in the owner-confirmed production state.
+
+### Coding philosophy
+
+- Prefer server authority over browser claims.
+- Prefer the existing plain-JavaScript architecture over new frameworks or broad abstractions.
+- Use additive reviewed migrations; never edit an already-applied migration to change production behavior.
+- Preserve narrow ownership boundaries and the documented Legacy Compatibility requirements.
+- Treat UI-only tasks as UI-only unless the request explicitly authorizes protected backend changes.
+- Test in proportion to risk and keep rollback simple.
+
+## 4. Repository Map
+
+### Public pages and scripts
+
+- `index.html`: Resident Portal, Store, tracking, feedback, and Luna shell.
+- `checkout.html`: dedicated legal-gated Stripe checkout.
+- `lifestyle.html`: Lifestyle experience and video.
+- `styles.css`: resident, checkout, and shared public presentation.
+- `i18n.js`: English/Spanish dictionaries and language state.
 - `public-nav.js`: public navigation.
-- `legal.js`: authoritative versioned Legal Notice content.
-
-### Dedicated checkout
-
-`checkout.html` loads:
-
-- `legal.js`
-- `app.js`
-- `roadmap.js`
-
-It does not load `chat.js`, `public-nav.js`, Management scripts, or the Management Supabase client. `app.js` skips homepage reveal/parallax behavior on `.checkout-page`.
+- `app.js`: resident-only catalog, Store, cart, and general UI.
+- `roadmap.js`: checkout, Stripe client, confirmation, tracking, and feedback.
+- `chat.js`: Luna resident client and local transcript UX.
+- `legal.js`: authoritative versioned Legal Notice.
+- `lifestyle.js`: visibility-aware Lifestyle video playback.
 
 ### Management
 
-`management/dashboard.html` loads:
+- `management/login.html`: Management sign-in page.
+- `auth.js`: Management login/recovery behavior.
+- `management/dashboard.html`: Management application shell.
+- `management/dashboard.css`: Management-only visual system.
+- `management/dashboard.js`: self-contained Management application.
 
-- `legal.js`
-- `management/dashboard.js`
-
-It does not load resident `app.js` or `roadmap.js`. `management/dashboard.js` is self-contained for Management authentication/session checks, products, internal GL/accounting, orders, exports, feedback, settings, revenue, audit behavior, and Luna Review.
-
-`management/login.html` loads the Supabase browser library and `auth.js` for login/recovery.
-
-Security consequence:
-
-- Resident-loaded scripts contain no GL codes, internal names, Management Supabase/table logic, Management exports, or Luna Review UI logic.
-- Management retains private accounting functionality in its dedicated bundle.
-- Server-side trusted catalog remains the authority for checkout and Stripe.
-
-Do not reverse this separation.
-
-## 5. Repository And Active Files
-
-Important root files:
-
-- `index.html`: resident portal, Store/cart, tracking, feedback, success state, and Luna shell.
-- `checkout.html`: dedicated checkout, legal review, Stripe mount target, and checkout confirmation layout.
-- `styles.css`: shared visual styles with resident, checkout, Management, Luna, and responsive sections.
-- `app.js`: resident-only Store/cart/catalog behavior.
-- `roadmap.js`: resident checkout/Stripe/tracking/feedback behavior.
-- `chat.js`: Luna frontend.
-- `legal.js`: complete Legal Notice and version.
-- `auth.js`: Management login/recovery logic.
-- `management/dashboard.js`: Management-only application bundle.
-- `.env.example`: placeholder-only source-confirmed environment names.
-- `package.json`: runtime dependency currently includes `resend`.
-
-Active API handlers:
+### Public API handlers
 
 - `api/products.js`: sanitized public product catalog.
-- `api/create-order.js`: trusted zero-dollar order flow.
-- `api/order-status.js`: public-safe order lookup.
-- `api/feedback.js`: validated/database-rate-limited feedback insert.
+- `api/create-order.js`: trusted zero-dollar order route.
+- `api/order-status.js`: public-safe order status lookup.
+- `api/feedback.js`: validated feedback submission and database-backed abuse control.
 - `api/chat.js`: Luna backend and Luna Review writer.
-- `api/luna-insights.js`: Management-authenticated Luna Review GET/PATCH route; historical filename retained.
-- `api/stripe.js`: consolidated Stripe config/session/confirm/webhook handler.
-- `api/supabase-config.js`: browser-safe Supabase URL/anon-key response.
+- `api/luna-insights.js`: Management-authenticated API for the current Luna Review workflow.
+- `api/stripe.js`: consolidated Stripe config, Session, confirm, and webhook actions.
+- `api/supabase-config.js`: browser-safe Supabase URL and anon key.
 
-Server helpers:
+### Server helpers
 
-- `api/_catalog.js`: trusted catalog, GL mapping, public catalog sanitization.
-- `api/_stripe-checkout.js`: Stripe key gate, API calls, Session/order lifecycle, verification, events, and emails.
+- `api/_catalog.js`: trusted product catalog, accounting mapping, and public sanitization.
+- `api/_stripe-checkout.js`: Stripe key gates, Session/order lifecycle, verification, events, and emails.
 - `api/_supabase.js`: service-role Supabase REST helper.
-- `api/_rate-limit.js`: in-memory instance-local rate limiting.
-- `api/order-emails.js`: Resend email construction/sending helper.
+- `api/_rate-limit.js`: instance-local public endpoint rate limiting.
+- `api/order-emails.js`: transactional email rendering and Resend delivery.
+- `server/order-number.js`: server-generated public order references.
 
-There is no active `/api/create-payment` or `/api/square-config` route.
+Because Vercel Hobby has a function limit, inspect deployment behavior before adding API files. Stripe actions are intentionally consolidated into `api/stripe.js`.
 
-Because Vercel Hobby has function limits, inspect the deployed function count before adding new API files. Prefer careful consolidation where ownership remains clear.
+## 5. Resident Portal
 
-## 6. Resident Portal And Store
+### Capabilities
 
-Resident features:
-
-- Luxury home experience and public building information.
-- Store product cards, category filters, search, inventory status, and cart.
-- Dedicated checkout.
-- Public-safe order tracking by BrickellHouse order number.
+- Resident Store with product cards, search, category filtering, inventory state, images, and shopping bag.
+- Dedicated checkout and legal review.
+- Public-safe order tracking.
 - Feedback submission.
+- Lifestyle page.
 - Luna assistant.
+- Responsive desktop/mobile navigation and layouts.
 
-LocalStorage is temporary resident UI/cache state only:
+There is no resident login, resident account, or resident profile system. Resident UI state is browser-local and is not an authenticated resident account.
 
-- `bh_products`: resident-safe product cache.
-- `bh_cart`: product IDs and quantities.
-- `bh_fee_settings`: public fee display settings only.
-- `bh_catalog_version`: cache compatibility marker.
+### Language support
 
-`publicProduct()` strips data to resident-safe fields: ID, resident name, category, description, price, inventory, image, and active state. Old browser order storage is removed.
+- English and Spanish are supported through `i18n.js`.
+- The preference key is `bh_language` in localStorage.
+- Blocked or unavailable storage fails safely.
+- `document.documentElement.lang` follows the selected language.
+- Language changes dispatch `bh:language-changed` and update Store, checkout, tracking, feedback, Lifestyle, and Luna presentation.
+- Spanish product presentation is resident-facing only; trusted product identity and server pricing remain unchanged.
 
-Catalog behavior:
+### Store and cart
 
-- `/api/products` returns only active products with inventory above zero.
-- Successful catalog refresh reconciles saved cart quantities against the current active catalog.
-- Inactive, missing, zero-inventory, or invalid saved-cart products are removed.
-- Products remain in Supabase for future Management reactivation; active/inactive state is not hardcoded into architectural docs or resident logic.
-- Product images use the API `image` field, preserving valid Supabase image URLs and falling back only when missing.
+- `/api/products` is the public catalog authority.
+- The response contains only resident-safe fields and only active, in-stock products.
+- The browser cache and cart are reconciled against the current catalog.
+- Missing, inactive, invalid, or out-of-stock items are removed from saved carts.
+- Product image URLs are normalized to the resident-safe `image` field; genuinely missing images use a fallback.
+- Dedicated checkout blocks if current catalog availability cannot be confirmed.
+- Checkout uses an immutable cart snapshot. Quantities are locked for the active checkout attempt.
 
-The Store may render local fallback data while the public API is unavailable, but dedicated checkout will not proceed unless current product availability is confirmed successfully.
+Current inactive repository fallback products:
 
-## 7. Product, Price, And Accounting Trust Flow
+- `svc5` - Trash Compactor Replacement.
+- `svc7` - Lockout Assistance.
+- `svc8` - Faucet Repair.
+- `svc10` - Portable AC Unit Rental.
+- `svc12` - Annual AC Filter Subscription.
+- `svc15` - Premium Resident Care Plan.
 
-Exact trust flow:
+They remain preserved for later reactivation and are not eligible for resident rendering or trusted checkout while inactive.
 
-1. Approved Management users edit products through `management/dashboard.js` and authenticated Supabase access.
-2. Supabase stores resident name, internal name, GL code, price cents, inventory, image URL, and active status.
-3. Migration 012 removes anon read access to full `public.products` rows.
-4. `/api/products` uses service role to load the trusted catalog, filters inactive/out-of-stock rows, and returns resident-safe fields only.
-5. Resident Store/cart uses that sanitized response.
-6. Checkout sends product IDs and quantities only. Browser prices/totals are display-only.
-7. `api/_stripe-checkout.js` or `api/create-order.js` reloads the trusted server catalog.
-8. Server validates product existence, active state, inventory, integer quantity, and bounds.
-9. Server computes subtotal and `PROCESSING_FEE_PERCENT`; client-submitted price/fee/total values are ignored.
-10. Stripe and Supabase receive server-derived values.
+### Tracking
+
+- Residents look up an order by its stored BrickellHouse order number.
+- `/api/order-status` is rate-limited and returns only `order_number`, `status`, `public_note`, and `created_at`.
+- It does not expose resident contact data, order items, payment details, internal notes, GL data, or processor references.
+
+### Feedback
+
+- Feedback is submitted through the public resident UI and validated server-side.
+- Database-backed abuse protection limits matching submissions across normalized email, phone, unit, or request IP to two per 96 hours.
+- Management receives private workflow controls without exposing feedback records publicly.
+
+### Current UI state
+
+- The resident experience is a polished, bilingual, responsive portal rather than a marketing landing page.
+- Homepage Store, tracking, feedback, Lifestyle, and Luna remain separate workflows.
+- Checkout is a dedicated page; the old modal is not the active checkout path.
+- Resident-loaded scripts contain no Management Supabase logic, exports, Luna Review logic, internal product names, or GL/accounting constants.
+
+## 6. Management Portal
+
+### Security and initialization
+
+- Management uses Supabase Auth.
+- A valid session alone is insufficient: `management_users` must contain an active approved record.
+- `public.is_management_user()` enforces approval and the configured MFA requirement; an MFA-required profile must have an `aal2` JWT.
+- RLS is the data boundary. A guessed Management URL or hidden frontend control does not grant data access.
+- `api/luna-insights.js` independently validates the Bearer token and active Management approval.
+- The service-role key is never used in the browser.
+
+### Current operations workspace
+
+- Overview command center with current metrics, open work, low inventory, feedback/Luna queues, quick actions, and current activity.
+- Orders workspace with search, status/date filters, grouped details, resident contact data, public/private notes, legal evidence, payment references, and status updates.
+- Products workspace with search/filtering, resident presentation, inventory, availability, image preservation, internal names, GL codes, creation, editing, and active/inactive toggles.
+- Feedback inbox with search, status/category filters, response, internal notes, details, deletion, and export.
+- Reports workspace with revenue analytics and exports.
+- Settings for processing fee and session/administrative information.
+- Luna Review queue, thread view, filters, review status, Management notes, and export.
+- Global search and command palette, including `Ctrl+K`.
+- Responsive sidebar, mobile overlay, drawers, dialogs, and workspace layouts.
+
+### Products
+
+- Product updates use the authenticated Management Supabase client.
+- Table privileges restored by migration 014 do not bypass RLS.
+- Active/inactive updates change only `active` and `updated_at`, require exactly one matching returned database row, and update local state only after confirmation.
+- Seed-only fallback products are not silently created or treated as editable database records.
+- Full edits preserve valid `internal_name` and current GL rules.
+
+### Reports and exports
+
+- Monthly revenue chart supports year selection, tooltips, order counts, and product-level monthly drill-down.
+- The right-side profit-margin axis is intentionally a placeholder until verified cost/margin data exists. No margin is fabricated.
+- Order, feedback, and Luna Review exports are Management-only.
+- Internal product/accounting names and GL snapshots remain available in Management order views and exports.
+
+### Expected console message
+
+The following Management console message is informational, not an application error:
+
+```text
+[Management products] Seed-only products are not backed by editable Supabase rows.
+```
+
+It identifies local fallback products that have no matching editable Supabase row. Do not weaken RLS or silently upsert products to remove this message.
+
+## 7. Product and Pricing Trust Flow
+
+1. Approved Management users edit database-backed products through authenticated Supabase access.
+2. Supabase stores resident-facing fields plus private `internal_name`, `gl_code`, price, inventory, image, and active state.
+3. Migration 012 blocks anon full-row reads from `public.products`.
+4. `/api/products` uses the service role, filters unavailable rows, and returns only resident-safe fields.
+5. Store and checkout send product IDs and quantities, not trusted prices.
+6. Server routes reload the trusted catalog and validate IDs, active state, inventory, and integer quantity bounds.
+7. The server computes subtotal, processing fee, and total. Browser values are ignored.
+8. Supabase and Stripe receive only server-derived amounts.
 
 Accounting rules:
 
-- Standard purchasable products use GL `40090`.
-- Valet products use GL `40033`.
-- The server-side mapping in `api/_catalog.js` is authoritative for checkout.
-- Stripe customer-facing product names and descriptions are clean resident names.
-- Stripe Session and PaymentIntent metadata contain `gl_code` as `40090`, `40033`, or `40090,40033` depending on the order.
-- Metadata also contains order number, legal version, compact item IDs/quantities, and trusted calculated totals.
-- Stripe metadata does not contain resident name, email, phone, unit, or legal acceptance timestamp.
-- Supabase `order_items` keeps resident-name, internal-name, and GL snapshots.
-- Management and exports retain internal accounting names and GL codes.
-- Resident Store, resident checkout, resident confirmation, resident email, Luna, and `/api/products` remain clean.
-
-## 8. Dedicated Checkout And Legal Review
-
-Navigation and reconciliation:
-
-- Store cart/bag Continue navigates to `checkout.html`.
-- Cart survives navigation through localStorage.
-- Checkout refreshes `/api/products` before enabling submission.
-- Inactive, missing, unavailable, and invalid-quantity items are reconciled out.
-- Empty and catalog-unavailable states block checkout safely.
-
-Before Stripe mount, the page shows:
-
-- Order Summary.
-- Resident/contact information.
-- Secure checkout notice.
-- Amount due.
-- Legal-review state.
-- Continue to secure payment button.
-
-Mandatory legal flow:
-
-1. Legal state begins unaccepted; there is no directly operable checkbox.
-2. Resident opens Review Legal Terms.
-3. The modal shows the complete existing `legal.js` content and current version without rewriting or summarizing it.
-4. Accept Legal Terms starts disabled.
-5. Resident must scroll the actual legal-content container to the bottom. Bottom detection uses a 12-pixel tolerance.
-6. Reaching the bottom only enables Accept; it does not accept automatically.
-7. Resident must explicitly click Accept Legal Terms.
-8. That click records the current legal version and exact acceptance timestamp, closes the modal, and updates the accepted state.
-9. Cancel, close, Escape, or backdrop close before acceptance leaves the state unaccepted and resets scroll progress to the top.
-10. Continue remains disabled until resident fields, cart/catalog, and accepted legal state are all valid.
-
-Accessibility/responsiveness:
-
-- Focus enters the legal panel and returns to the opening control.
-- Keyboard focus is contained while the dialog is open.
-- Escape cancels without accepting.
-- Background page scrolling is locked.
-- Mobile uses a near-full-height panel with its own touch-scrolling legal container.
-- No heavy backdrop blur is used.
-
-Submission and focused payment state:
-
-- Resident must intentionally submit once after validation.
-- `paymentInProgress` and existing `stripeEmbeddedCheckout` guards block duplicate form submission.
-- Stripe mounts only after successful server Session creation.
-- After mount, resident/contact fields, legal state, secure notice, Continue button, and pre-payment fine print are removed from layout.
-- Order Summary and amount due remain visible.
-- Stripe becomes primary content.
-- The page scrolls once per mounted checkout instance to Stripe, smoothly unless reduced motion is requested.
-- There is no Edit contact details flow after Session creation. Submitted resident details are locked for that attempt.
-- If Session creation or mount fails, the pre-payment state is restored and the resident-safe error is shown.
-
-## 9. Stripe Payments
-
-### Active consolidated route
-
-- `GET /api/stripe?action=config`
-- `POST /api/stripe?action=session`
-- `POST /api/stripe?action=confirm`
-- `POST /api/stripe?action=webhook`
-
-Config response contains only browser-safe enabled/provider/mode state and the publishable key when enabled. Secret/webhook keys never reach the browser.
-
-### Provider and key gate
-
-- Paid Stripe operations require `CHECKOUT_PROVIDER=stripe`.
-- Missing, invalid, or non-Stripe provider values fail closed and do not create/reconcile Stripe orders.
-- Matching test keys are accepted without the live gate.
-- Matching live keys require `STRIPE_MODE=live` or `STRIPE_ALLOW_LIVE=true`.
-- Mixed test/live key pairs and unknown prefixes are rejected.
-- Production live payments currently work. Do not switch production to test keys casually.
-
-### Session creation
-
-1. Enforce 5 Session attempts per IP per 10 minutes.
-2. Verify required Supabase Stripe columns/tables are available.
-3. Validate resident, email, normalized U.S. phone, cart, and legal evidence.
-4. Reload trusted products and compute amounts.
-5. Create the Pending Supabase `orders` row.
-6. Create all related `order_items` snapshots.
-7. If order-item insertion fails, delete the incomplete Pending header when possible and do not create Stripe Session.
-8. Create Stripe Embedded Checkout Session only after order/items exist.
-9. Patch the Pending order with Session/PaymentIntent references.
-
-### Fulfillment
-
-Both confirm and webhook retrieve Stripe Session state server-side. Fulfillment requires:
-
-- `payment_status=paid`.
-- USD currency.
-- Existing matching Pending/paid Stripe order.
-- Matching Stripe Checkout Session ID.
-- At least one stored order item.
-- Stripe amount equal to stored trusted total.
-
-Fulfillment writes Stripe IDs only to processor-neutral/Stripe columns, never `square_payment_id`, marks the order Paid, and sends resident/Management emails.
-
-Webhook details:
-
-- Not application-rate-limited.
-- Fails closed unless provider is Stripe.
-- Requires `STRIPE_WEBHOOK_SECRET`.
-- Verifies timestamp/signature against the raw body with a five-minute tolerance and timing-safe comparison.
-- Processes paid `checkout.session.completed` events.
-
-Idempotency:
-
-- Confirm and webhook derive the same logical processor payment event reference: `stripe_payment_<payment-intent-or-session>`.
-- Migration 011 unique indexes prevent duplicate Stripe Session/PaymentIntent/charge/order-event identifiers.
-- Repeated confirm/webhook fulfillment reuses the existing order rather than creating another paid order.
-- Resend uses payment/order-derived idempotency keys for resident and Management messages.
-
-Current return URL:
-
-```text
-/?stripe_session_id={CHECKOUT_SESSION_ID}
-```
-
-This intentionally returns to `index.html`, not `checkout.html`. Root `roadmap.js` confirms the Session, clears the cart after verified success, removes the query parameter, and shows the polished confirmation. Do not change this casually.
-
-### Square retirement
-
-- No active Square config/payment route exists.
-- No Square SDK is initialized by resident pages.
-- Missing/invalid provider may still normalize to a historical `square` label as a fail-closed state; this does not provide Square checkout.
-- Keep `square_payment_id` and historical reporting support.
-- See `SQUARE_SETUP.md` for the archived notice.
-
-## 10. Zero-Dollar Orders
-
-`POST /api/create-order` is retained for orders whose trusted server total is zero.
-
-It validates resident/contact/legal/cart data, reloads trusted products, computes totals, rejects any positive total, and writes order/order-item/payment-event records with `No Payment Required` status.
-
-Known follow-up: free/zero-dollar order email behavior requires verification/fix. The current zero-dollar route does not call the paid-order Resend helper.
-
-## 11. Management Portal
-
-Auth model:
-
-- Supabase Auth validates the user/session.
-- The authenticated user must also have an active matching `management_users` row.
-- Unapproved/inactive users are rejected and signed out.
-- Supabase RLS protects Management tables; hiding the URL/UI is not the security boundary.
-- `api/luna-insights.js` independently validates Bearer token and active Management approval.
-- MFA schema fields exist from earlier migrations, but do not enforce MFA unless the corresponding UI/process is verified.
-
-Management capabilities:
-
-- Overview metrics and low inventory.
-- Monthly revenue chart, year selector, order count, tooltips, and product-level month drill-down.
-- Profit-margin axis remains a placeholder; do not invent cost/margin data.
-- Product creation/editing, price, inventory, active status, internal name, and GL code.
-- Orders, status, public/private notes, legal evidence, processor references, and search.
-- Order and feedback CSV/Excel-compatible exports.
-- Feedback filtering, response, internal notes, status, and deletion.
-- Processing-fee settings.
-- Best-effort audit logging.
-- Luna Review queue, thread view, status, Management note, and export.
-
-Historical Square and current Stripe identifiers remain compatible in order mapping/reporting.
-
-## 12. Supabase And Migrations
-
-Supabase roles:
-
-- Browser resident: no direct product-table reads after migration 012; uses `/api/products`.
-- Browser Management: anon key plus authenticated user JWT, restricted by RLS and `is_management_user()`.
-- Server routes: service-role key through `api/_supabase.js`.
-
-Main tables:
-
-- `management_users`, `management_user_requests`.
-- `products`, `portal_settings`.
-- `orders`, `order_items`, `payment_events`.
-- `feedback`, `audit_logs`.
-- Legacy privacy-safe `luna_insights`.
-- Active `luna_conversation_reviews`.
-
-Migration summary:
-
-1. `001_management_auth_rls.sql`: core schema/RLS.
-2. `002_management_users_auth.sql`: Management Auth/profile refinements.
-3. `003_management_security_hardening.sql`: table/policy/grant hardening, requests/events/admin functions.
-4. `004_resident_persistence_grants.sql`: service-role persistence grants and feedback insert repair.
-5. `005_storage_permission_repair.sql`: service-role/default privilege and policy repair.
-6. `006_feedback_completed_status.sql`: Completed feedback status.
-7. `007_feedback_rate_limit.sql`: normalized feedback identifiers/IP and rate-limit indexes.
-8. `008_luna_insights_redacted.sql`: legacy privacy-safe aggregate Luna Insights schema and 365-day purge.
-9. `009_luna_insights_service_role_grants.sql`: service-role Luna Insights and Management-user grants. Applied.
-10. `010_luna_conversation_reviews.sql`: anonymous 90-day raw conversation review table/RPCs/RLS. Applied.
-11. `011_stripe_parallel_foundation.sql`: provider-neutral/Stripe columns and unique indexes while preserving Square history. Applied.
-12. `012_lock_down_public_product_columns.sql`: removes anon product SELECT and leaves full product reads to approved Management/service role. Applied.
-
-Migration 012 details:
-
-- Drops the public resident product SELECT policy.
-- Revokes table SELECT from `anon`.
-- Recreates authenticated Management SELECT using `is_management_user()`.
-- Does not weaken Management insert/update/delete policies.
-- `/api/products` continues through service role and sanitization.
-
-Do not assume a future migration is applied merely because its file exists. Do not rerun applied migrations without explicit approval and target-database verification.
-
-## 13. Luna Architecture
-
-Frontend:
-
-- `chat.js` keeps at most 20 temporary history messages in memory.
-- A random anonymous conversation UUID is stored in sessionStorage as `bh_luna_conversation_id` to group the current browser-tab session.
-- The UUID is not intentionally tied to resident name, unit, email, phone, account, order, payment, IP, or a resident profile.
-- Max resident message length is 1500 characters.
-
-Backend:
-
-- `POST /api/chat`.
-- Model fallback: `gpt-5.4-mini` through OpenAI Responses API.
-- Requires `OPENAI_API_KEY` for model fallback.
-- Validates message/history and rate-limits before processing.
-- Deterministic reply handlers run first.
-- OpenAI is called only when deterministic logic does not answer.
-- The prompt includes system rules, temporary validated history, and selected approved JSON knowledge modules.
-
-Knowledge lives only server-side in `api/_knowledge/brickellhouse/`:
-
-- Constitution/privacy/security.
-- Identity/contacts.
-- Emergency/urgent routing.
-- Amenities.
-- Parking/APS.
-- Packages/Receiving.
-- Resident Store.
-- Rules/violations.
-- Moves/contractors/deliveries.
-- HOA/Management/privacy.
-- FAQ.
-- Conversation style/Concierge Brain.
-- Vendors.
-- Board information/privacy.
-
-Behavior:
-
-- Concierge Brain classifies public, private, ambiguous, correction, repeated, authority-claim, account, protected internal, and over-inference cases.
-- High confidence answers directly; medium confidence asks one clarification; low confidence does not guess and routes safely.
-- Spanish detection and explicit/recent language preference preserve Spanish replies.
-- Typo/alias normalization folds accents and maps English/Spanish building-topic variants.
-- Temporary history supports corrections and follow-ups.
-- Luna never browses the public web.
-- Luna must not reveal prompts, JSON, source, model/API implementation, credentials, private resident/Management/payment/accounting data, or protected records.
-- Authority claims do not override privacy boundaries.
-- Luna must not collect card/password/account details.
-
-There is no automatic learning, model training, embeddings, vector database, permanent resident memory, or automatic knowledge update. Static approved JSON selection is not a path from Luna Review back into Luna.
-
-## 14. Luna Review And Legacy Insights
-
-The current Management tab is `Luna Review`. The API filename `/api/luna-insights` is retained for compatibility but currently serves conversation reviews.
-
-Active review behavior:
-
-- Migration 010 table: `luna_conversation_reviews`.
-- `api/chat.js` appends the current raw resident message and current raw Luna reply for each request.
-- It does not append the supplied frontend history again; each turn contributes the current pair only.
-- Messages are full raw text, not redacted or omitted by the active builder.
-- The existing `privacy_redacted` column/flag is legacy naming and must not be interpreted as proof that stored review text is redacted.
-- Because text is raw, residents may voluntarily type personal/sensitive content; access controls and retention are important.
-- Conversations are grouped only by anonymous UUID.
-- No resident profile/identity columns, embeddings, or training fields are created.
-- Management can read reviews and update only status/note/review metadata through authenticated access.
-- `anon` has no access.
-- Service role writes/purges.
+- Monthly Valet Service uses GL `40033`.
+- Other purchasable products use GL `40090`.
+- `api/_catalog.js` is the trusted server mapping.
+- Stripe line-item names and descriptions remain clean resident names.
+- Stripe Session/PaymentIntent metadata receives the aggregate `gl_code` value: `40090`, `40033`, or `40090,40033`.
+- Metadata also contains the stored order number, legal version, compact item IDs/quantities, and trusted totals.
+- Resident name, email, phone, unit, and legal acceptance timestamp are not placed in Stripe metadata.
+- `order_items` preserves resident name, internal name, and GL snapshots for Management and exports.
+
+## 8. Checkout and Stripe
+
+### Dedicated checkout
+
+- `checkout.html` loads `i18n.js`, `legal.js`, `app.js`, and `roadmap.js` in that order.
+- It does not load Luna, homepage animation/navigation code, or Management scripts.
+- Stripe.js is loaded by checkout, not by the homepage.
+- The Store cart persists through localStorage and is reconciled on entry.
+
+### Mandatory legal review
+
+1. Legal acceptance starts false.
+2. The resident opens the complete versioned Legal Notice from `legal.js`.
+3. Accept remains disabled until the legal-content container is scrolled to the bottom.
+4. Reaching the bottom enables the button but does not accept automatically.
+5. The resident must explicitly click Accept Legal Terms.
+6. Checkout stores the accepted version and timestamp for the submitted attempt.
+7. Cancel, close, Escape, or backdrop dismissal before acceptance leaves it unaccepted.
+8. Required resident fields, a valid catalog/cart, legal acceptance, and intentional form submission are all required before Session creation.
+
+### Embedded Checkout behavior
+
+- `/api/stripe?action=config` exposes only enabled/provider/mode and the publishable key when valid.
+- `paymentInProgress` and an existing `stripeEmbeddedCheckout` guard prevent duplicate submission.
+- Pending order and order items are stored before Stripe Session creation.
+- Stripe Embedded Checkout mounts only after one valid server Session is returned.
+- After a successful mount, Order Summary remains visible while resident/contact fields, legal controls, notice, and Continue button are removed from layout.
+- The page scrolls once to the Stripe area; reduced-motion users receive immediate rather than smooth scrolling.
+- There is no Edit contact details path after mount and no flow that destroys/recreates a Session for editing.
+- Mount/Session failure restores the pre-payment form and shows resident-safe wording.
+
+### Provider and key gates
+
+- Paid Stripe actions require `CHECKOUT_PROVIDER=stripe`.
+- Matching test keys work without a live gate.
+- Matching live keys additionally require `STRIPE_MODE=live` or `STRIPE_ALLOW_LIVE=true`.
+- Mixed test/live keys, unknown prefixes, missing provider, and invalid configuration fail closed.
+- Secret and webhook keys never reach the browser.
+
+### Paid order flow
+
+1. Apply five Session attempts per IP per 10 minutes.
+2. Validate resident/contact/legal/cart input.
+3. Reload trusted products and calculate amounts.
+4. Generate and insert the Pending Supabase order.
+5. Insert all `order_items` snapshots.
+6. If item insertion fails, attempt to remove the incomplete header and do not create a Stripe Session.
+7. Create the Stripe Session only after order and items exist.
+8. Patch the Pending order with Stripe Session/PaymentIntent references.
+9. Mount Embedded Checkout.
+10. Confirm or webhook retrieves Stripe state server-side.
+11. Fulfillment requires paid status, USD, exact stored order/session match, at least one stored line item, and exact trusted amount.
+12. Mark the order Paid, record the idempotent payment event, and send emails.
+
+### Verification and idempotency
+
+- Webhook requires the Stripe provider, `STRIPE_WEBHOOK_SECRET`, a valid raw-body signature, timing-safe comparison, and a five-minute timestamp tolerance.
+- Confirm and webhook use the same logical payment-event reference: `stripe_payment_<payment-intent-or-session>`.
+- Migration 011 unique indexes protect Session, PaymentIntent, charge, and event identifiers.
+- Repeated confirms, webhook retries, and Resend delivery retries do not intentionally create another paid order.
+- Browser errors are generic; raw Supabase/PostgreSQL text is logged safely server-side and not returned to residents.
+
+### Wallets and return behavior
+
+- Production card payments and Apple Pay are verified working.
+- Other Stripe wallets/payment options appear only when Stripe, account configuration, device, browser, and resident eligibility allow them.
+- The return URL is `/?stripe_session_id={CHECKOUT_SESSION_ID}`.
+- Root `roadmap.js` confirms the Session, clears the cart after verified success, removes the query parameter, and renders the polished confirmation.
+
+### Zero-dollar orders
+
+- `POST /api/create-order` accepts only a server-calculated zero total.
+- It uses the same trusted catalog, legal evidence, order-number generator, and order/item persistence model.
+- A positive trusted total is rejected and must use Stripe.
+- This route currently does not call the paid-order email helper.
+
+## 9. Order Numbers
+
+New public order references are generated only on the server in `server/order-number.js`.
+
+- Exact format: `BH-XXXXX`.
+- Exact alphabet: `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`.
+- Ambiguous `0`, `1`, `I`, and `O` are excluded.
+- Randomness: Node `crypto.randomBytes(5)` with a uniform 32-character alphabet selection.
+- The browser does not generate or control the stored order number.
+- `public.orders.order_number` remains the uniqueness authority.
+- Only PostgreSQL unique violation code `23505` triggers regeneration.
+- Maximum allocation attempts: 10.
+- Other database errors do not retry and return a resident-safe generic failure.
+- The successful stored value is used by confirmation, emails, tracking, Management, exports, Stripe metadata, and `client_reference_id`.
+- Internal UUID primary keys and processor references are unchanged.
+
+## 10. Transactional Emails
+
+Transactional order email code lives in `api/order-emails.js`.
+
+### Delivery
+
+- Provider: Resend.
+- Sender: `BrickellHouse <orders@brickellhouse.org>`.
+- Resident recipient: the validated order email.
+- Management recipient: `admin@brickellhouse.net`.
+- Resident subject: `BrickellHouse Order Confirmation`.
+- Management subject: `New BrickellHouse Store Order`.
+- Paid fulfillment sends both messages.
+- Resend idempotency keys are derived from the payment/order reference.
+
+### Design and compatibility
+
+- Both templates include responsive table-based HTML and complete plain-text alternatives.
+- The palette uses high-contrast near-black and white surfaces with restrained olive/gold accents.
+- Supported color-scheme metadata is present, but the design does not depend on forced custom dark mode.
+- The header uses a handcrafted email-safe HTML/CSS `BH` monogram and exact `BrickellHouse` wordmark.
+- Resident subtitle: `Resident Services`; Management subtitle: `Management`.
+- No PNG/SVG logo, white logo tile, JavaScript, canvas, web font, gradient, or shadow is required.
+- Dynamic order values are escaped before HTML insertion.
+
+### Privacy and accounting separation
+
+- Resident email uses clean product names and no GL/internal accounting names.
+- Management email may include internal names, GL snapshots, resident contact details, legal evidence, and payment references required for operations.
+- No secret, service-role value, card data, or webhook secret is included.
+- Email wording, recipients, triggers, payment behavior, and plain-text output are protected behavior.
+
+Local email preview/test scripts are development-only and excluded from Vercel deployment by `.vercelignore`. Never send a real test email without explicit authorization.
+
+## 11. Luna
+
+### Current production-safe core
+
+- Endpoint: `POST /api/chat`.
+- Model: `gpt-5.6-luna` through the OpenAI Responses API.
+- OpenAI storage: `store:false`.
+- Deterministic intent/routing handlers run before model fallback.
+- The fallback receives selected approved server-side JSON knowledge, not public web results or Management data.
+- Luna supports English/Spanish, explicit and recent language persistence, typo/alias normalization, corrections, follow-ups, and Concierge Brain intent handling.
+- Generic price/cost language alone does not retrieve the Store; valid Store/product intent does.
+- Catalog retrieval failures return temporary resident-safe wording.
+- High-confidence known facts answer directly; ambiguous cases clarify; low-confidence/private cases do not guess.
+
+Approved server knowledge is under `api/_knowledge/brickellhouse/` and covers constitutional/privacy rules, identity/contacts, emergency routing, amenities, parking, packages, Store, rules, moves/contractors, HOA privacy, FAQ, conversation style, vendors, and Board information.
+
+### Browser and privacy protections
+
+- `chat.js` stores a temporary local transcript only for resident UX, capped at 20 messages with a two-hour expiry.
+- sessionStorage failures and malformed content fail safely.
+- Browser-supplied assistant, system, developer, and history content is not trusted by the server; the current browser request sends no history.
+- Clear Chat invalidates all in-flight responses, removes the prior UUID and transcript, and starts a fresh anonymous conversation identity.
+- Late responses from an invalidated generation cannot restore history or identity.
+- Error responses preserve the current anonymous UUID when safe.
+- Luna refuses prompts, source/JSON, backend implementation, credentials, private resident data, Management data, payment/accounting data, and protected contact information.
+- Authority or identity claims do not unlock private data.
+
+### Luna Review
+
+- Migration 010 is applied.
+- Current resident/assistant turn pairs are stored as raw text under an anonymous conversation UUID for 90 days.
+- Raw text is not redacted by the active review builder; residents may voluntarily type sensitive content.
+- Management can read records and update review status/note through authenticated Management access.
+- Public/anon users have no access; service role writes/purges.
 - Luna has no read path to the review table.
-- Review records are not used as context, memory, retrieval, training, prompt updates, JSON updates, or behavior changes.
+- Review data is not memory, retrieval, training, embeddings, a resident profile, prompt editing, JSON editing, or automatic learning.
+- Purge runs on review writes/Management reads; it is event-driven rather than a documented scheduled job.
 
-Retention:
+Current Luna verification: `npm run test:luna` passes 195/195 local checks with no production/network calls.
 
-- Purge function deletes rows whose `last_message_at` is older than 90 days.
-- Chat invokes purge after review writes.
-- Management review reads also invoke purge.
-- The API returns at most 1000 rows from the last 90 days.
-- Purging is triggered by reads/writes, not documented as an independent scheduled job.
+## 12. Supabase and Data Security
 
-Legacy Luna Insights:
+### Role boundaries
 
-- Migration 008 created privacy-safe aggregate/redacted `luna_insights` with 365-day retention behavior.
-- Migration 009 grants service-role access and is applied.
-- `api/chat.js` still contains legacy aggregate/redaction helper code, but the current request handler logs the Luna Review path, not the legacy aggregate helper.
-- Do not describe the active Management Review as redacted aggregate analytics.
+- Public residents do not query full product rows directly.
+- `/api/products` uses service role and sanitizes the catalog.
+- Management uses the public anon key only to initialize Supabase, then operates with the authenticated user JWT under RLS.
+- Server routes use `SUPABASE_SERVICE_ROLE_KEY`; it is never returned to the browser.
 
-## 15. Rate Limiting And Abuse Protection
+### Product restrictions
 
-Application limits:
+- Migration 012 removes the resident product SELECT policy and revokes anon table SELECT.
+- Authenticated users receive table privileges needed for Management, but RLS still requires `public.is_management_user()`.
+- Migration 014 restores authenticated product CRUD table privileges without granting public/anon access or changing Management policies.
+- Approved active Management users can read/create/update/delete products; ordinary authenticated users remain blocked by RLS.
+
+### Main data areas
+
+- Management approval/requests and audit logs.
+- Products and portal settings.
+- Orders, order items, and payment events.
+- Feedback and abuse-control identifiers.
+- Luna Review.
+
+## 13. HTTP and Application Security
+
+### Enforced CSP
+
+`vercel.json` contains enforcing `Content-Security-Policy` headers, not Report-Only headers, for 11 HTML route rules:
+
+- `/`
+- `/index.html`
+- `/lifestyle.html`
+- `/payment-success.html`
+- `/payment-failure.html`
+- `/login.html`
+- `/checkout.html`
+- `/management/login.html`
+- `/management/dashboard.html`
+- `/management`
+- `/management/`
+
+No active HTML meta CSP remains. No CSP is assigned specifically to `/api/*`.
+
+Policy philosophy:
+
+- Default to self.
+- `base-uri 'self'`, `object-src 'none'`, `frame-ancestors 'self'`, `form-action 'self'`, and `script-src-attr 'none'` remain standard.
+- External origins are route-specific and minimal.
+- Checkout alone allows required Stripe scripts, connections, images, and frames.
+- Management alone allows jsDelivr for the Supabase browser library and the exact Supabase project origin.
+- Cloudflare Web Analytics/Browser Insights loader origin `https://static.cloudflareinsights.com` is explicitly allowed where needed.
+- Management allows `style-src-attr 'unsafe-inline'` because its current UI assigns dynamic style attributes; script attributes remain blocked.
+- No script `unsafe-inline`, `unsafe-eval`, wildcard origin, or broad external source was added.
+
+### Global headers
+
+Every route receives:
+
+- `X-Frame-Options: SAMEORIGIN`
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy: camera=(), microphone=(), geolocation=(), accelerometer=(), gyroscope=(), magnetometer=(), usb=(), bluetooth=(), browsing-topics=()`
+
+Production HSTS is edge-delivered rather than defined in `vercel.json`; verify it after edge/infrastructure changes.
+
+### Public abuse protection
 
 - Stripe Session creation: 5 attempts per IP per 10 minutes.
-- Luna chat: 30 messages per IP per 10 minutes.
-- Order status lookup: 30 lookups per IP per 10 minutes.
-- Feedback: database-backed maximum 2 matching submissions per 96 hours across normalized email, phone, unit, or request IP.
-- Stripe config, confirm, and webhook are not application-rate-limited; webhook must remain unthrottled by the in-app limiter for reliable processor delivery.
-- Management functions are not covered by the public in-memory limiter; they rely on Auth/RLS/server checks.
+- Luna chat/identity requests: 30 per IP per 10 minutes.
+- Order status lookup: 30 per IP per 10 minutes.
+- Feedback: 2 matching submissions per 96 hours using database-backed normalized identifiers/IP.
+- Stripe webhook is not application-rate-limited.
+- Management workflows are not covered by the public in-memory limiter; Auth/RLS provide their access boundary.
+- `_rate-limit.js` buckets are Vercel-instance-local, not globally distributed.
 
-`api/_rate-limit.js` stores buckets in process memory. Serverless instances do not share the map, so these limits are conservative local-instance protection, not globally distributed enforcement.
+### Secret and response rules
 
-Cloudflare owner-confirmed Luna rule:
+- Expected browser-visible credentials are limited to the Stripe publishable key and Supabase anon key.
+- Stripe secret/webhook keys, Supabase service role, Resend key, OpenAI key, and signing secrets remain server-only.
+- Browser/API responses must not include GL/internal accounting data, `privateAccounting`, resident records, service-role data, raw database errors, tokens, or secrets.
+- Public JavaScript is always inspectable; never treat obscurity as security.
 
-- 5 requests per IP per 10 seconds.
-- 10-second block when exceeded.
+## 14. Lifestyle
 
-This external rule is not represented by repository source. Do not change it without explicit infrastructure approval.
+- `lifestyle.html` uses exactly one video element and one MP4 source: `BHouse_Drone_Web_Optimized.mp4`.
+- The video is muted, looped, inline on iOS, and uses `preload="metadata"` with `brickell-pool.webp` as poster.
+- The same video instance attempts autoplay on mobile and desktop when at least 45% visible.
+- Autoplay rejection is caught silently so the poster remains a safe fallback.
+- Playback pauses offscreen, when the document is hidden, and on `pagehide`.
+- Returning to visibility resumes the same instance without resetting `currentTime`.
+- `prefers-reduced-motion: reduce` disables autoplay and leaves the video paused/poster-visible.
+- There is no coarse-pointer/mobile poster-only override.
+- No moving-video blur or duplicate source/instance is used.
 
-## 16. Security State
+The production MP4 is a lossless fast-start remux:
 
-Current protections:
+- H.264 High profile, `yuv420p`.
+- 1920 x 1080, 30 fps.
+- Approximately 13.8 seconds / 414 frames.
+- No audio stream.
+- Size: 8,510,837 bytes.
+- `moov` begins immediately after `ftyp` and before `mdat`, allowing progressive startup.
+- No re-encoding occurred.
 
-- Migration 012 blocks direct anon full-row product reads.
-- `/api/products` returns a sanitized active catalog only.
-- Resident bundles contain no GL/internal/Management accounting logic.
-- Management uses dedicated authenticated code and Supabase RLS.
-- Server-only keys remain server-side.
-- Only the Stripe publishable key and Supabase anon key are expected browser-visible credentials.
-- Stripe webhook verifies raw-body signatures and fails closed without provider/secret/signature.
-- Client cannot set trusted product price, subtotal, fee, total, GL code, payment status, or paid state.
-- Public order lookup returns only order number, public status/note, and created time.
-- Luna Review requires approved Management access.
-- `.env`, `.env.*`, `.env.local`, and `.vercel` are ignored; `.env.example` is tracked intentionally and contains placeholders only.
-- Old Square `privateAccounting` response route no longer exists because the Square payment route was removed.
+## 15. Performance State
 
-Important caveats:
+Recently completed optimizations:
 
-- Public/browser JavaScript is always inspectable; do not put secrets/private fields in it.
-- Frontend legal scroll gating is a UI/legal-review requirement. Backend independently requires legal acceptance/version evidence but cannot prove physical reading behavior.
-- In-memory rate limits are not globally distributed.
-- CSP and RLS changes require careful review.
+- Dedicated checkout avoids rendering the homepage beneath a modal and removes nested modal scrolling.
+- The homepage does not load Stripe.js; only checkout does.
+- Resident and Management scripts are separate, preventing Management/accounting code from loading publicly.
+- Checkout removes pre-payment sections after Stripe mount while preserving Order Summary.
+- Catalog/cart reconciliation prevents stale unavailable products from reaching checkout.
+- Cache-version query strings force updated resident/Management scripts when behavior changes.
+- Lifestyle uses fast-start MP4 metadata, `preload="metadata"`, a poster, one source, offscreen/hidden-tab pause, reduced-motion handling, and no heavy blur.
+- `.vercelignore` removes development tooling, previews, backups, migrations, and Markdown from deployed static output.
+- Stripe API consolidation keeps Vercel Hobby function usage controlled.
 
-## 17. Environment Variables
+## 16. Deployment
 
-Use `.env.example` for names only. Never document real values.
+### Vercel
 
-Checkout/Stripe:
+- Plan: Hobby.
+- Project root: repository root.
+- Framework: Other/static.
+- Build command: none.
+- Static pages/assets and Node serverless API routes deploy from the same repository.
+- Asset query versions are deliberate cache busting; update only references for files whose browser behavior changed.
+
+### `.vercelignore`
+
+The following are intentionally excluded from deployment:
+
+- `scripts/`
+- Archived backup directories identified in Legacy Compatibility.
+- `supabase/`
+- all `*.md` files
+
+Consequences:
+
+- Local email preview/test tools are not public.
+- Migration SQL and technical handoff Markdown are not statically served.
+- Only the optimized Lifestyle MP4 remains a production video source.
+
+### Environment variable names
+
+Stripe/checkout:
 
 - `CHECKOUT_PROVIDER`
 - `STRIPE_MODE`
@@ -575,8 +668,8 @@ Checkout/Stripe:
 - `STRIPE_PUBLISHABLE_KEY`
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
-- `STRIPE_API_VERSION` (source default `2025-06-30.basil`)
-- `PROCESSING_FEE_PERCENT` (source default 3)
+- `STRIPE_API_VERSION`
+- `PROCESSING_FEE_PERCENT`
 
 Supabase:
 
@@ -589,129 +682,98 @@ Email/AI:
 - `RESEND_API_KEY`
 - `OPENAI_API_KEY`
 
-Optional Management bootstrap script:
+Optional Management bootstrap tooling:
 
 - `MANAGEMENT_EMAIL`
 - `MANAGEMENT_TEMP_PASSWORD`
 
-Resend sender and Management recipient addresses are currently source constants, not environment variables.
+Never record real values in documentation or output.
 
-There are no active Square environment variables.
+### Deployment workflow
 
-## 18. Deployment And Local Development
+1. Read this handoff and inspect `git status --short`.
+2. Inspect the exact diff and preserve unrelated user changes.
+3. Confirm only authorized files changed and no secret/private export is staged.
+4. Run relevant syntax, JSON, tests, and `git diff --check`.
+5. Inspect Vercel function implications before adding or splitting routes.
+6. Commit and push only reviewed work.
+7. Use a preview where safe.
+8. Deploy production only after explicit approval.
+9. Do not submit a production payment or write production data unless explicitly authorized.
 
-Vercel:
+Rollback should be isolated: redeploy the last known-good Vercel deployment or revert the reviewed commit. For database changes, use reviewed compensating SQL after backup; never improvise a destructive rollback.
 
-- Plan: Hobby.
-- Project root: repository root.
-- Framework: Other/static.
-- No build command.
-- Keep function count within Hobby limits; inspect before adding handlers.
-- Static assets use cache-version query strings. Update only necessary page references when resident JS/CSS changes.
+## 17. Known Expected Behaviors and Current Caveats
 
-Full local development:
+Expected, not bugs:
 
-```powershell
-npm install
-npx vercel dev --listen 4173
-```
+- The seed-only Management product console message documented above.
+- Profit margin is intentionally blank/placeholder until verified cost data exists.
+- Stripe wallet visibility varies by Stripe configuration, browser, device, region, and resident eligibility.
+- Inactive products can remain visible to Management while absent from resident Store/API/checkout.
+- Luna Review stores raw text for 90 days but is isolated from Luna memory/training/retrieval.
+- Luna Review purge is triggered by reads/writes, not by a documented scheduler.
+- In-memory endpoint rate limits are per serverless instance.
+- Abandoned Stripe attempts may leave Pending orders for later operational cleanup.
+- The zero-dollar route does not currently send the paid-order email templates.
 
-Open `http://localhost:4173/`.
+Legacy Compatibility requirements are expected behavior, not broad cleanup targets.
 
-Static-only servers cannot exercise Vercel API routes, Stripe, Supabase server access, Luna, feedback persistence, order lookup, or Management Auth.
+## 18. Protected Systems
 
-Controlled deployment:
+Require explicit scope and focused review:
 
-1. Read this file.
-2. Inspect `git status --short` and exact diff.
-3. Confirm only authorized files changed.
-4. Confirm no secrets/private exports are staged.
-5. Run relevant syntax/static/manual checks.
-6. Check Vercel function count.
-7. Commit/push reviewed work.
-8. Use preview where safe.
-9. Deploy production only after explicit approval.
-10. Do not submit a production payment unless explicitly authorized.
+- `api/stripe.js` and `api/_stripe-checkout.js`.
+- Trusted pricing and `api/_catalog.js`.
+- Order creation, order items, payment events, order-number generation, and fulfillment.
+- `api/order-emails.js` and Resend triggers/idempotency.
+- Supabase schema, migrations, grants, RLS, and `api/_supabase.js`.
+- Management Auth, approval, MFA-aware checks, and product access.
+- `legal.js` and the legal acceptance flow.
+- Product synchronization, GL mapping, and accounting snapshots.
+- Luna knowledge, prompts, routing, Luna Review isolation, privacy rules, and the deferred context implementation identified in Legacy Compatibility.
+- Enforced CSP, security headers, Vercel, Cloudflare, and environment configuration.
+- Resident/Management script separation.
 
-Rollback:
+For UI-only work, do not touch these systems unless the task expressly requires it.
 
-- Redeploy last known-good Vercel deployment or revert the reviewed commit.
-- Restore previously approved environment/Cloudflare settings rather than improvising.
-- Never use destructive Supabase rollback; prepare reviewed compensating SQL after backup.
+## 19. Verification Standards
 
-## 19. Known Follow-Ups
+Minimum workflow for future Codex tasks:
 
-1. Free/zero-dollar order email behavior requires verification/fix.
-2. Abandoned/stale Pending Stripe order cleanup remains a future operational improvement.
-3. Stripe payment-event ordering cleanup is non-blocking future work. Current fulfillment records the idempotent payment event before all pending-order match/line-item/amount checks complete.
-4. Generic public API error-message cleanup remains pending; avoid exposing backend permission/storage detail.
-5. Production monitoring, uptime checks, error aggregation, and alerting are recommended.
-6. Privacy-policy destination/disclosure remains to be completed.
-7. Old encoding/mojibake and accessibility cleanup remain lower-priority separate work.
-8. Legacy/dormant Square labels, archived pages, CSS selectors, and compatibility variable names remain in some source. Do not confuse them with an active Square path, and do not remove historical compatibility casually.
-9. Some localStorage operations and newer browser syntax may still merit a separate Safari resilience review.
-10. Legacy aggregate Luna Insights helper code remains in `api/chat.js` but is not the active review logger.
+1. Read this file completely.
+2. Inspect Git status and recent history.
+3. Read the current implementation relevant to the request.
+4. State what will change before editing.
+5. Keep the diff tightly scoped.
+6. Run `node --check` on every modified JavaScript file.
+7. Parse modified JSON and SQL-review migrations without running them.
+8. Run `npm run test:luna` for Luna changes; current baseline is 195/195.
+9. Run `git diff --check`.
+10. Search resident-loaded source for prohibited Management/internal fields after ownership changes.
+11. Perform manual smoke checks appropriate to the affected workflow.
+12. Report files changed, behavior changed, checks run, protected systems preserved, and deploy/migration status.
 
-## 20. Protected File Areas
+High-value smoke checks:
 
-Require explicit task scope and careful review:
+- Resident language selection, Store, search, filters, images, cart, tracking, feedback, Lifestyle, and Luna.
+- Checkout catalog reconciliation, legal review, duplicate guard, Stripe mount, return confirmation, and cart clearing.
+- Sanitized `/api/products` response with no internal/GL fields.
+- Management login/approval, products, orders, feedback, revenue, settings, exports, and Luna Review.
+- Enforced CSP with no legitimate browser violations on affected routes.
+- No resident-loaded source contains Management Supabase logic or accounting fields.
 
-- `api/stripe.js`
-- `api/_stripe-checkout.js`
-- `api/_catalog.js`
-- `api/_supabase.js`
-- `api/create-order.js`
-- `api/order-emails.js`
-- `api/chat.js`
-- `api/luna-insights.js`
-- `api/feedback.js`
-- `auth.js`
-- `management/dashboard.js`
-- Supabase migrations/RLS/grants
-- `legal.js` and checkout acceptance flow
-- Product synchronization and GL mapping
-- CSP meta tags
-- Environment/deployment/Cloudflare configuration
+## 20. Final Continuation Summary
 
-UI-only work must not spill into these systems unless the task explicitly requires it.
+As of the 2026-07-16 repository verification, BrickellHouse Portal is a live Vercel Hobby/Supabase application using production Stripe Embedded Checkout, Resend transactional email, an authenticated Management operations portal, enforced route-specific CSP, a bilingual resident experience, an optimized Lifestyle video, server-generated `BH-XXXXX` order references, and OpenAI-backed Luna with deterministic safety routing.
 
-## 21. Safe Continuation Checklist
+The most important facts for the next conversation are:
 
-For every new Codex conversation:
-
-1. Open `C:\Users\Admin\Documents\brickellhouse-portal`.
-2. Read `SESSION_RESUME.md` completely.
-3. Run `git status --short` and preserve unrelated user changes.
-4. Inspect relevant source instead of relying only on documentation.
-5. Use `.env.example` for names; do not print `.env.local`.
-6. Remember 009, 010, 011, and 012 are already applied.
-7. Remember Square is inactive and live Stripe works.
-8. Preserve resident/Management separation and public GL privacy.
-9. Preserve mandatory legal review and payment-focused checkout.
-10. If touching Luna Review, remember it stores raw current message/reply pairs for 90 days and Luna cannot read them.
-11. Do not deploy, run migrations, change live settings, or submit payments without approval.
-
-Recommended non-destructive smoke checks after authorized changes:
-
-- Resident home/Store/cart render.
-- `/api/products` contains no internal/GL fields.
-- Checkout reconciliation and legal review work.
-- Continue stays disabled until all requirements are satisfied.
-- Payment-focused state activates only after successful Stripe mount.
-- Management login/approval and RLS remain effective.
-- Products/orders/revenue/feedback/settings/exports/Luna Review load.
-- Luna answers approved questions, refuses protected requests, and maintains Spanish context.
-- No resident bundle contains GL/internal/Management terms.
-
-## 22. Final State Statement
-
-As of 2026-07-13, BrickellHouse Portal is a live Vercel Hobby/Supabase application using production Stripe Embedded Checkout, Resend, OpenAI-backed Luna, Cloudflare protection, a dedicated legal-gated checkout, separated resident/Management bundles, protected internal accounting, and Management-only 90-day Luna Review.
-
-The most important continuation facts are:
-
-- Live Stripe cards and Apple Pay work; eligible Google Pay is enabled.
-- Square is retired from active checkout.
-- Migrations 009-012 have already been run successfully.
-- Migration 012 blocks anon full product reads.
-- Luna Review stores raw current message/reply pairs under anonymous UUIDs for 90 days; Luna cannot read them and no automatic learning occurs.
-- Working payment verification, trusted pricing, RLS, resident/Management separation, GL privacy, and live key configuration are protected systems.
+- Stripe is the only active payment system; production card payments and Apple Pay work.
+- Server pricing, payment verification, order creation, RLS, and GL privacy are protected.
+- Public products are sanitized through `/api/products`; anon full-table product reads are blocked.
+- Management uses its own bundle, Supabase Auth, approval checks, and RLS.
+- Transactional emails use the HTML/CSS BrickellHouse wordmark and separate resident/internal accounting content.
+- Luna runs `gpt-5.6-luna` with `store:false`, rejects browser history, and keeps Luna Review isolated.
+- `.vercelignore` prevents local scripts, backups, migrations, and Markdown from being deployed.
+- Do not deploy, migrate, reconfigure production, or submit payments without explicit authorization.

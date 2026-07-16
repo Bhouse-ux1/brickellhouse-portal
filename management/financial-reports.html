@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="BrickellHouse private Management Financial Reports Center.">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>Financial Reports Center | BrickellHouse Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=Playfair+Display:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="financial-reports.css?v=20260716-financial-report1">
+</head>
+<body class="financial-reports-page">
+  <div class="report-access-state" id="reportAccessState" role="status" aria-live="polite">
+    <span class="report-spinner" aria-hidden="true"></span>
+    <strong>Verifying Management access</strong>
+    <p>Secure reporting controls will appear after authorization is confirmed.</p>
+  </div>
+
+  <div class="report-page hidden" id="reportPage">
+    <header class="report-topbar">
+      <a class="report-brand" href="/management/dashboard.html" aria-label="BrickellHouse Management dashboard">
+        <img src="../bh-logo-transparent.png" alt="">
+        <span><strong>BrickellHouse</strong><small>Management Financial Reports</small></span>
+      </a>
+      <div class="report-session">
+        <span><small>Authorized Management</small><strong id="reportUserEmail">Management session</strong></span>
+        <a href="/management/dashboard.html">Back to dashboard</a>
+        <button id="reportLogout" type="button">Sign out</button>
+      </div>
+    </header>
+
+    <main class="report-main">
+      <section class="report-hero">
+        <div>
+          <p class="report-kicker">Private accounting workspace</p>
+          <h1>Financial Reports Center</h1>
+          <p>Generate an on-demand internal financial statement directly from authoritative paid Resident Store transactions.</p>
+        </div>
+        <div class="report-trust-note"><span>Server authoritative</span><strong>PDF only</strong><small>No report storage or email delivery</small></div>
+      </section>
+
+      <div class="report-layout">
+        <section class="report-panel report-form-panel" aria-labelledby="reportFormTitle">
+          <div class="report-panel-heading">
+            <p class="report-kicker">Statement controls</p>
+            <h2 id="reportFormTitle">Choose a report period</h2>
+            <p>BrickellHouse dates use America/New_York. Weekly statements run Monday through Sunday.</p>
+          </div>
+
+          <form id="financialReportForm" novalidate>
+            <label class="report-field">
+              <span>Report period</span>
+              <select id="reportPeriodType" name="periodType">
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="custom">Custom date range</option>
+              </select>
+            </label>
+
+            <div class="report-period-control" id="weeklyPeriodControl">
+              <label class="report-field"><span>Week</span><input id="reportWeek" type="week" required></label>
+            </div>
+
+            <div class="report-period-control hidden" id="monthlyPeriodControl">
+              <label class="report-field"><span>Month and year</span><input id="reportMonth" type="month" required></label>
+            </div>
+
+            <div class="report-period-control report-date-grid hidden" id="customPeriodControl">
+              <label class="report-field"><span>Start date</span><input id="reportStartDate" type="date" required></label>
+              <label class="report-field"><span>End date</span><input id="reportEndDate" type="date" required></label>
+            </div>
+
+            <div class="resolved-period" id="resolvedReportPeriod">
+              <span>Resolved reporting period</span>
+              <strong id="resolvedReportDates">Select a valid period</strong>
+              <small>Inclusive local dates</small>
+            </div>
+
+            <div class="report-message hidden" id="reportMessage" role="status" aria-live="polite"></div>
+
+            <button class="generate-report-button" id="generateFinancialReport" type="submit">
+              <span class="button-label">Generate Financial Report</span>
+              <span class="button-loading"><i aria-hidden="true"></i>Generating secure PDF</span>
+            </button>
+          </form>
+        </section>
+
+        <aside class="report-panel report-guidance" aria-labelledby="reportGuidanceTitle">
+          <div class="report-panel-heading">
+            <p class="report-kicker">Statement basis</p>
+            <h2 id="reportGuidanceTitle">What the PDF contains</h2>
+          </div>
+          <ul>
+            <li><span>01</span><div><strong>Executive summary</strong><p>Paid orders, transaction lines, gross revenue, resident-paid processing fees, and net collected.</p></div></li>
+            <li><span>02</span><div><strong>GL reconciliation</strong><p>Authoritative item snapshots grouped by GL code with exact cent allocation.</p></div></li>
+            <li><span>03</span><div><strong>Detailed transactions</strong><p>One line per order item with resident, product, accounting, and payment references.</p></div></li>
+          </ul>
+          <div class="report-privacy-note">
+            <strong>Internal and confidential</strong>
+            <p>The PDF is generated in memory, downloaded once, never published to a report URL, and not stored by the portal.</p>
+          </div>
+        </aside>
+      </div>
+
+      <section class="report-result hidden" id="reportResult" aria-live="polite">
+        <span class="report-result-mark" aria-hidden="true">BH</span>
+        <div><p class="report-kicker">Generation complete</p><h2>Your download has started</h2><p id="reportResultDetail"></p></div>
+        <a href="/management/dashboard.html">Return to Management dashboard</a>
+      </section>
+    </main>
+
+    <footer class="report-page-footer">
+      <span>BrickellHouse Management</span>
+      <strong>Internal / Confidential Accounting</strong>
+      <span>Generated reports are not stored by the portal.</span>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="financial-reports.js?v=20260716-financial-report1"></script>
+</body>
+</html>
