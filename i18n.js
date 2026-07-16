@@ -113,7 +113,7 @@
       "cart.emptyTitle": "Your bag is empty",
       "cart.emptyCopy": "Resident services you select will appear here.",
       "cart.subtotal": "Subtotal",
-      "cart.processingFee": "Processing fee",
+      "cart.processingFee": "Processing Fee",
       "cart.approvalCopy": "Requests may require resident services approval and resident verification.",
       "cart.checkout": "Continue to checkout",
       "cart.decrease": "Decrease {{name}} quantity",

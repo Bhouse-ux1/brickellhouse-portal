@@ -5,6 +5,7 @@
   "description": "BrickellHouse resident services portal",
   "scripts": {
     "test:luna": "node scripts/luna-eval.js",
+    "test:processing-fee": "node scripts/test-processing-fee.js",
     "preview:emails": "node scripts/preview-emails.js",
     "preview:financial-report": "node scripts/preview-financial-report.js",
     "send:test-email": "node scripts/send-test-email.js"

@@ -142,9 +142,7 @@ function activeCheckoutSnapshot() {
 }
 
 function processingFee(subtotal) {
-  if (!feeSettings.enabled) return 0;
-  const amount = feeSettings.type === "fixed" ? feeSettings.amount : subtotal * feeSettings.amount / 100;
-  return +amount.toFixed(2);
+  return window.BH_PROCESSING_FEE.calculateProcessingFeeDollars(subtotal);
 }
 
 function renderTabs() {
@@ -252,10 +250,7 @@ function updateCartSummary(items = cart.map(item => ({...item, product:products.
   if ($("#checkoutTotal")) $("#checkoutTotal").textContent = money(subtotal + fee);
   if ($("#checkoutAmountDue")) $("#checkoutAmountDue").textContent = money(subtotal + fee);
   if ($("#checkoutFeeLabel")) {
-    const feeLabel = String(feeSettings.label || "").trim().toLowerCase() === "processing fee" ? t("cart.processingFee") : feeSettings.label;
-    $("#checkoutFeeLabel").textContent = feeSettings.enabled && feeSettings.type === "percent"
-      ? `${feeLabel} (${feeSettings.amount}%)`
-      : feeLabel;
+    $("#checkoutFeeLabel").textContent = t("cart.processingFee");
   }
   if (toggleEmptyState) {
     $("#cartEmpty").classList.toggle("hidden", items.length > 0);

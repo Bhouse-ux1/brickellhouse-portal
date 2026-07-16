@@ -1,6 +1,7 @@
 const {getTrustedProductCatalog} = require("./_catalog");
 const {supabaseRequest} = require("./_supabase");
 const {insertOrderWithGeneratedNumber} = require("../server/order-number");
+const {calculateProcessingFeeCents} = require("../processing-fee");
 
 const PUBLIC_ORDER_FAILURE_MESSAGE = "Your order could not be completed at this time. Please try again shortly or contact Management.";
 const ORDER_NUMBER_EXHAUSTION_MESSAGE = "Unable to allocate an order reference. Please try again.";
@@ -64,8 +65,7 @@ module.exports = async function handler(request, response) {
     accounting.push({productId:item.id,quantity,internalName:product.internalName,glCode:product.glCode});
   }
 
-  const feePercent = Number(process.env.PROCESSING_FEE_PERCENT || "3");
-  const feeCents = Math.round(subtotalCents * feePercent / 100);
+  const feeCents = calculateProcessingFeeCents(subtotalCents);
   const amountCents = subtotalCents + feeCents;
   if (amountCents > 0) {
     return send(response, 400, {success:false,message:"Paid orders must be processed through Square payment"});

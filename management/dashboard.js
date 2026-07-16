@@ -209,9 +209,7 @@ function cartSubtotal() {
 }
 
 function processingFee(subtotal) {
-  if (!feeSettings.enabled) return 0;
-  const amount = feeSettings.type === "fixed" ? feeSettings.amount : subtotal * feeSettings.amount / 100;
-  return +amount.toFixed(2);
+  return window.BH_PROCESSING_FEE.calculateProcessingFeeDollars(subtotal);
 }
 
 function revenueFor(list) {
@@ -460,7 +458,7 @@ function updateCartSummary(items = cart.map(item => ({...item, product:products.
   $("#checkoutSubtotal").textContent = money(subtotal);
   $("#checkoutFee").textContent = money(fee);
   $("#checkoutTotal").textContent = money(subtotal + fee);
-  $("#checkoutFeeLabel").textContent = feeSettings.enabled && feeSettings.type === "percent" ? `${feeSettings.label} (${feeSettings.amount}%)` : feeSettings.label;
+  $("#checkoutFeeLabel").textContent = "Processing Fee";
   if (toggleEmptyState) {
     $("#cartEmpty").classList.toggle("hidden", items.length > 0);
     $("#cartFooter").classList.toggle("hidden", !items.length);
@@ -640,7 +638,7 @@ function renderOverviewCommandCenter() {
         <button class="quick-action" type="button" data-quick-action="feedback"><strong>Review feedback</strong><small>Open resident messages needing action.</small></button>
         <button class="quick-action" type="button" data-quick-action="luna"><strong>Open Luna Review</strong><small>Inspect conversation quality records.</small></button>
         <button class="quick-action" type="button" data-quick-action="reports"><strong>Reports and exports</strong><small>Revenue and CSV exports.</small></button>
-        <button class="quick-action" type="button" data-quick-action="settings"><strong>Processing fee</strong><small>Open the existing checkout setting.</small></button>
+        <button class="quick-action" type="button" data-quick-action="settings"><strong>Processing fee</strong><small>Review the fixed checkout fee.</small></button>
       </div></section>
       <section class="operations-panel"><div class="panel-heading"><div><h2>Recent activity</h2><p>Latest loaded operational records.</p></div></div><div class="activity-list">${recentActivity.length ? recentActivity.map(item => `<div class="activity-item"><span>${escapeAdminHtml(item.type.slice(0,1))}</span><div><strong>${escapeAdminHtml(item.title)}</strong><small>${escapeAdminHtml(item.detail)}</small></div><small>${formatResidentDateTime(item.date)}</small></div>`).join("") : `<div class="workspace-empty">No recent activity is available.</div>`}</div></section>
       <section class="operations-panel"><div class="panel-heading"><div><h2>Inventory attention</h2><p>Active products at or below 15 units.</p></div><button type="button" data-quick-action="low-products">Open catalog</button></div><div class="alert-list">${lowProducts.length ? lowProducts.slice(0,7).map(product => `<div class="alert-item"><span>P</span><div><strong>${escapeAdminHtml(product.name)}</strong><small>${escapeAdminHtml(product.category)} · ${escapeAdminHtml(product.internalName)}</small></div><b>${Number(product.inventory || 0)} left</b></div>`).join("") : `<div class="workspace-empty">All active products are above the low-inventory threshold.</div>`}</div></section>

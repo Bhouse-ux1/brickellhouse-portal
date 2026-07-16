@@ -3,6 +3,7 @@ const {getTrustedProductCatalog} = require("./_catalog");
 const {supabaseRequest} = require("./_supabase");
 const {sendOrderEmails} = require("./order-emails");
 const {insertOrderWithGeneratedNumber} = require("../server/order-number");
+const {calculateProcessingFeeCents} = require("../processing-fee");
 
 const STRIPE_API_BASE = "https://api.stripe.com/v1";
 const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || "2025-06-30.basil";
@@ -157,8 +158,7 @@ async function buildTrustedCheckout(rawBody) {
     });
   }
 
-  const feePercent = Number(process.env.PROCESSING_FEE_PERCENT || "3");
-  const processingFeeCents = Math.round(subtotalCents * feePercent / 100);
+  const processingFeeCents = calculateProcessingFeeCents(subtotalCents);
   const totalCents = subtotalCents + processingFeeCents;
   if (totalCents <= 0) {
     const error = new Error("Stripe checkout is only used for paid orders");
@@ -216,7 +216,7 @@ async function createCheckoutSession(checkout, origin) {
 
   checkout.accounting.forEach((item, index) => appendLineItem(params, index, item.residentName, item.unitPriceCents, item.quantity, item.residentName));
   if (checkout.processingFeeCents > 0) {
-    appendLineItem(params, checkout.accounting.length, "Processing fee", checkout.processingFeeCents, 1);
+    appendLineItem(params, checkout.accounting.length, "Processing Fee", checkout.processingFeeCents, 1);
   }
 
   return stripeRequest("/checkout/sessions", {method:"POST", body:params});
