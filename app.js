@@ -104,6 +104,10 @@ let products = (Array.isArray(storedProducts) ? storedProducts : seedProducts).m
 let cart = Array.isArray(storedCart) ? storedCart : [];
 let feeSettings = publicFeeSettings(storedFeeSettings || {});
 let activeCategory = "All";
+let lastProductRenderKey = "";
+const residentAppIsCheckoutPage = document.body.classList.contains("checkout-page");
+let storeCatalogReady = residentAppIsCheckoutPage;
+let residentCatalogUnavailable = false;
 window.BH_CATALOG_STATE = {complete:false, success:false};
 
 function productImageSrc(image) {
@@ -161,7 +165,7 @@ function processingFee(subtotal) {
 
 function renderTabs() {
   const tabs = $("#categoryTabs");
-  if (!tabs) return;
+  if (!tabs || !storeCatalogReady) return;
   tabs.innerHTML = ["All", ...CATEGORIES].map(category =>
     `<button class="${category === activeCategory ? "active" : ""}" data-cat="${category}">${residentI18n?.categoryLabel(category) || category}</button>`
   ).join("");
@@ -177,7 +181,7 @@ function renderTabs() {
 function renderProducts() {
   const grid = $("#productGrid");
   const search = $("#searchInput");
-  if (!grid || !search) return;
+  if (!grid || !search || !storeCatalogReady) return;
   const query = search.value.trim().toLowerCase();
   const filtered = products.filter(product => {
     const display = residentI18n?.displayProduct(product) || product;
@@ -185,6 +189,17 @@ function renderProducts() {
       && (activeCategory === "All" || product.category === activeCategory)
       && `${product.name} ${product.description} ${display.name} ${display.description} ${display.category}`.toLowerCase().includes(query);
   });
+  const renderKey = JSON.stringify([
+    residentI18n?.getLanguage() || "en",
+    activeCategory,
+    query,
+    residentCatalogUnavailable,
+    filtered.map(product => {
+      const display = residentI18n?.displayProduct(product) || product;
+      return [product.id, display.name, display.category, display.description, product.price, product.inventory, product.image];
+    })
+  ]);
+  if (renderKey === lastProductRenderKey) return;
   grid.innerHTML = filtered.map((product, index) => {
     const display = residentI18n?.displayProduct(product) || product;
     const stockText = product.inventory === 0
@@ -193,7 +208,7 @@ function renderProducts() {
     return (
     `<article class="product-card" style="animation-delay:${Math.min(index * .05, .4)}s">
       <div class="product-image">
-        <img src="${productImageSrc(product.image)}" alt="${display.name}">
+        <img src="${productImageSrc(product.image)}" alt="${display.name}" loading="lazy" decoding="async">
         <span class="stock-badge ${product.inventory < 10 ? "low" : ""}">${stockText}</span>
       </div>
       <div class="product-info">
@@ -204,7 +219,11 @@ function renderProducts() {
     </article>`
     );
   }).join("");
+  lastProductRenderKey = renderKey;
   bindProductImageFallbacks(grid);
+  if ($("#emptyState")) {
+    $("#emptyState").textContent = residentCatalogUnavailable ? t("checkout.catalogUnavailable") : t("store.noResults");
+  }
   $("#emptyState")?.classList.toggle("hidden", filtered.length > 0);
   $$('[data-add]').forEach(button => button.onclick = () => addToCart(button.dataset.add));
 }
@@ -225,6 +244,8 @@ async function loadPublicProductCatalog() {
         image:product.image || existing.image || fallback.image || ""
       });
     });
+    residentCatalogUnavailable = false;
+    storeCatalogReady = true;
     reconcileCartWithCatalog();
     persist();
     renderTabs();
@@ -232,7 +253,15 @@ async function loadPublicProductCatalog() {
     renderCart();
     loaded = true;
   } catch (error) {
-    console.warn("Using local product catalog fallback", error);
+    console.warn("Product catalog is unavailable", error);
+    if (!residentAppIsCheckoutPage) {
+      products = [];
+      residentCatalogUnavailable = true;
+      storeCatalogReady = true;
+      renderTabs();
+      renderProducts();
+      renderCart();
+    }
   } finally {
     window.BH_CATALOG_STATE = {complete:true, success:loaded};
     document.dispatchEvent(new CustomEvent("bh:catalog-ready", {detail:{success:loaded}}));
@@ -367,7 +396,7 @@ $$('[data-close]').forEach(button => button.addEventListener("click", () => {
 
 function updateParallax() {}
 
-if (!document.body.classList.contains("checkout-page")) {
+if (!residentAppIsCheckoutPage) {
   const observer = new IntersectionObserver(entries => entries.forEach(entry => entry.isIntersecting && entry.target.classList.add("visible")), {threshold:.12});
   $$('.reveal').forEach(element => observer.observe(element));
 
@@ -401,11 +430,13 @@ document.addEventListener("bh:language-changed", () => {
   renderLegalNotice();
 });
 
-reconcileCartWithCatalog();
-persist();
-renderTabs();
-renderProducts();
-renderCart();
-renderLegalNotice();
+if (residentAppIsCheckoutPage) {
+  reconcileCartWithCatalog();
+  persist();
+  renderTabs();
+  renderProducts();
+  renderCart();
+  renderLegalNotice();
+}
 updateParallax();
 loadPublicProductCatalog();

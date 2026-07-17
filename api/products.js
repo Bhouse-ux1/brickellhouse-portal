@@ -1,8 +1,19 @@
+const crypto = require("crypto");
 const {getPublicProductCatalog} = require("./_catalog");
 
 function send(response, status, payload) {
   response.setHeader("Cache-Control", "no-store");
   return response.status(status).json(payload);
+}
+
+function catalogEtag(payload) {
+  const digest = crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+  return `"${digest}"`;
+}
+
+function requestMatchesEtag(request, etag) {
+  const header = String(request.headers?.["if-none-match"] || "");
+  return header.split(",").some(value => value.trim() === etag || value.trim() === "*");
 }
 
 module.exports = async function handler(request, response) {
@@ -13,7 +24,13 @@ module.exports = async function handler(request, response) {
 
   try {
     const products = await getPublicProductCatalog();
-    return send(response, 200, {success:true,products});
+    const payload = {success:true,products};
+    const etag = catalogEtag(payload);
+    response.setHeader("Cache-Control", "private, no-cache, max-age=0, must-revalidate");
+    response.setHeader("ETag", etag);
+    response.setHeader("Vary", "Accept-Encoding");
+    if (requestMatchesEtag(request, etag)) return response.status(304).end();
+    return response.status(200).json(payload);
   } catch (error) {
     return send(response, error.status || 503, {
       success:false,
