@@ -1,6 +1,6 @@
 # BrickellHouse Portal Master Project Handoff
 
-Last repository verification: 2026-07-16
+Last repository verification: 2026-07-17
 
 Project folder: `C:\Users\Admin\Documents\brickellhouse-portal`
 
@@ -24,10 +24,11 @@ Current major systems:
 - Luna resident assistant with deterministic routing, approved server knowledge, OpenAI fallback, Spanish support, typo/alias normalization, privacy rules, and abuse protection.
 - Vercel Hobby hosting/functions, Cloudflare edge services, and enforced route-specific CSP.
 
-### Applied migration state
+### Migration state
 
 - Migrations `001` through `012`: applied.
 - Migration `014_restore_management_product_privileges.sql`: applied.
+- Migration `015_management_product_images.sql`: repository implementation only; not applied in production.
 
 Do not run any migration without explicit approval and target-database verification.
 
@@ -75,7 +76,7 @@ Legacy compatibility preserves historical records; it does not identify systems 
 - Retired implementation notes are historical reference only and are not active setup instructions.
 - Legacy Luna Insights migrations 008 and 009, schema, aggregate/redaction helpers, and naming remain only for compatibility. The active Management workflow is Luna Review, served by `api/luna-insights.js` under its retained filename.
 
-### Unapplied migration
+### Unapplied migrations
 
 - Migration `013_luna_trusted_conversation_context.sql` exists in the repository but remains unapplied in production unless the owner separately confirms otherwise.
 - Do not assume an unapplied migration is active because its SQL or related application code exists.
@@ -83,6 +84,8 @@ Legacy compatibility preserves historical records; it does not identify systems 
 - The deferred design uses anonymous UUID-bound context, a two-hour sliding TTL, a maximum of 10 trusted turns / 20 messages, server-side redaction, fixed safe context state, approved references, HMAC-signed conversation tokens, and atomic request reservation.
 - Activation requires explicit approval for the migration and `LUNA_CONTEXT_SIGNING_SECRET`, applied in the verified target environment and correct order. Missing prerequisites must continue to disable persistence safely while basic Luna remains operational.
 - If applied later, migration 013 forces RLS on its context tables, revokes direct public/browser access, and permits only the required service-role reads and RPC execution.
+
+Migration `015_management_product_images.sql` is also unapplied, but it is a deferred feature migration rather than legacy compatibility. It creates isolated private-original/public-derivative product-image storage and additive product image metadata. The related repository UI/API code is not active production architecture until the migration is separately reviewed and applied.
 
 Never infer that a legacy-compatible field, file, migration, backup, or historical code path is currently active.
 
@@ -118,6 +121,7 @@ Before modifying anything marked legacy:
 - Final feature inventory and product audit.
 - Monthly accounting automation.
 - Migration `013_luna_trusted_conversation_context.sql` remains unapplied unless separately approved.
+- Migration `015_management_product_images.sql` remains unapplied unless separately approved; Management image-upload persistence is therefore not active in production.
 
 ## 2. Non-Negotiable Continuation Rules
 
@@ -200,6 +204,7 @@ Before modifying anything marked legacy:
 - `api/feedback.js`: validated feedback submission and database-backed abuse control.
 - `api/chat.js`: Luna backend and Luna Review writer.
 - `api/luna-insights.js`: Management-authenticated API for the current Luna Review workflow.
+- `api/product-images.js`: Management-authenticated, MFA-aware product-image validation and assignment endpoint; gated by unapplied migration 015.
 - `api/stripe.js`: consolidated Stripe config, Session, confirm, and webhook actions.
 - `api/supabase-config.js`: browser-safe Supabase URL and anon key.
 
@@ -244,6 +249,7 @@ There is no resident login, resident account, or resident profile system. Reside
 - The browser cache and cart are reconciled against the current catalog.
 - Missing, inactive, invalid, or out-of-stock items are removed from saved carts.
 - Product image URLs are normalized to the resident-safe `image` field; genuinely missing images use a fallback.
+- The repository adds a load-error fallback for unavailable product image URLs. Database-backed uploaded derivatives remain inactive until migration 015 is applied and an approved Management user assigns an image.
 - Dedicated checkout blocks if current catalog availability cannot be confirmed.
 - Checkout uses an immutable cart snapshot. Quantities are locked for the active checkout attempt.
 
@@ -292,7 +298,7 @@ They remain preserved for later reactivation and are not eligible for resident r
 
 - Overview command center with current metrics, open work, low inventory, feedback/Luna queues, quick actions, and current activity.
 - Orders workspace with search, status/date filters, grouped details, resident contact data, public/private notes, legal evidence, payment references, and status updates.
-- Products workspace with search/filtering, resident presentation, inventory, availability, image preservation, internal names, GL codes, creation, editing, and active/inactive toggles.
+- Products workspace with search/filtering, resident presentation, inventory, availability, internal names, GL codes, creation, editing, and active/inactive toggles. The repository also contains upload/preview/crop/zoom/reposition controls gated by unapplied migration 015.
 - Feedback inbox with search, status/category filters, response, internal notes, details, deletion, and export.
 - Reports workspace with revenue analytics and exports.
 - Settings for processing fee and session/administrative information.
@@ -307,6 +313,7 @@ They remain preserved for later reactivation and are not eligible for resident r
 - Active/inactive updates change only `active` and `updated_at`, require exactly one matching returned database row, and update local state only after confirmation.
 - Seed-only fallback products are not silently created or treated as editable database records.
 - Full edits preserve valid `internal_name` and current GL rules.
+- The pending image workflow stages originals in a private bucket under the authenticated user path, validates and assigns a server-generated 1200-square WebP derivative through `api/product-images.js`, and stores constrained crop metadata. It is not production-active while migration 015 remains unapplied.
 
 ### Reports and exports
 
@@ -711,6 +718,7 @@ Expected, not bugs:
 - Profit margin is intentionally blank/placeholder until verified cost data exists.
 - Stripe wallet visibility varies by Stripe configuration, browser, device, region, and resident eligibility.
 - Inactive products can remain visible to Management while absent from resident Store/API/checkout.
+- The repository product-image upload workflow is intentionally inactive until migration 015 is explicitly applied; do not treat the presence of its UI/API code as proof that its Storage buckets or columns exist in production.
 - Luna Review stores raw text for 90 days but is isolated from Luna memory/training/retrieval.
 - Luna Review purge is triggered by reads/writes, not by a documented scheduler.
 - In-memory endpoint rate limits are per serverless instance.
@@ -727,7 +735,7 @@ Require explicit scope and focused review:
 - Trusted pricing and `api/_catalog.js`.
 - Order creation, order items, payment events, order-number generation, and fulfillment.
 - `api/order-emails.js` and Resend triggers/idempotency.
-- Supabase schema, migrations, grants, RLS, and `api/_supabase.js`.
+- Supabase schema, migrations, grants, RLS, `api/_supabase.js`, and the migration-015-gated `api/product-images.js` workflow.
 - Management Auth, approval, MFA-aware checks, and product access.
 - `legal.js` and the legal acceptance flow.
 - Product synchronization, GL mapping, and accounting snapshots.
@@ -765,7 +773,7 @@ High-value smoke checks:
 
 ## 20. Final Continuation Summary
 
-As of the 2026-07-16 repository verification, BrickellHouse Portal is a live Vercel Hobby/Supabase application using production Stripe Embedded Checkout, Resend transactional email, an authenticated Management operations portal, enforced route-specific CSP, a bilingual resident experience, an optimized Lifestyle video, server-generated `BH-XXXXX` order references, and OpenAI-backed Luna with deterministic safety routing.
+As of the 2026-07-17 repository verification, BrickellHouse Portal is a live Vercel Hobby/Supabase application using production Stripe Embedded Checkout, Resend transactional email, an authenticated Management operations portal, enforced route-specific CSP, a bilingual resident experience, an optimized Lifestyle video, server-generated `BH-XXXXX` order references, and OpenAI-backed Luna with deterministic safety routing.
 
 The most important facts for the next conversation are:
 
@@ -773,6 +781,7 @@ The most important facts for the next conversation are:
 - Server pricing, payment verification, order creation, RLS, and GL privacy are protected.
 - Public products are sanitized through `/api/products`; anon full-table product reads are blocked.
 - Management uses its own bundle, Supabase Auth, approval checks, and RLS.
+- Migration 015 and its Management product-image upload code are repository-only and unapplied; do not assume the related Storage buckets, columns, or persistence workflow are active in production.
 - Transactional emails use the HTML/CSS BrickellHouse wordmark and separate resident/internal accounting content.
 - Luna runs `gpt-5.6-luna` with `store:false`, rejects browser history, and keeps Luna Review isolated.
 - `.vercelignore` prevents local scripts, backups, migrations, and Markdown from being deployed.

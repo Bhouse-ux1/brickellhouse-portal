@@ -95,6 +95,25 @@ const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const isManagementPage = document.body.classList.contains("management-page");
 const PRODUCT_IMAGE_VERSION = "20260624-product-images1";
+const PRODUCT_IMAGE_ORIGINALS_BUCKET = "product-image-originals";
+const PRODUCT_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
+const PRODUCT_IMAGE_MAX_DIMENSION = 12000;
+const PRODUCT_IMAGE_MAX_PIXELS = 40_000_000;
+const PRODUCT_IMAGE_OUTPUT_SIZE = 1200;
+let productImageEditorState = {
+  generation:0,
+  productId:"",
+  source:null,
+  file:null,
+  fileMeta:null,
+  originalPath:"",
+  zoom:1,
+  x:0,
+  y:0,
+  dirty:false,
+  pointer:null
+};
+let productImageSaveInProgress = false;
 const money = value => new Intl.NumberFormat("en-US", {style:"currency",currency:"USD"}).format(value);
 function escapeAdminHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, character => ({
@@ -129,6 +148,343 @@ function productThumbnail(product) {
   if (!image) return `<div class="admin-product-thumb placeholder">BH</div>`;
   return `<img class="admin-product-thumb" src="${escapeAdminHtml(productImageSrc(image))}" alt="${escapeAdminHtml(displayText(product.name, "Product"))}">`;
 }
+
+function closeProductImageSource() {
+  if (productImageEditorState.source?.close) productImageEditorState.source.close();
+  productImageEditorState.source = null;
+}
+
+function setProductImageStatus(message = "", type = "") {
+  const status = $("#productImageStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.classList.toggle("error", type === "error");
+  status.classList.toggle("success", type === "success");
+}
+
+function setProductImageSummary(product = null) {
+  const container = $("#productEditorImage");
+  if (!container) return;
+  if (!product) {
+    container.innerHTML = `<div class="admin-product-thumb placeholder">BH</div><div><strong>No image selected</strong><p>Choose a PNG, JPEG, or WebP image up to 8 MB.</p></div>`;
+    return;
+  }
+  container.innerHTML = `${productThumbnail(product)}<div><strong>${escapeAdminHtml(displayText(product.name, "Product"))}</strong><p>${product.image ? "Current Resident Store image. Uploading a replacement will not remove it until the new image is safely saved." : "No stored image. The safe catalog fallback remains active."}</p></div>`;
+}
+
+function normalizedCrop(value = {}) {
+  const zoom = Number(value.zoom);
+  const x = Number(value.x);
+  const y = Number(value.y);
+  return {
+    version:1,
+    zoom:Number.isFinite(zoom) ? Math.min(4, Math.max(1, zoom)) : 1,
+    x:Number.isFinite(x) ? Math.min(1, Math.max(-1, x)) : 0,
+    y:Number.isFinite(y) ? Math.min(1, Math.max(-1, y)) : 0,
+    aspect:"1:1"
+  };
+}
+
+function productImageGeometry(size, source = productImageEditorState.source, crop = productImageEditorState) {
+  if (!source) return null;
+  const sourceWidth = Number(source.width || source.naturalWidth || 0);
+  const sourceHeight = Number(source.height || source.naturalHeight || 0);
+  if (!sourceWidth || !sourceHeight) return null;
+  const baseScale = Math.max(size / sourceWidth, size / sourceHeight);
+  const width = sourceWidth * baseScale * crop.zoom;
+  const height = sourceHeight * baseScale * crop.zoom;
+  const maxX = Math.max(0, (width - size) / 2);
+  const maxY = Math.max(0, (height - size) / 2);
+  return {
+    width,
+    height,
+    left:(size - width) / 2 + crop.x * maxX,
+    top:(size - height) / 2 + crop.y * maxY,
+    maxX,
+    maxY
+  };
+}
+
+function drawProductImage(targetCanvas = $("#productCropCanvas"), size = targetCanvas?.width || 600) {
+  if (!targetCanvas || !productImageEditorState.source) return;
+  const context = targetCanvas.getContext("2d", {alpha:true});
+  const geometry = productImageGeometry(size);
+  if (!context || !geometry) return;
+  context.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+  context.fillStyle = "#f7f7f2";
+  context.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  context.drawImage(productImageEditorState.source, geometry.left, geometry.top, geometry.width, geometry.height);
+}
+
+function showProductCropEditor() {
+  $("#productCropEditor")?.classList.remove("hidden");
+  if ($("#productImageZoom")) $("#productImageZoom").value = String(productImageEditorState.zoom);
+  drawProductImage();
+}
+
+function detectSelectedImageType(bytes) {
+  if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47
+    && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a) {
+    return {mime:"image/png",extension:"png"};
+  }
+  if (bytes.length >= 4 && bytes[0] === 0xff && bytes[1] === 0xd8) return {mime:"image/jpeg",extension:"jpg"};
+  if (bytes.length >= 12 && String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP") {
+    return {mime:"image/webp",extension:"webp"};
+  }
+  return null;
+}
+
+async function loadBrowserImage(blob) {
+  if (typeof createImageBitmap === "function") {
+    try {
+      return await createImageBitmap(blob, {imageOrientation:"from-image"});
+    } catch {
+      try { return await createImageBitmap(blob); } catch {}
+    }
+  }
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const image = new Image();
+    image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
+    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error("The selected file could not be decoded as an image.")); };
+    image.src = url;
+  });
+}
+
+async function prepareProductImageBlob(blob, {file = null, crop = null, dirty = true, originalPath = "", generation = null} = {}) {
+  if (!blob || blob.size < 1) throw new Error("Choose an image file first.");
+  if (blob.size > PRODUCT_IMAGE_MAX_BYTES) throw new Error("Choose an image smaller than 8 MB.");
+  const header = new Uint8Array(await blob.slice(0, 32).arrayBuffer());
+  const fileMeta = detectSelectedImageType(header);
+  if (!fileMeta) throw new Error("Choose a valid PNG, JPEG, or WebP image.");
+  const source = await loadBrowserImage(blob);
+  if (generation !== null && generation !== productImageEditorState.generation) {
+    if (source?.close) source.close();
+    return false;
+  }
+  const width = Number(source.width || source.naturalWidth || 0);
+  const height = Number(source.height || source.naturalHeight || 0);
+  if (!width || !height || width > PRODUCT_IMAGE_MAX_DIMENSION || height > PRODUCT_IMAGE_MAX_DIMENSION || width * height > PRODUCT_IMAGE_MAX_PIXELS) {
+    if (source?.close) source.close();
+    throw new Error("Choose an image no larger than 12,000 pixels per side or 40 megapixels.");
+  }
+  closeProductImageSource();
+  const nextCrop = normalizedCrop(crop || {});
+  productImageEditorState.source = source;
+  productImageEditorState.file = file;
+  productImageEditorState.fileMeta = fileMeta;
+  productImageEditorState.originalPath = originalPath;
+  productImageEditorState.zoom = nextCrop.zoom;
+  productImageEditorState.x = nextCrop.x;
+  productImageEditorState.y = nextCrop.y;
+  productImageEditorState.dirty = dirty;
+  showProductCropEditor();
+  return true;
+}
+
+async function selectProductImageFile(file) {
+  const generation = productImageEditorState.generation + 1;
+  productImageEditorState.generation = generation;
+  setProductImageStatus("Preparing image preview...");
+  try {
+    const prepared = await prepareProductImageBlob(file, {file,dirty:true,generation});
+    if (!prepared || generation !== productImageEditorState.generation) return;
+    setProductImageStatus("Image ready. Drag, zoom, or reset the crop before saving.", "success");
+  } catch (error) {
+    if (generation !== productImageEditorState.generation) return;
+    setProductImageStatus(error.message || "The selected image could not be used.", "error");
+    if ($("#productImageFile")) $("#productImageFile").value = "";
+  }
+}
+
+async function loadStoredProductImageSource(product, generation) {
+  if (!managementAuthClient || !product?.imageOriginalPath) return;
+  setProductImageStatus("Loading the stored source image...");
+  try {
+    const {data, error} = await managementAuthClient.storage.from(PRODUCT_IMAGE_ORIGINALS_BUCKET).download(product.imageOriginalPath);
+    if (error || !data) throw new Error("Stored source unavailable");
+    if (generation !== productImageEditorState.generation) return;
+    const prepared = await prepareProductImageBlob(data, {crop:product.imageCrop,dirty:false,originalPath:product.imageOriginalPath,generation});
+    if (!prepared || generation !== productImageEditorState.generation) return;
+    setProductImageStatus("Stored source loaded. Adjust the crop or choose a replacement image.");
+  } catch {
+    if (generation !== productImageEditorState.generation) return;
+    setProductImageStatus("The current Store image remains assigned. Choose a replacement file to edit it.");
+  }
+}
+
+function resetProductImageEditor(product = null) {
+  closeProductImageSource();
+  productImageEditorState = {
+    generation:productImageEditorState.generation + 1,
+    productId:String(product?.id || ""),
+    source:null,
+    file:null,
+    fileMeta:null,
+    originalPath:String(product?.imageOriginalPath || ""),
+    zoom:1,
+    x:0,
+    y:0,
+    dirty:false,
+    pointer:null
+  };
+  if ($("#productImageFile")) $("#productImageFile").value = "";
+  $("#productCropEditor")?.classList.add("hidden");
+  setProductImageSummary(product);
+  setProductImageStatus("");
+  if (product?.imageOriginalPath) loadStoredProductImageSource(product, productImageEditorState.generation);
+}
+
+function updateProductImageCrop(changes, {dirty = true} = {}) {
+  Object.assign(productImageEditorState, normalizedCrop({...productImageEditorState,...changes}));
+  if (dirty) productImageEditorState.dirty = true;
+  if ($("#productImageZoom")) $("#productImageZoom").value = String(productImageEditorState.zoom);
+  drawProductImage();
+}
+
+function resetProductImageCrop() {
+  updateProductImageCrop({zoom:1,x:0,y:0});
+  setProductImageStatus("Crop reset to the centered image.");
+}
+
+function canvasToWebp(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if (!blob || blob.type !== "image/webp") return reject(new Error("This browser cannot prepare the required WebP product image."));
+      resolve(blob);
+    }, "image/webp", 0.9);
+  });
+}
+
+async function createProductImageDerivative() {
+  if (!productImageEditorState.source) throw new Error("Choose an image file before saving.");
+  const canvas = document.createElement("canvas");
+  canvas.width = PRODUCT_IMAGE_OUTPUT_SIZE;
+  canvas.height = PRODUCT_IMAGE_OUTPUT_SIZE;
+  const context = canvas.getContext("2d", {alpha:true});
+  const geometry = productImageGeometry(PRODUCT_IMAGE_OUTPUT_SIZE);
+  context.fillStyle = "#f7f7f2";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  context.drawImage(productImageEditorState.source, geometry.left, geometry.top, geometry.width, geometry.height);
+  return canvasToWebp(canvas);
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || "").split(",")[1] || "");
+    reader.onerror = () => reject(new Error("The processed image could not be read."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function currentManagementSession() {
+  if (!managementAuthClient) throw new Error("Management authentication is unavailable.");
+  const {data:{session}, error} = await managementAuthClient.auth.getSession();
+  if (error || !session?.user?.id || !session.access_token) throw new Error("Your Management session has expired. Sign in again.");
+  return session;
+}
+
+async function uploadProductImageOriginal(session) {
+  const file = productImageEditorState.file;
+  const fileMeta = productImageEditorState.fileMeta;
+  if (!file || !fileMeta) return "";
+  const stagedPath = `${session.user.id}/${crypto.randomUUID()}.${fileMeta.extension}`;
+  const {error} = await managementAuthClient.storage.from(PRODUCT_IMAGE_ORIGINALS_BUCKET).upload(stagedPath, file, {
+    cacheControl:"3600",
+    contentType:fileMeta.mime,
+    upsert:false
+  });
+  if (error) throw new Error("The source image could not be uploaded. Verify Management access and try again.");
+  return stagedPath;
+}
+
+async function productImageApi(session, body) {
+  const response = await fetch("/api/product-images", {
+    method:"POST",
+    headers:{
+      "Accept":"application/json",
+      "Authorization":`Bearer ${session.access_token}`,
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify(body)
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload.success) throw new Error(payload.message || "The product image could not be saved.");
+  return payload;
+}
+
+async function discardStagedProductImage(session, stagedPath) {
+  if (!stagedPath) return;
+  try {
+    await productImageApi(session, {action:"discard",stagedPath});
+  } catch {}
+}
+
+async function finalizeProductImage(productId, session, derivative, stagedPath = "") {
+  const payload = await productImageApi(session, {
+    action:"finalize",
+    productId,
+    stagedPath:stagedPath || undefined,
+    derivativeBase64:await blobToBase64(derivative),
+    crop:normalizedCrop(productImageEditorState)
+  });
+  return payload.image;
+}
+
+function setProductFormBusy(busy, message = "") {
+  const form = $("#productForm");
+  if (!form) return;
+  productImageSaveInProgress = busy;
+  form.querySelectorAll("button, input, select, textarea").forEach(control => { control.disabled = busy; });
+  $(".product-image-fieldset")?.classList.toggle("busy", busy);
+  if (message) setProductImageStatus(message);
+}
+
+function bindProductImageEditor() {
+  const fileInput = $("#productImageFile");
+  const frame = $("#productCropFrame");
+  if (!fileInput || !frame) return;
+  fileInput.onchange = () => {
+    const file = fileInput.files?.[0];
+    if (file) selectProductImageFile(file);
+  };
+  $("#productImageReplace").onclick = () => { fileInput.value = ""; fileInput.click(); };
+  $("#productImageReset").onclick = resetProductImageCrop;
+  $("#productImageZoomIn").onclick = () => updateProductImageCrop({zoom:Math.min(4, productImageEditorState.zoom + 0.15)});
+  $("#productImageZoomOut").onclick = () => updateProductImageCrop({zoom:Math.max(1, productImageEditorState.zoom - 0.15)});
+  $("#productImageZoom").oninput = event => updateProductImageCrop({zoom:Number(event.target.value)});
+  frame.onpointerdown = event => {
+    if (!productImageEditorState.source) return;
+    frame.setPointerCapture(event.pointerId);
+    frame.classList.add("dragging");
+    productImageEditorState.pointer = {id:event.pointerId,startClientX:event.clientX,startClientY:event.clientY,startX:productImageEditorState.x,startY:productImageEditorState.y};
+  };
+  frame.onpointermove = event => {
+    const pointer = productImageEditorState.pointer;
+    if (!pointer || pointer.id !== event.pointerId) return;
+    const rect = frame.getBoundingClientRect();
+    const geometry = productImageGeometry($("#productCropCanvas").width);
+    if (!rect.width || !rect.height || !geometry) return;
+    const dx = (event.clientX - pointer.startClientX) * $("#productCropCanvas").width / rect.width;
+    const dy = (event.clientY - pointer.startClientY) * $("#productCropCanvas").height / rect.height;
+    const x = geometry.maxX ? Math.max(-1, Math.min(1, pointer.startX + dx / geometry.maxX)) : 0;
+    const y = geometry.maxY ? Math.max(-1, Math.min(1, pointer.startY + dy / geometry.maxY)) : 0;
+    updateProductImageCrop({x,y});
+  };
+  const release = event => {
+    if (productImageEditorState.pointer?.id !== event.pointerId) return;
+    productImageEditorState.pointer = null;
+    frame.classList.remove("dragging");
+  };
+  frame.onpointerup = release;
+  frame.onpointercancel = release;
+}
+
 function productRowMarkup(product, index = 0) {
   const name = displayText(product.name, "Unnamed product");
   const description = displayText(product.description, "No description available.");
@@ -183,7 +539,10 @@ function migrateOrderNumber(order) {
 orders.forEach(migrateOrderNumber);
 
 function persist() {
-  localStorage.setItem("bh_products", JSON.stringify(products));
+  localStorage.setItem("bh_products", JSON.stringify(products.map(product => {
+    const {imageStoragePath,imageOriginalPath,imageCrop,...residentCacheProduct} = product;
+    return residentCacheProduct;
+  })));
   localStorage.removeItem("bh_orders");
   localStorage.setItem("bh_cart", JSON.stringify(cart));
   localStorage.setItem("bh_fee_settings", JSON.stringify(feeSettings));
@@ -526,8 +885,14 @@ function openModal(selector) {
 function closeModal(selector) {
   const modal = $(selector);
   if (!modal) return;
+  if (selector === "#productModal" && productImageSaveInProgress) return;
   modal.classList.remove("open");
   modal.setAttribute("aria-hidden", "true");
+  if (selector === "#productModal") {
+    productImageEditorState.generation += 1;
+    closeProductImageSource();
+    productImageEditorState.pointer = null;
+  }
   syncManagementScrollLock();
   if (lastManagementFocus?.isConnected) lastManagementFocus.focus();
   lastManagementFocus = null;
@@ -1513,6 +1878,9 @@ function mapSupabaseProductRows(rows) {
     price:centsToDollars(product.price_cents),
     inventory:product.inventory,
     image:product.image_url || "",
+    imageStoragePath:product.image_storage_path || "",
+    imageOriginalPath:product.image_original_path || "",
+    imageCrop:product.image_crop || null,
     active:product.active
   }));
 }
@@ -1888,13 +2256,14 @@ window.addEventListener("pagehide", () => document.body.classList.remove("manage
 
 const categorySelect = $('#productForm select[name="category"]');
 if (categorySelect) categorySelect.innerHTML = CATEGORIES.map(category => `<option>${category}</option>`).join("");
+bindProductImageEditor();
 
 if ($("#addProduct")) $("#addProduct").onclick = () => {
   $("#productForm").reset();
   $("#productForm [name=id]").value = "";
   $("#productForm [name=active]").checked = true;
   $("#productFormTitle").textContent = "Add product";
-  if ($("#productEditorImage")) $("#productEditorImage").innerHTML = `<div class="admin-product-thumb placeholder">BH</div><div><strong>No image selected</strong><p>The existing product image is preserved by this editor.</p></div>`;
+  resetProductImageEditor();
   openModal("#productModal");
 };
 
@@ -1908,7 +2277,7 @@ function editProduct(id) {
     }
   });
   $("#productFormTitle").textContent = "Edit product";
-  if ($("#productEditorImage")) $("#productEditorImage").innerHTML = `${productThumbnail(product)}<div><strong>${escapeAdminHtml(product.name)}</strong><p>${product.image ? "Current Resident Store image. This editor preserves the stored image URL." : "No stored image. The safe catalog fallback remains active."}</p></div>`;
+  resetProductImageEditor(product);
   openModal("#productModal");
 }
 
@@ -1923,14 +2292,47 @@ if ($("#productForm")) $("#productForm").onsubmit = async event => {
     internalName:data.internalName,price:+data.price,inventory:+data.inventory,glCode:data.glCode,
     image:before?.image || "",active:form.elements.active.checked
   }, before);
+  const imageWillChange = Boolean(productImageEditorState.source && productImageEditorState.dirty);
+  let session = null;
+  let stagedPath = "";
+  let baseProductSaved = false;
+  let imageFinalized = false;
+  setProductFormBusy(true, imageWillChange ? "Preparing the high-resolution Store image..." : "Saving product...");
   try {
+    let derivative = null;
+    if (imageWillChange) {
+      derivative = await createProductImageDerivative();
+      session = await currentManagementSession();
+      if (productImageEditorState.file) {
+        setProductImageStatus("Uploading the validated source image...");
+        stagedPath = await uploadProductImageOriginal(session);
+      }
+    }
     await saveProductToSupabase(product);
-    if (index >= 0) products[index] = product;
-    else products.push(product);
-    persist(); renderProducts(); renderAdmin(); closeModal("#productModal"); toast("Catalog updated");
-    auditManagement(index >= 0 ? "product_update" : "product_create", "product", product.id, before, product);
+    baseProductSaved = true;
+    form.elements.id.value = product.id;
+    if (imageWillChange) {
+      setProductImageStatus("Validating and assigning the Store image...");
+      await finalizeProductImage(product.id, session, derivative, stagedPath);
+      imageFinalized = true;
+    }
+    await reloadManagementProductCatalog(product.id);
+    const confirmedProduct = products.find(candidate => String(candidate.id) === String(product.id)) || product;
+    persist(); renderProducts(); renderAdmin(); setProductFormBusy(false); closeModal("#productModal");
+    toast(imageWillChange ? "Product and image saved" : "Catalog updated");
+    auditManagement(index >= 0 ? "product_update" : "product_create", "product", product.id, before, confirmedProduct);
   } catch (error) {
-    toast(error.message || "Unable to save product");
+    if (stagedPath && session && !imageFinalized) await discardStagedProductImage(session, stagedPath);
+    if (baseProductSaved) {
+      try { await reloadManagementProductCatalog(product.id); persist(); renderProducts(); renderAdmin(); } catch {}
+    }
+    const message = baseProductSaved && imageWillChange
+      ? `Product details were saved, but the existing image was preserved: ${error.message || "the replacement image could not be saved."}`
+      : (error.message || "Unable to save product");
+    setProductImageStatus(message, "error");
+    toast(message);
+  } finally {
+    setProductFormBusy(false);
   }
 };
 

@@ -112,6 +112,20 @@ function productImageSrc(image) {
   return `${source}?v=${PRODUCT_IMAGE_VERSION}`;
 }
 
+function bindProductImageFallbacks(container) {
+  const fallback = productImageSrc("product-documents.webp");
+  container?.querySelectorAll(".product-image img").forEach(image => {
+    image.addEventListener("error", () => {
+      if (image.dataset.fallbackApplied === "true") {
+        image.hidden = true;
+        return;
+      }
+      image.dataset.fallbackApplied = "true";
+      image.src = fallback;
+    });
+  });
+}
+
 function persist() {
   safeLocalStorageSet("bh_products", JSON.stringify(products.map(publicProduct)));
   safeLocalStorageRemove("bh_orders");
@@ -190,6 +204,7 @@ function renderProducts() {
     </article>`
     );
   }).join("");
+  bindProductImageFallbacks(grid);
   $("#emptyState")?.classList.toggle("hidden", filtered.length > 0);
   $$('[data-add]').forEach(button => button.onclick = () => addToCart(button.dataset.add));
 }

@@ -879,6 +879,23 @@ body.management-page::before { display:none; }
 .management-page .product-editor-image { display:grid; grid-template-columns:58px minmax(0,1fr); align-items:center; gap:12px; }
 .management-page .product-editor-image strong { display:block; font-size:10px; font-weight:500; }
 .management-page .product-editor-image p { margin:4px 0 0; color:var(--ops-muted); font-size:8px; line-height:1.5; }
+.management-page .product-image-fieldset { gap:14px; }
+.management-page .product-image-file { margin:0; }
+.management-page .product-image-file input { width:100%; padding:10px; border:1px solid var(--ops-stone); border-radius:4px; background:#fff; font-size:9px; }
+.management-page .product-image-file input::file-selector-button { margin-right:10px; padding:9px 12px; border:1px solid var(--ops-olive-700); border-radius:3px; background:var(--ops-olive-800); color:#fff; font-family:inherit; font-size:8px; font-weight:600; line-height:1; letter-spacing:.08em; text-transform:uppercase; cursor:pointer; }
+.management-page .product-crop-editor { display:grid; gap:12px; }
+.management-page .product-crop-frame { position:relative; width:min(420px,100%); aspect-ratio:1; margin:0 auto; overflow:hidden; border:1px solid var(--ops-stone); border-radius:6px; background:linear-gradient(145deg,#fbfbf8,#edf0e9); box-shadow:inset 0 0 0 1px rgba(32,37,37,.04); cursor:grab; touch-action:none; user-select:none; }
+.management-page .product-crop-frame.dragging { cursor:grabbing; }
+.management-page .product-crop-frame canvas { display:block; width:100%; height:100%; }
+.management-page .product-crop-toolbar { display:flex; flex-wrap:wrap; justify-content:center; gap:7px; }
+.management-page .product-crop-toolbar .secondary-command { min-height:34px; padding:0 11px; }
+.management-page .product-image-zoom { display:grid; grid-template-columns:42px minmax(0,1fr); align-items:center; gap:10px; margin:0; }
+.management-page .product-image-zoom input { width:100%; padding:0; accent-color:var(--ops-olive-800); }
+.management-page .product-image-help { margin:0; color:var(--ops-muted); font-size:8px; line-height:1.55; text-align:center; }
+.management-page .product-image-status { min-height:14px; margin:0; color:var(--ops-muted); font-size:8px; line-height:1.5; }
+.management-page .product-image-status.error { color:#8b3838; }
+.management-page .product-image-status.success { color:#386346; }
+.management-page .product-image-fieldset.busy { opacity:.72; pointer-events:none; }
 .management-page .sheet-actions { position:sticky; bottom:0; z-index:3; display:flex; justify-content:flex-end; gap:8px; padding:14px 20px; border-top:1px solid var(--ops-stone); background:rgba(255,254,250,.97); }
 .management-page .luna-sheet-meta { padding:16px 20px 0; }
 .management-page .luna-review-id { margin:0; color:var(--ops-muted); font:8px ui-monospace,SFMono-Regular,Consolas,monospace; overflow-wrap:anywhere; }
