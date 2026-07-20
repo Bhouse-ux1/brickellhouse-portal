@@ -93,8 +93,11 @@ async function createSession(request, response) {
   if (!stripeEnabled()) return send(response, 403, {success:false,message:"Stripe checkout is not enabled"});
   try {
     enforceRateLimit(request, {namespace:"stripe-session", limit:5, windowMs:10 * 60 * 1000});
-    await assertStripeStorageReady();
-    const checkout = await buildTrustedCheckout(await jsonBody(request));
+    const body = await jsonBody(request);
+    const [checkout] = await Promise.all([
+      buildTrustedCheckout(body),
+      assertStripeStorageReady()
+    ]);
     const pendingOrder = await createPendingStripeOrder(checkout);
     const trustedCheckout = {...checkout, orderNumber:pendingOrder.order_number};
     const session = await createCheckoutSession(trustedCheckout, originFromRequest(request));

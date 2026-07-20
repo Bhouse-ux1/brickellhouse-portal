@@ -73,14 +73,16 @@ async function stripeRequest(path, {method = "GET", body} = {}) {
 }
 
 async function assertStripeStorageReady() {
-  await supabaseRequest("orders?select=id,payment_provider,payment_processor_reference,stripe_checkout_session_id,stripe_payment_intent_id,stripe_charge_id&limit=1", {
-    method:"GET",
-    prefer:""
-  });
-  await supabaseRequest("payment_events?select=id,payment_provider,processor_event_id,processor_payment_id,event_type&limit=1", {
-    method:"GET",
-    prefer:""
-  });
+  await Promise.all([
+    supabaseRequest("orders?select=id,payment_provider,payment_processor_reference,stripe_checkout_session_id,stripe_payment_intent_id,stripe_charge_id&limit=1", {
+      method:"GET",
+      prefer:""
+    }),
+    supabaseRequest("payment_events?select=id,payment_provider,processor_event_id,processor_payment_id,event_type&limit=1", {
+      method:"GET",
+      prefer:""
+    })
+  ]);
 }
 
 function parseBody(body) {

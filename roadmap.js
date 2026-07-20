@@ -1,6 +1,9 @@
 let checkoutProvider = "square";
 let stripeConfig = {enabled:false, provider:"square", publishableKey:""};
 let stripeClient = null;
+let stripeScriptPromise = null;
+let paymentProviderPromise = null;
+let paymentProviderState = "idle";
 let stripeEmbeddedCheckout = null;
 let stripeCheckoutScrolledFor = null;
 let paymentInProgress = false;
@@ -176,7 +179,13 @@ function hideApplePay() {
 
 async function loadStripeScript() {
   if (window.Stripe) return;
-  await loadExternalScript("https://js.stripe.com/v3/");
+  if (!stripeScriptPromise) {
+    stripeScriptPromise = loadExternalScript("https://js.stripe.com/v3/").catch(error => {
+      stripeScriptPromise = null;
+      throw error;
+    });
+  }
+  await stripeScriptPromise;
 }
 
 function setCheckoutPaymentFocus(focused) {
@@ -217,7 +226,9 @@ function resetStripeCheckout() {
   stripeCheckoutScrolledFor = null;
   setCheckoutPaymentFocus(false);
   $("#stripeEmbeddedCheckout") && ($("#stripeEmbeddedCheckout").innerHTML = "");
-  $("#stripeCheckoutContainer")?.classList.add("hidden");
+  const container = $("#stripeCheckoutContainer");
+  container?.classList.add("hidden");
+  container?.removeAttribute("aria-busy");
 }
 
 function clearPaymentMessage() {
@@ -303,6 +314,7 @@ function openLegalReview() {
   const container = $("#legalScrollContainer");
   const accept = $("#legalReviewAccept");
   if (!modal || !container || !accept) return;
+  preloadPaymentProvider();
 
   if (acceptedLegalNoticeVersion && acceptedLegalNoticeVersion !== LEGAL_NOTICE_VERSION) resetLegalAcceptance();
   const accepted = legalTermsAccepted();
@@ -403,7 +415,18 @@ function syncStripeCheckoutDisplay() {
     return;
   }
 
-  const shouldShowStripe = paidCheckoutRequired() && checkoutProvider === "stripe" && stripeConfig.enabled;
+  const requiresPayment = paidCheckoutRequired();
+  const providerPending = requiresPayment && ["idle", "loading", "failed"].includes(paymentProviderState);
+  if (providerPending) {
+    container.classList.add("hidden");
+    container.removeAttribute("aria-busy");
+    embedded.innerHTML = "";
+    setCheckoutSubmitLabel(tr("checkout.continueSecure"));
+    syncCheckoutSubmitState();
+    return;
+  }
+
+  const shouldShowStripe = requiresPayment && checkoutProvider === "stripe" && stripeConfig.enabled;
   if (!shouldShowStripe) {
     container.classList.add("hidden");
     embedded.innerHTML = "";
@@ -421,36 +444,74 @@ function syncStripeCheckoutDisplay() {
   syncCheckoutSubmitState();
 }
 
+function showPaymentPreparationState() {
+  const container = $("#stripeCheckoutContainer");
+  const embedded = $("#stripeEmbeddedCheckout");
+  if (!container || !embedded) return;
+  container.classList.remove("hidden");
+  container.setAttribute("aria-busy", "true");
+  embedded.innerHTML = `<div class="stripe-payment-notice" data-stripe-placeholder>${tr("checkout.preparing")}</div>`;
+}
+
 async function initializePaymentProvider() {
+  paymentProviderState = "loading";
   try {
-    const response = await fetch("/api/stripe?action=config");
+    const [response] = await Promise.all([
+      fetch("/api/stripe?action=config"),
+      loadStripeScript()
+    ]);
     const config = response.ok ? await response.json() : {provider:"square", enabled:false};
     checkoutProvider = config.provider === "stripe" ? "stripe" : "square";
     stripeConfig = config;
   } catch {
     checkoutProvider = "square";
     stripeConfig = {enabled:false, provider:"square", publishableKey:""};
+    stripeClient = null;
+    paymentProviderState = "failed";
+    syncStripeCheckoutDisplay();
+    return false;
   }
 
   hideApplePay();
-  resetStripeCheckout();
   if (checkoutProvider !== "stripe") {
+    paymentProviderState = "unavailable";
     syncStripeCheckoutDisplay();
-    return;
+    return false;
   }
 
   if (!stripeConfig.enabled || !stripeConfig.publishableKey) {
+    paymentProviderState = "unavailable";
     syncStripeCheckoutDisplay();
-    return;
+    return false;
   }
   try {
-    await loadStripeScript();
     stripeClient = window.Stripe(stripeConfig.publishableKey);
+    paymentProviderState = "ready";
   } catch {
     stripeClient = null;
     stripeConfig = {...stripeConfig, enabled:false};
+    paymentProviderState = "failed";
   }
   syncStripeCheckoutDisplay();
+  return paymentProviderState === "ready";
+}
+
+function preparePaymentProvider({retry = false} = {}) {
+  if (!isCheckoutPage || !checkoutPageCatalogReady || !paidCheckoutRequired()) return Promise.resolve(false);
+  if (paymentProviderState === "ready" && stripeClient) return Promise.resolve(true);
+  if (paymentProviderState === "unavailable") return Promise.resolve(false);
+  if (paymentProviderState === "failed" && !retry) return Promise.resolve(false);
+  if (paymentProviderState === "failed") paymentProviderState = "idle";
+  if (!paymentProviderPromise) {
+    paymentProviderPromise = initializePaymentProvider().finally(() => {
+      paymentProviderPromise = null;
+    });
+  }
+  return paymentProviderPromise;
+}
+
+function preloadPaymentProvider() {
+  void preparePaymentProvider();
 }
 
 async function createStripeCheckoutSession({resident, acceptedAt, snapshot}) {
@@ -536,9 +597,7 @@ function showResidentOrderConfirmation({name = "", orderNumber = "", note = ""})
 async function mountStripeCheckout(session, records, resident, number) {
   if (!stripeClient) throw new Error("Stripe checkout is not available");
   resetStripeCheckout();
-  $("#stripeCheckoutContainer")?.classList.remove("hidden");
-  $("#paymentMessage").textContent = tr("checkout.stripeReady");
-  $("#paymentMessage").classList.remove("hidden", "error");
+  showPaymentPreparationState();
   stripeEmbeddedCheckout = await stripeClient.initEmbeddedCheckout({
     clientSecret:session.clientSecret,
     onComplete:async () => {
@@ -556,6 +615,9 @@ async function mountStripeCheckout(session, records, resident, number) {
   });
   try {
     stripeEmbeddedCheckout.mount("#stripeEmbeddedCheckout");
+    $("#stripeCheckoutContainer")?.removeAttribute("aria-busy");
+    $("#paymentMessage").textContent = tr("checkout.stripeReady");
+    $("#paymentMessage").classList.remove("hidden", "error");
     focusMountedStripeCheckout();
   } catch (error) {
     resetStripeCheckout();
@@ -649,9 +711,11 @@ function finalizeSuccessfulOrder(records) {
 
 if ($("#checkoutForm")) {
   const syncCheckoutFormState = () => {
+    preloadPaymentProvider();
     syncCheckoutSubmitState();
     syncStripeCheckoutDisplay();
   };
+  $("#checkoutForm").addEventListener("focusin", preloadPaymentProvider, {once:true});
   $("#checkoutForm").addEventListener("input", syncCheckoutFormState);
   $("#checkoutForm").addEventListener("change", syncCheckoutFormState);
   $("#checkoutForm").addEventListener("reset", resetLegalAcceptance);
@@ -673,34 +737,16 @@ if ($("#checkoutForm")) {
   form.elements.phone.value = resident.phone;
   form.elements.unit.value = resident.unit;
 
+  const subtotal = cartSubtotal();
+  const fee = processingFee(subtotal);
+  const requiresPayment = subtotal + fee > 0;
   const submit = $("#checkoutSubmit");
   const message = $("#paymentMessage");
   submit.disabled = true;
   paymentInProgress = true;
-  submit.textContent = checkoutProvider === "stripe" ? tr("checkout.preparing") : tr("checkout.recording");
+  submit.textContent = requiresPayment ? tr("checkout.preparing") : tr("checkout.recording");
   clearPaymentMessage();
 
-  const subtotal = cartSubtotal();
-  const fee = processingFee(subtotal);
-  const requiresPayment = subtotal + fee > 0;
-  if (requiresPayment && checkoutProvider !== "stripe") {
-    message.textContent = tr("checkout.paymentUnavailable");
-    message.classList.remove("hidden");
-    message.classList.add("error");
-    submit.disabled = false;
-    paymentInProgress = false;
-    syncStripeCheckoutDisplay();
-    return;
-  }
-  if (requiresPayment && checkoutProvider === "stripe" && (!stripeConfig.enabled || !stripeClient)) {
-    message.textContent = tr("checkout.secureUnavailable");
-    message.classList.remove("hidden");
-    message.classList.add("error");
-    submit.disabled = false;
-    paymentInProgress = false;
-    syncStripeCheckoutDisplay();
-    return;
-  }
   const acceptedAt = legalAcceptedAt;
   const snapshot = setCheckoutSnapshot(captureCheckoutSnapshot());
   if (!snapshot) {
@@ -712,6 +758,21 @@ if ($("#checkoutForm")) {
     return;
   }
   const records = createOrderRecords();
+
+  if (requiresPayment) {
+    showPaymentPreparationState();
+    const providerReady = await preparePaymentProvider({retry:true});
+    if (!providerReady || checkoutProvider !== "stripe" || !stripeConfig.enabled || !stripeClient) {
+      releaseCheckoutSnapshot();
+      message.textContent = checkoutProvider === "stripe" ? tr("checkout.secureUnavailable") : tr("checkout.paymentUnavailable");
+      message.classList.remove("hidden");
+      message.classList.add("error");
+      submit.disabled = false;
+      paymentInProgress = false;
+      syncStripeCheckoutDisplay();
+      return;
+    }
+  }
 
   try {
     let payment;
@@ -840,8 +901,6 @@ syncCheckoutSubmitState();
 if (isCheckoutPage && window.BH_CATALOG_STATE?.complete) {
   applyCheckoutCatalogState(window.BH_CATALOG_STATE.success);
 }
-if ($("#checkoutForm")) {
-  initializePaymentProvider().finally(handleStripeReturnConfirmation);
-} else if (new URLSearchParams(window.location.search).has("stripe_session_id")) {
+if (new URLSearchParams(window.location.search).has("stripe_session_id")) {
   handleStripeReturnConfirmation();
 }
