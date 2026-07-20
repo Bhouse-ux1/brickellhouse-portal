@@ -153,6 +153,11 @@ if ($("#feedbackForm")) $("#feedbackForm").onsubmit = async event => {
       body:JSON.stringify(data)
     });
     const payload = await response.json();
+    const isFeedbackCooldown = response.status === 429 && /96 hours/i.test(String(payload.message || ""));
+    if (isFeedbackCooldown) {
+      confirmation.innerHTML = `<strong>${tr("feedback.cooldown")}</strong>`;
+      return;
+    }
     if (!response.ok || !payload.success) throw new Error("Unable to save feedback");
     event.target.reset();
     confirmation.classList.add("hidden");
