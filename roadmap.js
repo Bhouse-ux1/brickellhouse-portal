@@ -614,6 +614,7 @@ async function mountStripeCheckout(session, records, resident, number) {
     }
   });
   try {
+    $("#stripeEmbeddedCheckout").innerHTML = "";
     stripeEmbeddedCheckout.mount("#stripeEmbeddedCheckout");
     $("#stripeCheckoutContainer")?.removeAttribute("aria-busy");
     $("#paymentMessage").textContent = tr("checkout.stripeReady");
