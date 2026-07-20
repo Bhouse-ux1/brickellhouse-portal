@@ -136,7 +136,13 @@ let productImageEditorState = {
   pointer:null
 };
 let productImageSaveInProgress = false;
-const money = value => new Intl.NumberFormat("en-US", {style:"currency",currency:"USD"}).format(value);
+let managementCurrencyFormatter = null;
+let managementInsightDateFormatter = null;
+let managementResidentDateTimeFormatter = null;
+const money = value => {
+  managementCurrencyFormatter ||= new Intl.NumberFormat("en-US", {style:"currency",currency:"USD"});
+  return managementCurrencyFormatter.format(value);
+};
 function escapeAdminHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, character => ({
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
@@ -728,17 +734,6 @@ function centsToDollars(value) {
   return +(Number(value || 0) / 100).toFixed(2);
 }
 
-function iconFor(category) {
-  const paths = {
-    "Access Devices":'<rect x="21" y="18" width="48" height="74" rx="9"/><circle cx="45" cy="39" r="9"/><path d="M45 48v25M35 66h20"/>',
-    "Keys":'<circle cx="32" cy="39" r="17"/><path d="M44 51l30 30M61 68l9-9M69 76l9-9"/>',
-    "Parking Services":'<rect x="18" y="17" width="64" height="76" rx="5"/><path d="M35 74V35h15c20 0 20 27 0 27H35"/>',
-    "Building Services":'<path d="M20 88h60M27 88V37l23-19 23 19v51M39 88V60h22v28M38 43h6M56 43h6"/>',
-    "Maintenance Items":'<path d="M58 20a21 21 0 0 0-19 30L19 70l12 12 20-20a21 21 0 0 0 29-25L65 52 49 36 64 21z"/>'
-  };
-  return `<div class="product-icon"><svg viewBox="0 0 100 110">${paths[category]}</svg></div>`;
-}
-
 function renderTabs() {
   if (!$("#categoryTabs")) return;
   $("#categoryTabs").innerHTML = ["All", ...CATEGORIES].map(category =>
@@ -1108,29 +1103,17 @@ function renderAdmin() {
   renderManagementWorkspace(currentAdminView);
 }
 
-function insightDate(row) {
-  const date = new Date(row.created_at);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function insightPeriodStart(period) {
-  const now = new Date();
-  if (period === "week") return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  if (period === "month") return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  if (period === "year") return new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-  return null;
-}
-
 function formatInsightDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Unknown";
-  return new Intl.DateTimeFormat("en-US", {
+  managementInsightDateFormatter ||= new Intl.DateTimeFormat("en-US", {
     month:"short",
     day:"numeric",
     year:"numeric",
     hour:"numeric",
     minute:"2-digit"
-  }).format(date);
+  });
+  return managementInsightDateFormatter.format(date);
 }
 
 function countBy(rows, key) {
@@ -1143,70 +1126,6 @@ function countBy(rows, key) {
 
 function insightMetric(label, value, helper = "") {
   return `<div class="metric luna-insight-metric"><span>${label}</span><strong>${value}</strong>${helper ? `<small>${helper}</small>` : ""}</div>`;
-}
-
-function legacyLunaInsightsRendererUnused() {
-  const container = $("#lunaInsightsContent");
-  if (!container) return;
-  if (lunaInsightsError) {
-    container.innerHTML = `<div class="inventory-ok">${escapeAdminHtml(lunaInsightsError)}</div>`;
-    return;
-  }
-  const rows = filteredLunaInsights();
-  const now = Date.now();
-  const todayRows = lunaInsights.filter(row => {
-    const date = insightDate(row);
-    return date && new Date(date).toDateString() === new Date().toDateString();
-  });
-  const weekRows = lunaInsights.filter(row => {
-    const date = insightDate(row);
-    return date && now - date.getTime() <= 7 * 24 * 60 * 60 * 1000;
-  });
-  const monthRows = lunaInsights.filter(row => {
-    const date = insightDate(row);
-    return date && now - date.getTime() <= 30 * 24 * 60 * 60 * 1000;
-  });
-  const avgHistory = rows.length
-    ? (rows.reduce((total, row) => total + Number(row.history_message_count || 0) + 1, 0) / rows.length).toFixed(1)
-    : "0";
-  const unknownCount = rows.filter(row => row.outcome === "unknown").length;
-  const clarificationCount = rows.filter(row => row.clarification_requested).length;
-  const categoryCounts = Object.entries(countBy(weekRows, "category"))
-    .sort((a,b) => b[1] - a[1])
-    .slice(0, 6);
-  const unknownRows = rows
-    .filter(row => row.redacted_question_snippet)
-    .slice(0, 12);
-
-  container.innerHTML = `
-    <div class="metric-grid luna-insight-grid">
-      ${insightMetric("Today", todayRows.length, "anonymous events")}
-      ${insightMetric("Last 7 days", weekRows.length, "anonymous events")}
-      ${insightMetric("Last 30 days", monthRows.length, "anonymous events")}
-      ${insightMetric("Avg. context", avgHistory, "messages")}
-    </div>
-    <div class="luna-insight-panels">
-      <div class="admin-panel luna-insight-panel">
-        <div class="luna-insight-panel-head"><div><p class="eyebrow">Knowledge gaps</p><h3>Unknown and low-confidence questions</h3></div><span>${unknownCount} unknown · ${clarificationCount} clarifications</span></div>
-        ${unknownRows.length ? `<div class="luna-insight-list">${unknownRows.map(row => `
-          <article class="luna-insight-row">
-            <div><strong>${escapeAdminHtml(row.redacted_question_snippet || "Redacted snippet unavailable")}</strong><small>${escapeAdminHtml(row.category)} · ${escapeAdminHtml(row.detected_language || "unknown")} · ${formatInsightDate(row.created_at)}</small></div>
-            <span class="status-pill ${row.outcome === "unknown" || Number(row.confidence || 0) < 60 ? "new" : ""}">${escapeAdminHtml(row.outcome)}</span>
-          </article>`).join("")}</div>` : `<div class="inventory-ok">No redacted unknown or low-confidence snippets match this filter.</div>`}
-      </div>
-      <div class="admin-panel luna-insight-panel">
-        <div class="luna-insight-panel-head"><div><p class="eyebrow">Aggregate only</p><h3>Top categories this week</h3></div></div>
-        ${categoryCounts.length ? `<div class="luna-category-list">${categoryCounts.map(([category,count]) => `
-          <div><span>${escapeAdminHtml(category)}</span><strong>${count}</strong></div>`).join("")}</div>` : `<div class="inventory-ok">No Luna usage has been recorded this week.</div>`}
-      </div>
-    </div>
-    <div class="admin-panel luna-insight-table-panel">
-      <h3>Review log</h3>
-      <p>Rows show privacy-safe analytics only. Normal answered questions are aggregate-only and do not include snippets.</p>
-      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Category</th><th>Language</th><th>Outcome</th><th>Confidence</th><th>Snippet</th></tr></thead><tbody>
-        ${rows.length ? rows.slice(0, 80).map(row => `<tr><td>${formatInsightDate(row.created_at)}</td><td>${escapeAdminHtml(row.category)}</td><td>${escapeAdminHtml(row.detected_language || "unknown")}</td><td>${escapeAdminHtml(row.outcome)}</td><td>${Number(row.confidence || 0)}%</td><td>${row.redacted_question_snippet ? escapeAdminHtml(row.redacted_question_snippet) : "<em>Aggregate only</em>"}</td></tr>`).join("") : `<tr><td colspan="6">No insights match this filter.</td></tr>`}
-      </tbody></table></div>
-    </div>`;
 }
 
 function bindLunaInsightControls() {
@@ -1254,22 +1173,6 @@ function bindManagementPagination(kind, onPage) {
   $$(`[data-management-page="${kind}"]`).forEach(button => button.onclick = () => onPage(Number(button.dataset.page || 1)));
 }
 
-function legacyLunaInsightsCsvUnused() {
-  const rows = filteredLunaInsights();
-  const headers = ["created_at","category","detected_language","detected_topic","outcome","confidence","source","redacted_question_snippet","history_message_count"];
-  const csv = [
-    headers.join(","),
-    ...rows.map(row => headers.map(header => csvEscape(row[header] || "")).join(","))
-  ].join("\n");
-  const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = `luna-insights-${new Date().toISOString().slice(0,10)}.csv`;
-  link.click();
-  URL.revokeObjectURL(link.href);
-  auditManagement("export", "luna_insights", "redacted_csv");
-}
-
 function filteredLunaInsights() {
   const start = insightPeriodStart(lunaInsightFilters.period === "quarter" ? "quarter" : lunaInsightFilters.period);
   const search = lunaInsightFilters.search.trim().toLowerCase();
@@ -1315,65 +1218,6 @@ function statusClass(status) {
 
 function conversationById(id) {
   return lunaInsights.find(row => row.conversation_id === id);
-}
-
-function renderLunaInsightsPrevious() {
-  const container = $("#lunaInsightsContent");
-  if (!container) return;
-  if (lunaInsightsError) {
-    container.innerHTML = `<div class="workspace-empty"><strong>${escapeAdminHtml(lunaInsightsError)}</strong><button class="secondary-command" id="retryLunaInsights" type="button">Retry</button></div>`;
-    $("#retryLunaInsights").onclick = async () => {
-      showManagementWorkspaceLoading("insights");
-      await loadLunaInsights({force:true});
-      renderLunaInsights();
-    };
-    return;
-  }
-  const rows = filteredLunaInsights();
-  const pageData = managementPageSlice(rows, lunaListPage);
-  lunaListPage = pageData.page;
-  const now = Date.now();
-  const activeRows = lunaInsights.filter(row => {
-    const date = insightDate(row);
-    return date && now - date.getTime() <= 90 * 24 * 60 * 60 * 1000;
-  });
-  const newCount = activeRows.filter(row => row.status === "New").length;
-  const reviewedCount = activeRows.filter(row => row.status === "Reviewed").length;
-  const resolvedCount = activeRows.filter(row => row.status === "Resolved").length;
-  const spanishCount = activeRows.filter(row => row.detected_language === "es").length;
-  const unknownCount = activeRows.filter(row => (row.detected_topic || "unknown") === "unknown" || row.category === "Unknown").length;
-  const lowConfidenceCount = activeRows.filter(row => Number(row.confidence || 0) < 60).length;
-  const categoryCounts = Object.entries(countBy(activeRows, "category"))
-    .sort((a,b) => b[1] - a[1])
-    .slice(0, 6);
-
-  container.innerHTML = `
-    <div class="metric-grid luna-insight-grid">
-      ${insightMetric("Conversations", activeRows.length, "last 90 days")}
-      ${insightMetric("New", newCount, "awaiting review")}
-      ${insightMetric("Reviewed", reviewedCount, "management touched")}
-      ${insightMetric("Resolved", resolvedCount, "closed items")}
-    </div>
-    <div class="luna-insight-panels">
-      <div class="admin-panel luna-insight-panel">
-        <div class="luna-insight-panel-head"><div><p class="eyebrow">Conversation review</p><h3>Luna conversations</h3></div><span>${spanishCount} Spanish · ${unknownCount} unknown · ${lowConfidenceCount} low confidence</span></div>
-        ${rows.length ? `<div class="luna-review-list">${rows.map(row => `
-          <button class="luna-review-card" type="button" data-luna-review="${escapeAdminHtml(row.conversation_id)}">
-            <div>
-              <strong>${escapeAdminHtml(conversationPreview(row))}</strong>
-              <small>${escapeAdminHtml(row.category || "Unknown")} · ${escapeAdminHtml(row.detected_language || "unknown")} · ${formatInsightDate(row.last_message_at || row.created_at)}</small>
-            </div>
-            <span class="status-pill ${statusClass(row.status)}">${escapeAdminHtml(row.status || "New")}</span>
-          </button>`).join("")}</div>` : `<div class="inventory-ok">No conversations match this filter.</div>`}
-      </div>
-      <div class="admin-panel luna-insight-panel">
-        <div class="luna-insight-panel-head"><div><p class="eyebrow">90-day summary</p><h3>Top categories</h3></div></div>
-        ${categoryCounts.length ? `<div class="luna-category-list">${categoryCounts.map(([category,count]) => `
-          <div><span>${escapeAdminHtml(category)}</span><strong>${count}</strong></div>`).join("")}</div>` : `<div class="inventory-ok">No Luna conversations have been recorded in the review window.</div>`}
-      </div>
-    </div>
-    <div class="inventory-ok luna-review-guardrail">Management review only. These records are temporary and cannot update Luna knowledge, prompts, model, or behavior.</div>`;
-  bindLunaReviewCards();
 }
 
 function renderLunaInsights() {
@@ -1995,10 +1839,6 @@ function loadScriptOnce(src) {
     script.onerror = () => reject(new Error("Supabase login library could not load."));
     document.head.appendChild(script);
   });
-}
-
-function isLocalPrototypeHost() {
-  return false;
 }
 
 async function loadManagementAuthClient() {
@@ -2700,62 +2540,6 @@ function orderPaymentClass(status) {
   return "";
 }
 
-function renderManagementOrderTablePrevious() {
-  if (!$("#orderTable")) return;
-  const matches = matchingOrders();
-  $("#orderTable").innerHTML = matches.slice().reverse().map(order => {
-    const subtotal = order.price * order.quantity;
-    const fee = +order.processingFee || 0;
-    const acceptance = order.legalAccepted
-      ? `<strong>Yes</strong>${escapeHtml(order.legalAcceptedAt)}<br><small>Version ${escapeHtml(order.legalNoticeVersion || "Not recorded")}</small>`
-      : `<span class="acceptance-missing">Not recorded</span>`;
-    const payment = `<span class="payment-pill ${orderPaymentClass(order.paymentStatus)}">${escapeHtml(order.paymentStatus || "Not recorded")}</span>${order.squareTransactionId ? `<br><small>${escapeHtml(order.squareTransactionId)}</small>` : ""}`;
-    return `<tr class="admin-order-row">
-      <td data-label="Order"><span class="admin-order-number">${escapeHtml(order.number)}</span></td>
-      <td data-label="Resident / Unit"><strong>${escapeHtml(order.name)}</strong>Unit ${escapeHtml(order.unit)}</td>
-      <td data-label="Product">${escapeHtml(order.product)}<br><small>${escapeHtml(order.internalName || `${order.product} GL-${order.glCode}`)}</small></td>
-      <td data-label="Quantity">${order.quantity}</td>
-      <td data-label="Total">${money(subtotal + fee)}</td>
-      <td data-label="Payment">${payment}</td>
-      <td data-label="GL code">${escapeHtml(order.glCode)}</td>
-      <td data-label="Date">${formatDate(order.date)}</td>
-      <td data-label="Status"><select class="order-status-select" data-order-status="${escapeHtml(order.number)}">${ORDER_STATUSES.map(status => `<option ${status === order.status ? "selected" : ""}>${status}</option>`).join("")}</select></td>
-      <td data-label="Legal acceptance">${acceptance}</td>
-      <td class="order-notes" data-label="Notes">
-        <textarea data-public-note="${escapeHtml(order.number)}" placeholder="Public pickup note">${escapeHtml(order.publicNote)}</textarea>
-        <textarea data-internal-note="${escapeHtml(order.number)}" placeholder="Internal management note">${escapeHtml(order.internalNote)}</textarea>
-        <button class="table-action" data-save-order="${escapeHtml(order.number)}">Save notes</button>
-      </td>
-    </tr>`;
-  }).join("") || `<tr><td colspan="11">No orders match this search.</td></tr>`;
-  if ($("#orderSearchCount")) $("#orderSearchCount").textContent = `${matches.length} line item${matches.length === 1 ? "" : "s"} found`;
-
-  $$('[data-order-status]').forEach(select => {
-    select.onchange = async () => {
-      try {
-        await updateOrder(select.dataset.orderStatus, {status:select.value});
-        toast(`Order status updated to ${select.value}`);
-      } catch (error) {
-        toast(error.message || "Unable to update order status");
-      }
-      renderManagementOrderTable();
-    };
-  });
-  $$('[data-save-order]').forEach(button => {
-    button.onclick = async () => {
-      const number = button.dataset.saveOrder;
-      const publicNote = $(`[data-public-note="${CSS.escape(number)}"]`).value.trim();
-      const internalNote = $(`[data-internal-note="${CSS.escape(number)}"]`).value.trim();
-      try {
-        await updateOrder(number, {publicNote, internalNote});
-        toast("Order notes saved");
-      } catch (error) {
-        toast(error.message || "Unable to save order notes");
-      }
-    };
-  });
-}
-
 function matchingOrderGroups() {
   const matchingLines = matchingOrders();
   const allowedNumbers = new Set(matchingLines.map(order => order.number));
@@ -2888,89 +2672,10 @@ function matchingFeedback() {
 
 function formatResidentDateTime(value) {
   if (!value) return "";
-  return new Intl.DateTimeFormat("en-US", {
+  managementResidentDateTimeFormatter ||= new Intl.DateTimeFormat("en-US", {
     month:"2-digit",day:"2-digit",year:"numeric",hour:"numeric",minute:"2-digit"
-  }).format(new Date(value));
-}
-
-function renderManagementFeedbackPrevious() {
-  const container = $("#feedbackAdminList");
-  if (!container) return;
-  const matches = matchingFeedback().sort((a, b) => b.dateSubmitted.localeCompare(a.dateSubmitted));
-  container.innerHTML = matches.map(record => {
-    const status = normalizeFeedbackStatus(record.status);
-    return `<article class="feedback-record" data-feedback-record="${record.id}">
-      <button class="feedback-record-toggle" type="button" data-feedback-toggle="${record.id}" aria-expanded="false">
-        <span><small>Unit</small><strong>${escapeHtml(record.unit)}</strong></span>
-        <span><small>Resident</small><strong>${escapeHtml(record.name)}</strong></span>
-        <span><small>Type</small><strong>${escapeHtml(record.category)}</strong></span>
-        <span><small>Status</small><b class="status-pill feedback-status ${feedbackStatusClass(status)}">${escapeHtml(status)}</b></span>
-        <span><small>Submitted</small><strong>${formatResidentDateTime(record.dateSubmitted)}</strong></span>
-      </button>
-      <div class="feedback-record-body">
-        <div class="feedback-record-detail">
-          <p><strong>Message</strong>${escapeHtml(record.message)}</p>
-          <p><strong>Email</strong>${record.email ? escapeHtml(record.email) : "Not provided"}</p>
-          <p><strong>Phone</strong>${record.phone ? escapeHtml(record.phone) : "Not provided"}</p>
-        </div>
-        <div class="feedback-record-grid">
-          <label><span>Status</span><select data-feedback-status="${record.id}">${FEEDBACK_STATUSES.map(option => `<option ${option === status ? "selected" : ""}>${option}</option>`).join("")}</select></label>
-          <label><span>Management response</span><textarea data-feedback-response="${record.id}">${escapeHtml(record.managementResponse)}</textarea></label>
-          <label><span>Internal notes</span><textarea data-feedback-notes="${record.id}">${escapeHtml(record.internalNotes)}</textarea></label>
-        </div>
-        <div class="feedback-record-actions"><button class="table-action" data-delete-feedback="${record.id}">Delete</button><button class="primary-button" data-save-feedback="${record.id}">Save feedback record</button></div>
-      </div>
-    </article>`;
-  }).join("") || `<div class="admin-panel">No feedback matches the current filters.</div>`;
-
-  $$('[data-feedback-toggle]').forEach(button => {
-    button.onclick = () => {
-      const record = button.closest(".feedback-record");
-      const expanded = record.classList.toggle("expanded");
-      button.setAttribute("aria-expanded", String(expanded));
-    };
   });
-  $$('[data-save-feedback]').forEach(button => {
-    button.onclick = async () => {
-      const record = feedbackRecords.find(item => item.id === button.dataset.saveFeedback);
-      const before = {...record};
-      const status = $(`[data-feedback-status="${record.id}"]`).value;
-      const changes = {
-        status,
-        managementResponse:$(`[data-feedback-response="${record.id}"]`).value.trim(),
-        internalNotes:$(`[data-feedback-notes="${record.id}"]`).value.trim(),
-        dateResponded:status === "Completed" && $(`[data-feedback-response="${record.id}"]`).value.trim()
-          ? new Date().toISOString()
-          : record.dateResponded
-      };
-      try {
-        await saveFeedbackToSupabase(record.id, changes);
-        Object.assign(record, changes);
-        renderManagementFeedback();
-        renderFeedbackMetric();
-        toast("Feedback record saved");
-        auditManagement("feedback_response_update", "feedback", record.id, before, record);
-      } catch (error) {
-        toast(error.message || "Unable to save feedback record");
-      }
-    };
-  });
-  $$('[data-delete-feedback]').forEach(button => {
-    button.onclick = async () => {
-      if (!confirm("Delete this feedback record?")) return;
-      const deleted = feedbackRecords.find(record => record.id === button.dataset.deleteFeedback);
-      try {
-        await deleteFeedbackFromSupabase(button.dataset.deleteFeedback);
-        feedbackRecords = feedbackRecords.filter(record => record.id !== button.dataset.deleteFeedback);
-        renderManagementFeedback();
-        renderFeedbackMetric();
-        toast("Feedback record deleted");
-        auditManagement("feedback_delete", "feedback", button.dataset.deleteFeedback, deleted, null);
-      } catch (error) {
-        toast(error.message || "Unable to delete feedback record");
-      }
-    };
-  });
+  return managementResidentDateTimeFormatter.format(new Date(value));
 }
 
 function renderFeedbackDetail(record) {
