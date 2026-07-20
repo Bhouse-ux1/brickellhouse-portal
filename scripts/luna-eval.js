@@ -156,6 +156,27 @@ function memoryChecks() {
   );
   const tokenErrorPass = errorIdentity.conversationToken === "replacement-token"
     && storage.getItem(session.LUNA_CONVERSATION_TOKEN_STORAGE_KEY) === "replacement-token";
+  const unchangedIdentityValues = new Map([
+    [session.LUNA_CONVERSATION_STORAGE_KEY, "55555555-5555-4555-8555-555555555555"],
+    [session.LUNA_CONVERSATION_TOKEN_STORAGE_KEY, "unchanged-token"]
+  ]);
+  let unchangedIdentityWrites = 0;
+  const unchangedIdentityStorage = {
+    getItem:key => unchangedIdentityValues.get(key) || null,
+    setItem:(key, value) => {
+      unchangedIdentityWrites++;
+      unchangedIdentityValues.set(key, String(value));
+    },
+    removeItem:key => {
+      unchangedIdentityWrites++;
+      unchangedIdentityValues.delete(key);
+    }
+  };
+  session.applyLunaConversationIdentity(
+    {conversationId:"55555555-5555-4555-8555-555555555555",conversationToken:"unchanged-token",conversationExpiresAt:now + 60_000},
+    {conversationId:"55555555-5555-4555-8555-555555555555",conversationToken:"unchanged-token",expiresAt:now},
+    unchangedIdentityStorage
+  );
   return [
     {name:"sessionStorage restoration",pass:restorePass},
     {name:"20-message cap",pass:capPass},
@@ -172,7 +193,8 @@ function memoryChecks() {
     {name:"clear removes prior conversation UUID",pass:cleanAfterClearPass},
     {name:"clear removes prior conversation token",pass:cleanAfterClearPass},
     {name:"error response preserves conversation UUID",pass:uuidErrorPass},
-    {name:"reset response stores replacement signed token",pass:tokenErrorPass}
+    {name:"reset response stores replacement signed token",pass:tokenErrorPass},
+    {name:"unchanged Luna identity avoids redundant storage writes",pass:unchangedIdentityWrites === 0}
   ];
 }
 
@@ -218,8 +240,14 @@ function architectureChecks() {
     {name:"unrelated Store keyword skips catalog",pass:!luna.shouldLoadPublicCatalog("How much does a car battery cost?", [], unrelatedBatteryRetrieval)},
     {name:"valid product price loads Store catalog",pass:luna.shouldLoadPublicCatalog("How much is a mailbox key?", [], mailboxRetrieval)},
     {name:"catalog failure wording is temporary",pass:/unable to verify the current Resident Store catalog/i.test(catalogFailure) && !/not currently listed/i.test(catalogFailure)},
-    {name:"Luna stylesheet cache version current",pass:index.includes("styles.css?v=20260713-resident-i18n1")},
-    {name:"Luna script cache version current",pass:index.includes("chat.js?v=20260713-resident-i18n1")},
+    {name:"Luna stylesheet cache version current",pass:index.includes("styles.css?v=20260717-product-image-fill1")},
+    {name:"Luna script cache version current",pass:index.includes("chat.js?v=20260720-luna-performance1")},
+    {name:"Luna transcript hydration is deferred",pass:browserSource.includes("requestIdleCallback")},
+    {name:"restored Luna transcript renders in one DOM batch",pass:browserSource.includes("createDocumentFragment")},
+    {name:"Luna identity initialization shares one in-flight promise",pass:browserSource.includes("identityInitialization?.generation === generation")},
+    {name:"Luna fallback identity is reused for the page session",pass:browserSource.includes("payload.contextAvailable === false")},
+    {name:"Luna Review append and purge execute independently in parallel",pass:/await Promise\.all\(\[[\s\S]*append_luna_conversation_review[\s\S]*purge_old_luna_conversation_reviews[\s\S]*\]\)/.test(source)},
+    {name:"Luna Review reuses generation retrieval metadata",pass:source.includes("generated.source, generated.retrieval")},
     {name:"resident-safe catalog context",pass:!/(gl_code|internal_name|privateAccounting|inventory)/i.test(serializedKnowledge)},
     {name:"Luna Review not read as memory",pass:!/(luna_conversation_reviews\?select|from\(["']luna_conversation_reviews["']\))/i.test(source)}
   ];

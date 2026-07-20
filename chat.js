@@ -104,18 +104,25 @@ function applyLunaConversationId(payload, currentId, storage) {
 
 function applyLunaConversationIdentity(payload, currentIdentity, storage) {
   const current = currentIdentity || {};
+  const currentConversationId = String(current.conversationId || "");
+  const currentConversationToken = String(current.conversationToken || "");
   const conversationId = typeof payload?.conversationId === "string" && payload.conversationId.trim()
     ? payload.conversationId.trim()
-    : String(current.conversationId || "");
+    : currentConversationId;
   const conversationToken = typeof payload?.conversationToken === "string"
     ? payload.conversationToken.trim()
-    : String(current.conversationToken || "");
+    : currentConversationToken;
   const expiresAt = Number.isFinite(Number(payload?.conversationExpiresAt))
     ? Number(payload.conversationExpiresAt)
     : Number(current.expiresAt) || 0;
-  if (conversationId) safeStorageSet(storage, LUNA_CONVERSATION_STORAGE_KEY, conversationId);
-  if (conversationToken) safeStorageSet(storage, LUNA_CONVERSATION_TOKEN_STORAGE_KEY, conversationToken);
-  else safeStorageRemove(storage, LUNA_CONVERSATION_TOKEN_STORAGE_KEY);
+  if (conversationId && conversationId !== currentConversationId) {
+    safeStorageSet(storage, LUNA_CONVERSATION_STORAGE_KEY, conversationId);
+  }
+  if (conversationToken && conversationToken !== currentConversationToken) {
+    safeStorageSet(storage, LUNA_CONVERSATION_TOKEN_STORAGE_KEY, conversationToken);
+  } else if (!conversationToken && currentConversationToken) {
+    safeStorageRemove(storage, LUNA_CONVERSATION_TOKEN_STORAGE_KEY);
+  }
   return {conversationId,conversationToken,expiresAt};
 }
 
@@ -151,7 +158,6 @@ function createAnonymousConversationId(cryptoSource = globalThis.crypto) {
 function initResidentChat() {
   const chatWidget = document.querySelector("#residentChat");
   if (!chatWidget || chatWidget.dataset.chatReady === "true") return;
-  chatWidget.dataset.chatReady = "true";
 
   const launcher = chatWidget.querySelector("#chatLauncher");
   const panel = chatWidget.querySelector("#chatPanel");
@@ -167,17 +173,22 @@ function initResidentChat() {
   const promptDelay = 4200;
   const promptVisibleDuration = 7600;
   const storage = getLunaSessionStorage();
-  const restoredSession = readLunaSession(storage);
-  const conversation = [...restoredSession.messages];
-  let conversationId = restoredSession.conversationId;
-  let conversationToken = restoredSession.conversationToken;
-  let conversationExpiresAt = restoredSession.expiresAt;
+  const conversation = [];
+  let conversationId = "";
+  let conversationToken = "";
+  let conversationExpiresAt = 0;
+  let sessionHydrated = false;
+  let identityInitializedForPage = false;
+  let identityInitialization = null;
+  let activeRequestGeneration = null;
   let promptHideTimer;
   const requestGeneration = createLunaRequestGeneration();
 
   if (!launcher || !panel || !closeButton || !form || !input || !messages || !sendButton) return;
+  chatWidget.dataset.chatReady = "true";
 
   function setChatOpen(open) {
+    if (open) hydrateConversationSession();
     chatWidget.classList.toggle("open", open);
     chatWidget.classList.remove("teasing");
     if (promptHideTimer) clearTimeout(promptHideTimer);
@@ -187,7 +198,7 @@ function initResidentChat() {
     if (open) requestAnimationFrame(() => input.focus());
   }
 
-  function appendMessage(role, text) {
+  function createMessageBubble(role, text) {
     const bubble = document.createElement("div");
     bubble.className = `chat-message ${role}`;
     if (role.includes("assistant")) {
@@ -195,6 +206,11 @@ function initResidentChat() {
     } else {
       bubble.textContent = text;
     }
+    return bubble;
+  }
+
+  function appendMessage(role, text) {
+    const bubble = createMessageBubble(role, text);
     messages.appendChild(bubble);
     messages.scrollTop = messages.scrollHeight;
     return bubble;
@@ -227,22 +243,56 @@ function initResidentChat() {
     conversation.splice(0, conversation.length, ...sanitized);
   }
 
-  async function ensureConversationIdentity(generation = requestGeneration.capture()) {
-    if (conversationId && (conversationToken || !restoredSession.conversationToken) && conversationExpiresAt > Date.now()) {
-      if (conversationToken) return true;
+  function hydrateConversationSession() {
+    if (sessionHydrated) return;
+    sessionHydrated = true;
+    const restoredSession = readLunaSession(storage);
+    conversation.splice(0, conversation.length, ...restoredSession.messages);
+    conversationId = restoredSession.conversationId;
+    conversationToken = restoredSession.conversationToken;
+    conversationExpiresAt = restoredSession.expiresAt;
+    identityInitializedForPage = Boolean(conversationId && conversationToken && conversationExpiresAt > Date.now());
+
+    if (!conversation.length) return;
+    const fragment = document.createDocumentFragment();
+    for (const item of conversation) {
+      fragment.appendChild(createMessageBubble(item.role === "assistant" ? "assistant" : "resident", item.content));
     }
-    const payload = await requestLunaConversationIdentity();
-    if (!requestGeneration.isCurrent(generation)) return false;
-    const identity = applyLunaConversationIdentity(payload, {}, storage);
-    conversationId = identity.conversationId;
-    conversationToken = identity.conversationToken;
-    conversationExpiresAt = identity.expiresAt || Date.now() + LUNA_HISTORY_TTL_MS;
-    writeLunaHistory(storage, conversation, Date.now(), conversationExpiresAt);
-    return true;
+    messages.appendChild(fragment);
+    messages.scrollTop = messages.scrollHeight;
   }
 
-  async function clearConversation() {
+  async function ensureConversationIdentity(generation = requestGeneration.capture()) {
+    hydrateConversationSession();
+    if (conversationId && conversationExpiresAt > Date.now() && (conversationToken || identityInitializedForPage)) {
+      return true;
+    }
+    if (identityInitialization?.generation === generation) return identityInitialization.promise;
+
+    const promise = requestLunaConversationIdentity().then(payload => {
+      if (!requestGeneration.isCurrent(generation)) return false;
+      const identity = applyLunaConversationIdentity(payload, {conversationId,conversationToken,expiresAt:conversationExpiresAt}, storage);
+      conversationId = identity.conversationId;
+      conversationToken = identity.conversationToken;
+      conversationExpiresAt = identity.expiresAt || Date.now() + LUNA_HISTORY_TTL_MS;
+      identityInitializedForPage = Boolean(conversationId && (conversationToken || payload.contextAvailable === false || identityInitializedForPage));
+      writeLunaHistory(storage, conversation, Date.now(), conversationExpiresAt);
+      return true;
+    });
+    identityInitialization = {generation,promise};
+    try {
+      return await promise;
+    } finally {
+      if (identityInitialization?.promise === promise) identityInitialization = null;
+    }
+  }
+
+  function clearConversation() {
+    hydrateConversationSession();
     requestGeneration.invalidate();
+    identityInitialization = null;
+    identityInitializedForPage = false;
+    activeRequestGeneration = null;
     clearLunaSession(storage);
     conversation.splice(0, conversation.length);
     conversationId = "";
@@ -251,30 +301,32 @@ function initResidentChat() {
     sendButton.disabled = false;
     messages.querySelectorAll(".chat-message:not(.chat-welcome)").forEach(message => message.remove());
     const generation = requestGeneration.capture();
-    try {
-      await ensureConversationIdentity(generation);
-    } catch (error) {
+    void ensureConversationIdentity(generation).catch(() => {
       // Luna can initialize again on the resident's next message.
-    }
+    });
   }
 
   function openChat(event) {
     event.preventDefault();
     setChatOpen(true);
+    void ensureConversationIdentity().catch(() => {
+      // Luna can initialize again when the resident sends a message.
+    });
   }
 
   launcher.addEventListener("click", openChat);
   teaser?.addEventListener("click", openChat);
   closeButton.addEventListener("click", () => setChatOpen(false));
-  clearButton?.addEventListener("click", async () => {
-    await clearConversation();
+  clearButton?.addEventListener("click", () => {
+    clearConversation();
     input.value = "";
     input.focus();
   });
 
-  for (const item of conversation) {
-    appendMessage(item.role === "assistant" ? "assistant" : "resident", item.content);
-  }
+  const scheduleHistoryHydration = typeof window.requestIdleCallback === "function"
+    ? callback => window.requestIdleCallback(callback, {timeout:1500})
+    : callback => setTimeout(callback, 1200);
+  scheduleHistoryHydration(hydrateConversationSession);
 
   if (!safeStorageGet(storage, promptStorageKey)) {
     setTimeout(() => {
@@ -288,14 +340,16 @@ function initResidentChat() {
   form.addEventListener("submit", async event => {
     event.preventDefault();
     const message = input.value.trim();
-    if (!message) return;
-    if (conversationExpiresAt && conversationExpiresAt <= Date.now()) await clearConversation();
+    if (!message || activeRequestGeneration !== null) return;
+    hydrateConversationSession();
+    if (conversationExpiresAt && conversationExpiresAt <= Date.now()) clearConversation();
+    const generation = requestGeneration.capture();
+    activeRequestGeneration = generation;
     input.value = "";
     appendMessage("resident", message);
-    remember("user", message);
     const loading = appendMessage("assistant loading", chatText("luna.thinking"));
     sendButton.disabled = true;
-    const generation = requestGeneration.capture();
+    remember("user", message);
 
     try {
       await ensureConversationIdentity(generation);
@@ -319,6 +373,7 @@ function initResidentChat() {
       conversationId = identity.conversationId;
       conversationToken = identity.conversationToken;
       conversationExpiresAt = identity.expiresAt || conversationExpiresAt;
+      identityInitializedForPage = Boolean(conversationId && (conversationToken || payload.contextAvailable === false || identityInitializedForPage));
       if (!response.ok || !payload.success) {
         const requestError = new Error(payload.message || chatText("luna.error"));
         requestError.residentMessageKey = response.status === 429 ? "luna.rateLimit" : "luna.error";
@@ -333,7 +388,8 @@ function initResidentChat() {
       loading.classList.add("error");
       loading.textContent = chatText(error.residentMessageKey || "luna.error");
     } finally {
-      if (requestGeneration.isCurrent(generation)) {
+      if (requestGeneration.isCurrent(generation) && activeRequestGeneration === generation) {
+        activeRequestGeneration = null;
         sendButton.disabled = false;
         input.focus();
       }

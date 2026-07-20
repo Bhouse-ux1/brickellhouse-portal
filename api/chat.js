@@ -1687,8 +1687,8 @@ function insightLanguage(message, history = []) {
   return "en";
 }
 
-function insightCategory(message, history = []) {
-  const retrieval = retrieveKnowledge(message, history);
+function insightCategory(message, history = [], existingRetrieval = null) {
+  const retrieval = existingRetrieval || retrieveKnowledge(message, history);
   const key = retrieval.ranked[0]?.module || "unknown";
   return {
     key,
@@ -1840,8 +1840,8 @@ function reviewMessage(role, value, offset = 0) {
   };
 }
 
-function buildConversationReviewRecord(message, history, reply, source, conversationId) {
-  const category = insightCategory(message, history);
+function buildConversationReviewRecord(message, history, reply, source, conversationId, retrieval = null) {
+  const category = insightCategory(message, history, retrieval);
   const outcome = insightOutcome(reply, source);
   const confidence = insightConfidence(outcome, source, category.key);
   return {
@@ -1857,19 +1857,21 @@ function buildConversationReviewRecord(message, history, reply, source, conversa
   };
 }
 
-async function logLunaConversationReview(conversationId, message, history, reply, source = "model") {
+async function logLunaConversationReview(conversationId, message, history, reply, source = "model", retrieval = null) {
   try {
-    const record = buildConversationReviewRecord(message, history, reply, source, conversationId);
-    await supabaseRequest("rpc/append_luna_conversation_review", {
-      method:"POST",
-      body:record,
-      prefer:"return=minimal"
-    });
-    await supabaseRequest("rpc/purge_old_luna_conversation_reviews", {
-      method:"POST",
-      body:{},
-      prefer:"return=minimal"
-    });
+    const record = buildConversationReviewRecord(message, history, reply, source, conversationId, retrieval);
+    await Promise.all([
+      supabaseRequest("rpc/append_luna_conversation_review", {
+        method:"POST",
+        body:record,
+        prefer:"return=minimal"
+      }),
+      supabaseRequest("rpc/purge_old_luna_conversation_reviews", {
+        method:"POST",
+        body:{},
+        prefer:"return=minimal"
+      })
+    ]);
   } catch (error) {
     console.warn("Luna conversation review logging skipped", error?.message || "Error");
   }
@@ -2000,13 +2002,13 @@ async function generateLunaTurn(message, trustedContext, interfaceLanguage = "en
   const directReply = deterministicReply(generationMessage, history, publicProducts, {needsCatalog,catalogStatus,resolution});
   if (directReply) {
     logLunaRoute("deterministic", retrieval);
-    return {success:true,httpStatus:200,reply:directReply,source:"deterministic",history,resolution,publicProducts};
+    return {success:true,httpStatus:200,reply:directReply,source:"deterministic",history,resolution,publicProducts,retrieval};
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     console.error("OpenAI chat route is missing OPENAI_API_KEY.");
-    return {success:false,httpStatus:503,reply:SAFE_ERROR_MESSAGE,source:"error",history,resolution,publicProducts};
+    return {success:false,httpStatus:503,reply:SAFE_ERROR_MESSAGE,source:"error",history,resolution,publicProducts,retrieval};
   }
 
   try {
@@ -2023,17 +2025,17 @@ async function generateLunaTurn(message, trustedContext, interfaceLanguage = "en
     const payload = await openAiResponse.json().catch(() => ({}));
     if (!openAiResponse.ok) {
       console.error("OpenAI chat request failed", {status:openAiResponse.status,type:payload?.error?.type || "unknown"});
-      return {success:false,httpStatus:502,reply:SAFE_ERROR_MESSAGE,source:"error",history,resolution,publicProducts};
+      return {success:false,httpStatus:502,reply:SAFE_ERROR_MESSAGE,source:"error",history,resolution,publicProducts,retrieval};
     }
 
     const reply = extractAssistantText(payload);
     if (!reply) {
-      return {success:false,httpStatus:502,reply:SAFE_ERROR_MESSAGE,source:"error",history,resolution,publicProducts};
+      return {success:false,httpStatus:502,reply:SAFE_ERROR_MESSAGE,source:"error",history,resolution,publicProducts,retrieval};
     }
-    return {success:true,httpStatus:200,reply,source:"model",history,resolution,publicProducts};
+    return {success:true,httpStatus:200,reply,source:"model",history,resolution,publicProducts,retrieval};
   } catch (error) {
     console.error("OpenAI chat route failed", error?.name || "Error");
-    return {success:false,httpStatus:500,reply:SAFE_ERROR_MESSAGE,source:"error",history,resolution,publicProducts};
+    return {success:false,httpStatus:500,reply:SAFE_ERROR_MESSAGE,source:"error",history,resolution,publicProducts,retrieval};
   }
 }
 
@@ -2145,7 +2147,7 @@ module.exports = async function handler(request, response) {
       const identity = contextConfigured
         ? conversationIdentityPayload(conversationId, Date.now() + (2 * 60 * 60 * 1000))
         : {conversationId,conversationToken:"",conversationExpiresAt:Date.now() + (2 * 60 * 60 * 1000)};
-      await logLunaConversationReview(conversationId, message, generated.history, generated.reply, generated.source);
+      await logLunaConversationReview(conversationId, message, generated.history, generated.reply, generated.source, generated.retrieval);
       return sendGeneratedTurn(response, generated, identity, {contextAvailable:false});
     }
 
@@ -2188,12 +2190,12 @@ module.exports = async function handler(request, response) {
     }
     if (committed.status === "unavailable") {
       const identity = conversationIdentityPayload(conversationId, Date.now() + (2 * 60 * 60 * 1000));
-      await logLunaConversationReview(conversationId, message, generated.history, generated.reply, generated.source);
+      await logLunaConversationReview(conversationId, message, generated.history, generated.reply, generated.source, generated.retrieval);
       return sendGeneratedTurn(response, generated, identity, {contextAvailable:false});
     }
 
     const identity = conversationIdentityPayload(conversationId, committed.expiresAt);
-    await logLunaConversationReview(conversationId, message, generated.history, generated.reply, generated.source);
+    await logLunaConversationReview(conversationId, message, generated.history, generated.reply, generated.source, generated.retrieval);
     return sendGeneratedTurn(response, generated, identity, {contextAvailable:true});
   }
 
