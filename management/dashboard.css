@@ -720,6 +720,9 @@ body.management-page::before { display:none; }
 .management-page .privacy-note strong { font-weight:500; }
 .management-page .workspace-loading { min-height:280px; display:grid; place-items:center; align-content:center; gap:12px; color:var(--ops-muted); font-size:9px; }
 .management-page .workspace-loading span { width:22px; height:22px; border:2px solid var(--ops-stone); border-top-color:var(--ops-olive-700); border-radius:50%; animation:spin .8s linear infinite; }
+.management-page .workspace-pagination { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border-top:1px solid var(--ops-stone-soft); background:var(--ops-surface-alt); color:var(--ops-muted); font-size:8px; }
+.management-page .workspace-pagination .secondary-command { min-height:32px; padding:0 12px; }
+.management-page .workspace-pagination .secondary-command:disabled { opacity:.45; cursor:not-allowed; }
 
 .management-page .report-action-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-bottom:16px; }
 .management-page .report-action-grid button { min-height:132px; display:flex; flex-direction:column; align-items:flex-start; padding:18px; border:1px solid var(--ops-stone-soft); border-radius:var(--ops-radius); background:var(--ops-surface); box-shadow:var(--ops-shadow); text-align:left; cursor:pointer; }

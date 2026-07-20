@@ -9,6 +9,28 @@ let managementProfile = null;
 let managementAccessPending = false;
 let managementDataLoaded = false;
 let managementSupabaseProductIds = new Set();
+let managementDataRequest = null;
+let managementDataRequestVersion = 0;
+let managementMutationVersion = 0;
+let lunaInsightsRequest = null;
+let lunaInsightsRequestVersion = 0;
+let lunaInsightsMutationVersion = 0;
+let lunaInsightsLoaded = false;
+
+const MANAGEMENT_WORKSPACE_NAMES = ["overview", "orders", "products", "feedback", "insights", "reports", "settings"];
+const managementWorkspaceStates = Object.fromEntries(MANAGEMENT_WORKSPACE_NAMES.map(view => [view, {
+  status:"idle",
+  initialized:false,
+  dirty:false,
+  promise:null
+}]));
+const MANAGEMENT_LIST_PAGE_SIZE = 50;
+let orderListPage = 1;
+let feedbackListPage = 1;
+let lunaListPage = 1;
+let productControlsInitialized = false;
+let feedbackControlsInitialized = false;
+let reportControlsInitialized = false;
 
 const PRODUCT_TOGGLE_RECORD_ERROR = "This product could not be updated because no matching editable database record was found. Please refresh and try again.";
 
@@ -972,6 +994,10 @@ function renderOverviewCommandCenter() {
   const activeProducts = products.filter(product => product.active);
   const newFeedback = feedbackRecords.filter(record => ["New","In Review"].includes(normalizeFeedbackStatus(record.status)));
   const newLuna = lunaInsights.filter(row => row.status === "New");
+  const lunaQueueValue = lunaInsightsError ? "\u2014" : lunaInsightsLoaded ? newLuna.length : "\u2026";
+  const lunaQueueHelper = lunaInsightsError
+    ? "Review queue unavailable"
+    : lunaInsightsLoaded ? "Conversations awaiting review" : "Loading the review queue";
   const dateLabel = new Intl.DateTimeFormat("en-US", {weekday:"long",month:"long",day:"numeric"}).format(new Date());
   const recentActivity = [
     ...groups.map(group => ({date:group.first.date,type:"Order",title:group.number,detail:`${group.first.name} · Unit ${group.first.unit}`})),
@@ -987,7 +1013,7 @@ function renderOverviewCommandCenter() {
       <button class="metric success" type="button" data-quick-action="reports"><span>Revenue this month</span><strong>${money(currentMonthRevenue())}</strong><small>Recorded order value</small></button>
       <button class="metric attention" type="button" id="lowInventoryMetric"><span>Low inventory</span><strong>${lowProducts.length}</strong><small>Active products at 15 or fewer</small></button>
       <button class="metric" id="feedbackMetric" type="button" data-quick-action="feedback"><span>Feedback attention</span><strong>${newFeedback.length}</strong><small>New or currently in review</small></button>
-      <button class="metric" type="button" data-quick-action="luna"><span>Luna review queue</span><strong>${newLuna.length}</strong><small>Conversations awaiting review</small></button>
+      <button class="metric" type="button" data-quick-action="luna"><span>Luna review queue</span><strong>${lunaQueueValue}</strong><small>${lunaQueueHelper}</small></button>
       <button class="metric" type="button" data-quick-action="active-products"><span>Store availability</span><strong>${activeProducts.length}</strong><small>${products.length - activeProducts.length} inactive products</small></button>
     </div>
     <div class="command-center-grid">
@@ -995,7 +1021,7 @@ function renderOverviewCommandCenter() {
         <div class="today-item"><span>O</span><div><strong>${todayGroups.length ? `${todayGroups.length} order${todayGroups.length === 1 ? "" : "s"} received today` : "No orders received today"}</strong><small>${paidAwaiting.length} paid order${paidAwaiting.length === 1 ? "" : "s"} remain open across the queue.</small></div><b>${openGroups.length} open</b></div>
         <div class="today-item"><span>F</span><div><strong>${newFeedback.length ? `${newFeedback.length} resident message${newFeedback.length === 1 ? "" : "s"} need attention` : "Resident feedback is current"}</strong><small>New and In Review records are included.</small></div><b>${newFeedback.length} active</b></div>
         <div class="today-item"><span>P</span><div><strong>${lowProducts.length ? `${lowProducts.length} product${lowProducts.length === 1 ? "" : "s"} have low inventory` : "Product inventory has no low-stock alerts"}</strong><small>Only active Resident Store products are evaluated.</small></div><b>${lowProducts.length} alerts</b></div>
-        <div class="today-item"><span>L</span><div><strong>${newLuna.length ? `${newLuna.length} Luna conversation${newLuna.length === 1 ? "" : "s"} await review` : "Luna review queue is current"}</strong><small>Review records remain isolated from Luna knowledge and memory.</small></div><b>${newLuna.length} new</b></div>
+        <div class="today-item"><span>L</span><div><strong>${lunaInsightsError ? "Luna review queue is unavailable" : !lunaInsightsLoaded ? "Loading the Luna review queue" : newLuna.length ? `${newLuna.length} Luna conversation${newLuna.length === 1 ? "" : "s"} await review` : "Luna review queue is current"}</strong><small>Review records remain isolated from Luna knowledge and memory.</small></div><b>${lunaInsightsError ? "Retry in Luna Review" : lunaInsightsLoaded ? `${newLuna.length} new` : "Loading"}</b></div>
       </div></section>
       <section class="operations-panel"><div class="panel-heading"><div><h2>Quick actions</h2><p>Go directly to a Management workflow.</p></div></div><div class="quick-action-grid">
         <button class="quick-action" type="button" data-quick-action="create-product"><strong>Create product</strong><small>Open the catalog editor.</small></button>
@@ -1078,21 +1104,8 @@ function bindOverviewActions() {
 }
 
 function renderAdmin() {
-  if (!$("#adminOverview") || !window.managementAccessGranted) return;
-  auditManagement("report_access", "management_report", "overview");
-  const years = revenueYears();
-  if (!years.includes(revenueChartYear)) revenueChartYear = years[0];
-  renderOverviewCommandCenter();
-  renderProductWorkspace();
-  renderOrderTable();
-  renderLunaInsights();
-  if ($("#adminReportsContent")) $("#adminReportsContent").innerHTML = revenueChartMarkup(revenueChartYear);
-  bindRevenueControls();
-  bindLunaInsightControls();
-  populateFeeSettings();
-  bindOrderSearch();
-  bindOverviewActions();
-  updateManagementNavigationBadges();
+  if (!window.managementAccessGranted) return;
+  renderManagementWorkspace(currentAdminView);
 }
 
 function insightDate(row) {
@@ -1204,25 +1217,41 @@ function bindLunaInsightControls() {
   const exportButton = $("#exportLunaInsights");
   if (period) {
     period.value = lunaInsightFilters.period;
-    period.onchange = () => { lunaInsightFilters.period = period.value; renderLunaInsights(); };
+    period.onchange = () => { lunaListPage = 1; lunaInsightFilters.period = period.value; renderLunaInsights(); };
   }
   if (language) {
     language.value = lunaInsightFilters.language;
-    language.onchange = () => { lunaInsightFilters.language = language.value; renderLunaInsights(); };
+    language.onchange = () => { lunaListPage = 1; lunaInsightFilters.language = language.value; renderLunaInsights(); };
   }
   if (outcome) {
     outcome.value = lunaInsightFilters.outcome;
-    outcome.onchange = () => { lunaInsightFilters.outcome = outcome.value; renderLunaInsights(); };
+    outcome.onchange = () => { lunaListPage = 1; lunaInsightFilters.outcome = outcome.value; renderLunaInsights(); };
   }
   if (search) {
     search.value = lunaInsightFilters.search;
-    search.oninput = () => { lunaInsightFilters.search = search.value; renderLunaInsights(); };
+    search.oninput = () => { lunaListPage = 1; lunaInsightFilters.search = search.value; renderLunaInsights(); };
   }
   if (exportButton) exportButton.onclick = exportLunaInsightsCsv;
 }
 
 function csvEscape(value) {
   return `"${String(value ?? "").replace(/"/g, '""')}"`;
+}
+
+function managementPageSlice(rows, requestedPage) {
+  const totalPages = Math.max(1, Math.ceil(rows.length / MANAGEMENT_LIST_PAGE_SIZE));
+  const page = Math.min(Math.max(1, requestedPage), totalPages);
+  const start = (page - 1) * MANAGEMENT_LIST_PAGE_SIZE;
+  return {page,totalPages,start,rows:rows.slice(start, start + MANAGEMENT_LIST_PAGE_SIZE)};
+}
+
+function managementPaginationMarkup(kind, page, totalPages, totalRows) {
+  if (totalPages <= 1) return "";
+  return `<div class="workspace-pagination" aria-label="${escapeAdminHtml(kind)} pages"><button class="secondary-command" type="button" data-management-page="${escapeAdminHtml(kind)}" data-page="${page - 1}" ${page === 1 ? "disabled" : ""}>Previous</button><span>Page ${page} of ${totalPages} &middot; ${totalRows} records</span><button class="secondary-command" type="button" data-management-page="${escapeAdminHtml(kind)}" data-page="${page + 1}" ${page === totalPages ? "disabled" : ""}>Next</button></div>`;
+}
+
+function bindManagementPagination(kind, onPage) {
+  $$(`[data-management-page="${kind}"]`).forEach(button => button.onclick = () => onPage(Number(button.dataset.page || 1)));
 }
 
 function legacyLunaInsightsCsvUnused() {
@@ -1292,10 +1321,17 @@ function renderLunaInsightsPrevious() {
   const container = $("#lunaInsightsContent");
   if (!container) return;
   if (lunaInsightsError) {
-    container.innerHTML = `<div class="inventory-ok">${escapeAdminHtml(lunaInsightsError)}</div>`;
+    container.innerHTML = `<div class="workspace-empty"><strong>${escapeAdminHtml(lunaInsightsError)}</strong><button class="secondary-command" id="retryLunaInsights" type="button">Retry</button></div>`;
+    $("#retryLunaInsights").onclick = async () => {
+      showManagementWorkspaceLoading("insights");
+      await loadLunaInsights({force:true});
+      renderLunaInsights();
+    };
     return;
   }
   const rows = filteredLunaInsights();
+  const pageData = managementPageSlice(rows, lunaListPage);
+  lunaListPage = pageData.page;
   const now = Date.now();
   const activeRows = lunaInsights.filter(row => {
     const date = insightDate(row);
@@ -1344,10 +1380,17 @@ function renderLunaInsights() {
   const container = $("#lunaInsightsContent");
   if (!container) return;
   if (lunaInsightsError) {
-    container.innerHTML = `<div class="inventory-ok">${escapeAdminHtml(lunaInsightsError)}</div>`;
+    container.innerHTML = `<div class="workspace-empty"><strong>${escapeAdminHtml(lunaInsightsError)}</strong><button class="secondary-command" id="retryLunaInsights" type="button">Retry</button></div>`;
+    $("#retryLunaInsights").onclick = async () => {
+      showManagementWorkspaceLoading("insights");
+      await loadLunaInsights({force:true});
+      renderLunaInsights();
+    };
     return;
   }
   const rows = filteredLunaInsights();
+  const pageData = managementPageSlice(rows, lunaListPage);
+  lunaListPage = pageData.page;
   const now = Date.now();
   const activeRows = lunaInsights.filter(row => {
     const date = insightDate(row);
@@ -1370,7 +1413,7 @@ function renderLunaInsights() {
     <div class="luna-review-workbench">
       <section class="luna-conversation-panel">
         <div class="luna-panel-heading"><h2>Conversation queue</h2><p>${rows.length} matching &middot; ${spanishCount} Spanish &middot; ${unknownCount} unknown topic &middot; ${lowConfidenceCount} low confidence</p></div>
-        ${rows.length ? `<div class="luna-review-list">${rows.map(row => `<button class="luna-review-card" type="button" data-luna-review="${escapeAdminHtml(row.conversation_id)}"><div><strong>${escapeAdminHtml(conversationPreview(row))}</strong><small>${escapeAdminHtml(row.category || "Unknown")} &middot; ${escapeAdminHtml(row.detected_language || "unknown")} &middot; ${formatInsightDate(row.last_message_at || row.created_at)}</small></div><span class="status-pill ${statusClass(row.status)}">${escapeAdminHtml(row.status || "New")}</span></button>`).join("")}</div>` : `<div class="inventory-ok">No conversations match the current filters.</div>`}
+        ${rows.length ? `<div class="luna-review-list">${pageData.rows.map(row => `<button class="luna-review-card" type="button" data-luna-review="${escapeAdminHtml(row.conversation_id)}"><div><strong>${escapeAdminHtml(conversationPreview(row))}</strong><small>${escapeAdminHtml(row.category || "Unknown")} &middot; ${escapeAdminHtml(row.detected_language || "unknown")} &middot; ${formatInsightDate(row.last_message_at || row.created_at)}</small></div><span class="status-pill ${statusClass(row.status)}">${escapeAdminHtml(row.status || "New")}</span></button>`).join("")}</div>${managementPaginationMarkup("luna", pageData.page, pageData.totalPages, rows.length)}` : `<div class="inventory-ok">No conversations match the current filters.</div>`}
       </section>
       <aside class="luna-summary-panel">
         <div class="luna-panel-heading"><h2>90-day topics</h2><p>Categories in the active review window.</p></div>
@@ -1379,6 +1422,7 @@ function renderLunaInsights() {
     </div>
     <div class="inventory-ok luna-review-guardrail">Management review only. These temporary records cannot update Luna knowledge, prompts, model, or behavior.</div>`;
   bindLunaReviewCards();
+  bindManagementPagination("luna", page => { lunaListPage = page; renderLunaInsights(); });
 }
 
 function bindLunaReviewCards() {
@@ -1428,6 +1472,8 @@ async function saveLunaConversationReview() {
       status,
       management_note:managementNote
     });
+    lunaInsightsMutationVersion++;
+    markManagementWorkspacesDirty("overview", "reports");
     renderLunaInsights();
     closeModal("#lunaReviewModal");
     auditManagement("luna_conversation_review_update", "luna_conversation_review", selectedLunaConversationId, null, {status});
@@ -1496,11 +1542,13 @@ function bindOrderSearch() {
   input.value = orderSearchQuery;
   input.placeholder = placeholders[orderSearchField];
   field.onchange = () => {
+    orderListPage = 1;
     orderSearchField = field.value;
     input.placeholder = placeholders[orderSearchField];
     renderOrderTable();
   };
   input.oninput = () => {
+    orderListPage = 1;
     orderSearchQuery = input.value;
     renderOrderTable();
   };
@@ -1509,17 +1557,18 @@ function bindOrderSearch() {
   const dateFilter = $("#orderDateFilter");
   if (statusFilter) {
     statusFilter.value = orderStatusFilter;
-    statusFilter.onchange = () => { orderStatusFilter = statusFilter.value; renderOrderTable(); };
+    statusFilter.onchange = () => { orderListPage = 1; orderStatusFilter = statusFilter.value; renderOrderTable(); };
   }
   if (paymentFilter) {
     paymentFilter.value = orderPaymentFilter;
-    paymentFilter.onchange = () => { orderPaymentFilter = paymentFilter.value; renderOrderTable(); };
+    paymentFilter.onchange = () => { orderListPage = 1; orderPaymentFilter = paymentFilter.value; renderOrderTable(); };
   }
   if (dateFilter) {
     dateFilter.value = orderDateFilter;
-    dateFilter.onchange = () => { orderDateFilter = dateFilter.value; renderOrderTable(); };
+    dateFilter.onchange = () => { orderListPage = 1; orderDateFilter = dateFilter.value; renderOrderTable(); };
   }
   $("#clearOrderSearch").onclick = () => {
+    orderListPage = 1;
     orderSearchQuery = "";
     orderSearchField = "all";
     orderStatusFilter = "All";
@@ -1597,6 +1646,158 @@ function setAdminNavigationOpen(open) {
   syncManagementScrollLock();
 }
 
+function managementWorkspaceTarget(view) {
+  return {
+    overview:"#adminOverview",
+    orders:"#orderTable",
+    products:"#productTable",
+    feedback:"#feedbackAdminList",
+    insights:"#lunaInsightsContent",
+    reports:"#adminReportsContent"
+  }[view] || "";
+}
+
+function setManagementWorkspaceBusy(view, busy) {
+  const section = $(`#admin${view[0].toUpperCase() + view.slice(1)}`);
+  if (!section) return;
+  if (busy) section.setAttribute("aria-busy", "true");
+  else section.removeAttribute("aria-busy");
+}
+
+function showManagementWorkspaceLoading(view) {
+  const state = managementWorkspaceStates[view];
+  const target = $(managementWorkspaceTarget(view));
+  setManagementWorkspaceBusy(view, true);
+  if (!target || state?.initialized) return;
+  target.innerHTML = `<div class="workspace-loading"><span></span><p>Loading ${view === "insights" ? "Luna Review" : view}</p></div>`;
+}
+
+function showManagementWorkspaceError(view) {
+  const target = $(managementWorkspaceTarget(view));
+  setManagementWorkspaceBusy(view, false);
+  if (!target) return;
+  target.innerHTML = `<div class="workspace-empty"><strong>This workspace could not be loaded.</strong><p>Please retry. Your authenticated session and permissions remain unchanged.</p><button class="secondary-command" type="button" data-workspace-retry="${escapeAdminHtml(view)}">Retry</button></div>`;
+  target.querySelector("[data-workspace-retry]")?.addEventListener("click", () => {
+    initializeManagementWorkspace(view, {force:true}).catch(() => toast("Unable to load this Management workspace. Please retry."));
+  }, {once:true});
+}
+
+function markManagementWorkspacesDirty(...views) {
+  views.forEach(view => {
+    const state = managementWorkspaceStates[view];
+    if (state?.initialized) state.dirty = true;
+  });
+}
+
+function initializeProductWorkspaceControls() {
+  if (productControlsInitialized) return;
+  productControlsInitialized = true;
+  const categorySelect = $('#productForm select[name="category"]');
+  if (categorySelect) categorySelect.innerHTML = CATEGORIES.map(category => `<option>${category}</option>`).join("");
+  bindProductFilters();
+  bindProductImageEditor();
+}
+
+function bindFeedbackControls() {
+  if (feedbackControlsInitialized) return;
+  feedbackControlsInitialized = true;
+  ["feedbackSearch","feedbackStatusFilter","feedbackCategoryFilter","feedbackDateFilter"].forEach(id => {
+    const control = $(`#${id}`);
+    if (!control) return;
+    control.addEventListener(id === "feedbackSearch" ? "input" : "change", () => {
+      feedbackListPage = 1;
+      renderManagementFeedback();
+    });
+  });
+}
+
+function bindReportControls() {
+  if (reportControlsInitialized) return;
+  reportControlsInitialized = true;
+  $$('[data-report-action]').forEach(button => button.onclick = async () => {
+    if (button.dataset.reportAction === "orders") $("#exportOrders")?.click();
+    if (button.dataset.reportAction === "feedback") $("#exportFeedback")?.click();
+    if (button.dataset.reportAction === "luna") {
+      await loadLunaInsights();
+      exportLunaInsightsCsv();
+    }
+  });
+}
+
+function renderManagementWorkspace(view) {
+  if (!window.managementAccessGranted) return;
+  if (view === "overview") {
+    const years = revenueYears();
+    if (!years.includes(revenueChartYear)) revenueChartYear = years[0];
+    renderOverviewCommandCenter();
+    bindOverviewActions();
+  } else if (view === "orders") {
+    bindOrderSearch();
+    renderManagementOrderTable();
+  } else if (view === "products") {
+    initializeProductWorkspaceControls();
+    renderProductWorkspace();
+  } else if (view === "feedback") {
+    bindFeedbackControls();
+    renderManagementFeedback();
+  } else if (view === "insights") {
+    bindLunaInsightControls();
+    renderLunaInsights();
+  } else if (view === "reports") {
+    const years = revenueYears();
+    if (!years.includes(revenueChartYear)) revenueChartYear = years[0];
+    $("#adminReportsContent").innerHTML = revenueChartMarkup(revenueChartYear);
+    bindRevenueControls();
+    bindReportControls();
+  } else if (view === "settings") {
+    populateFeeSettings();
+  }
+  const state = managementWorkspaceStates[view];
+  if (state) {
+    state.status = "ready";
+    state.initialized = true;
+    state.dirty = false;
+  }
+  setManagementWorkspaceBusy(view, false);
+  updateManagementNavigationBadges();
+}
+
+async function initializeManagementWorkspace(view, {force = false} = {}) {
+  const state = managementWorkspaceStates[view];
+  if (!state || !window.managementAccessGranted) return;
+  if (!force && state.initialized && !state.dirty) return;
+  if (state.promise) return state.promise;
+  state.status = "loading";
+  showManagementWorkspaceLoading(view);
+  const request = (async () => {
+    try {
+      if (view === "insights") await loadLunaInsights({force});
+      else if (view !== "settings") await loadManagementData({force});
+      if (currentAdminView === view) renderManagementWorkspace(view);
+      else {
+        state.status = "ready";
+        state.dirty = true;
+      }
+      if (view === "overview" && currentAdminView === "overview") {
+        loadLunaInsights({force}).then(() => {
+          if (currentAdminView === "overview") renderManagementWorkspace("overview");
+          else markManagementWorkspacesDirty("overview");
+          updateManagementNavigationBadges();
+        });
+      }
+    } catch (error) {
+      state.status = "error";
+      if (!state.initialized) showManagementWorkspaceError(view);
+      else setManagementWorkspaceBusy(view, false);
+      throw error;
+    } finally {
+      state.promise = null;
+    }
+  })();
+  state.promise = request;
+  return request;
+}
+
 function showAdminView(view) {
   if (!$(`#admin${view[0].toUpperCase() + view.slice(1)}`)) return;
   const subtitles = {
@@ -1610,6 +1811,7 @@ function showAdminView(view) {
   };
   currentAdminView = view;
   auditManagement("report_access", "management_view", view);
+  if (view === "overview") auditManagement("report_access", "management_report", "overview");
   $$(".admin-view").forEach(element => element.classList.add("hidden"));
   $(`#admin${view[0].toUpperCase() + view.slice(1)}`).classList.remove("hidden");
   $("#adminTitle").textContent = view === "insights" ? "Luna Review" : view[0].toUpperCase() + view.slice(1);
@@ -1622,6 +1824,9 @@ function showAdminView(view) {
   });
   setAdminNavigationOpen(false);
   window.scrollTo({top:0,behavior:"auto"});
+  return initializeManagementWorkspace(view).catch(() => {
+    toast("Unable to load this Management workspace. Please retry.");
+  });
 }
 
 function updateManagementNavigationBadges() {
@@ -1639,13 +1844,21 @@ async function refreshManagementWorkspace() {
   if (!managementAuthClient) return;
   const button = $("#adminRefresh");
   if (button) button.disabled = true;
+  setManagementWorkspaceBusy(currentAdminView, true);
   try {
-    await loadManagementData();
-    renderAdmin();
+    if (currentAdminView === "insights") await loadLunaInsights({force:true});
+    else if (currentAdminView !== "settings") await loadManagementData({force:true});
+    markManagementWorkspacesDirty(...MANAGEMENT_WORKSPACE_NAMES);
+    renderManagementWorkspace(currentAdminView);
+    if (currentAdminView === "overview") {
+      await loadLunaInsights({force:true});
+      renderManagementWorkspace("overview");
+    }
     toast("Management data refreshed");
   } catch (error) {
-    toast(error.message || "Unable to refresh Management data");
+    toast("Unable to refresh Management data. Please try again.");
   } finally {
+    setManagementWorkspaceBusy(currentAdminView, false);
     if (button) button.disabled = false;
   }
 }
@@ -1657,6 +1870,7 @@ function runManagementAction(action) {
     return;
   }
   if (action === "today-orders") {
+    orderListPage = 1;
     orderDateFilter = todayISO();
     orderStatusFilter = "All";
     showAdminView("orders");
@@ -1665,6 +1879,7 @@ function runManagementAction(action) {
     return;
   }
   if (action === "pending-orders") {
+    orderListPage = 1;
     orderDateFilter = "";
     orderStatusFilter = "Open";
     showAdminView("orders");
@@ -1681,12 +1896,14 @@ function runManagementAction(action) {
     return;
   }
   if (action === "feedback") {
+    feedbackListPage = 1;
     showAdminView("feedback");
     if ($("#feedbackStatusFilter")) $("#feedbackStatusFilter").value = "New";
     renderManagementFeedback();
     return;
   }
   if (action === "luna") {
+    lunaListPage = 1;
     lunaInsightFilters.outcome = "New";
     showAdminView("insights");
     bindLunaInsightControls();
@@ -1971,45 +2188,72 @@ async function verifyResidentProductCatalog(productId) {
   }
 }
 
-async function loadManagementData() {
+async function loadManagementData({force = false} = {}) {
   if (!managementAuthClient || !window.managementAccessGranted) return;
-  const [ordersResult, feedbackResult, productsResult, settingsResult] = await Promise.all([
-    managementAuthClient.from("orders").select("*,order_items(*)").order("created_at", {ascending:true}),
-    managementAuthClient.from("feedback").select("*").order("submitted_at", {ascending:true}),
-    managementAuthClient.from("products").select("*").order("resident_name", {ascending:true}),
-    managementAuthClient.from("portal_settings").select("*")
-  ]);
-  if (ordersResult.error) throw ordersResult.error;
-  if (feedbackResult.error) throw feedbackResult.error;
-  if (productsResult.error) throw productsResult.error;
-  if (settingsResult.error) throw settingsResult.error;
-  orders = mapSupabaseOrderRows(ordersResult.data);
-  if (typeof feedbackRecords !== "undefined") feedbackRecords = mapSupabaseFeedbackRows(feedbackResult.data);
-  applyManagementProductRows(productsResult.data);
-  const feeSetting = (settingsResult.data || []).find(setting => setting.key === "processing_fee");
-  if (feeSetting?.value) feeSettings = {...feeSettings, ...feeSetting.value};
-  await loadLunaInsights();
-  managementDataLoaded = true;
+  if (managementDataRequest) return managementDataRequest;
+  if (managementDataLoaded && !force) return;
+  const requestVersion = ++managementDataRequestVersion;
+  const mutationVersion = managementMutationVersion;
+  const request = (async () => {
+    const [ordersResult, feedbackResult, productsResult, settingsResult] = await Promise.all([
+      managementAuthClient.from("orders").select("id,order_number,created_at,resident_name,unit_number,email,phone,subtotal_cents,processing_fee_cents,legal_accepted,legal_accepted_at,legal_notice_version,terms_version,privacy_policy_version,status,public_note,internal_note,payment_status,square_payment_id,payment_processor_reference,stripe_payment_intent_id,stripe_checkout_session_id,payment_at,order_items(id,product_id,resident_name_snapshot,internal_name_snapshot,gl_code_snapshot,quantity,unit_price_cents)").order("created_at", {ascending:true}),
+      managementAuthClient.from("feedback").select("id,resident_name,unit_number,email,phone,category,message,submitted_at,status,management_response,responded_at,internal_notes").order("submitted_at", {ascending:true}),
+      managementAuthClient.from("products").select("*").order("resident_name", {ascending:true}),
+      managementAuthClient.from("portal_settings").select("key,value").eq("key", "processing_fee").maybeSingle()
+    ]);
+    if (ordersResult.error) throw ordersResult.error;
+    if (feedbackResult.error) throw feedbackResult.error;
+    if (productsResult.error) throw productsResult.error;
+    if (settingsResult.error) throw settingsResult.error;
+    if (requestVersion !== managementDataRequestVersion || mutationVersion !== managementMutationVersion) return;
+    if (settingsResult.data?.value) feeSettings = {...feeSettings, ...settingsResult.data.value};
+    orders = mapSupabaseOrderRows(ordersResult.data);
+    feedbackRecords = mapSupabaseFeedbackRows(feedbackResult.data);
+    applyManagementProductRows(productsResult.data);
+    managementDataLoaded = true;
+  })();
+  managementDataRequest = request;
+  try {
+    return await request;
+  } finally {
+    if (managementDataRequest === request) managementDataRequest = null;
+  }
 }
 
-async function loadLunaInsights() {
+async function loadLunaInsights({force = false} = {}) {
   if (!managementAuthClient || !window.managementAccessGranted) return;
+  if (lunaInsightsRequest) return lunaInsightsRequest;
+  if (lunaInsightsLoaded && !force) return;
+  const requestVersion = ++lunaInsightsRequestVersion;
+  const mutationVersion = lunaInsightsMutationVersion;
+  const request = (async () => {
+    try {
+      const {data:{session}} = await managementAuthClient.auth.getSession();
+      if (!session?.access_token) throw new Error("Management login required.");
+      const response = await fetch("/api/luna-insights", {
+        headers:{
+          "Accept":"application/json",
+          "Authorization":`Bearer ${session.access_token}`
+        }
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.success) throw new Error(payload.message || "Luna conversation review is unavailable.");
+      if (requestVersion !== lunaInsightsRequestVersion || mutationVersion !== lunaInsightsMutationVersion) return;
+      lunaInsights = Array.isArray(payload.conversations) ? payload.conversations : [];
+      lunaInsightsError = "";
+    } catch (error) {
+      if (requestVersion !== lunaInsightsRequestVersion || mutationVersion !== lunaInsightsMutationVersion) return;
+      lunaInsights = [];
+      lunaInsightsError = "Luna conversation review is unavailable. Please retry.";
+    } finally {
+      if (requestVersion === lunaInsightsRequestVersion) lunaInsightsLoaded = true;
+    }
+  })();
+  lunaInsightsRequest = request;
   try {
-    const {data:{session}} = await managementAuthClient.auth.getSession();
-    if (!session?.access_token) throw new Error("Management login required.");
-    const response = await fetch("/api/luna-insights", {
-      headers:{
-        "Accept":"application/json",
-        "Authorization":`Bearer ${session.access_token}`
-      }
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || !payload.success) throw new Error(payload.message || "Luna conversation review is unavailable.");
-    lunaInsights = Array.isArray(payload.conversations) ? payload.conversations : [];
-    lunaInsightsError = "";
-  } catch (error) {
-    lunaInsights = [];
-    lunaInsightsError = error.message || "Luna conversation review is unavailable.";
+    return await request;
+  } finally {
+    if (lunaInsightsRequest === request) lunaInsightsRequest = null;
   }
 }
 
@@ -2022,6 +2266,8 @@ async function saveOrderToSupabase(number, changes) {
   payload.updated_at = new Date().toISOString();
   const {error} = await managementAuthClient.from("orders").update(payload).eq("order_number", number);
   if (error) throw error;
+  managementMutationVersion++;
+  markManagementWorkspacesDirty("overview", "reports");
 }
 
 async function saveFeedbackToSupabase(id, changes) {
@@ -2033,12 +2279,16 @@ async function saveFeedbackToSupabase(id, changes) {
   if ("dateResponded" in changes) payload.responded_at = changes.dateResponded || null;
   const {error} = await managementAuthClient.from("feedback").update(payload).eq("id", id);
   if (error) throw error;
+  managementMutationVersion++;
+  markManagementWorkspacesDirty("overview");
 }
 
 async function deleteFeedbackFromSupabase(id) {
   if (!managementAuthClient) return;
   const {error} = await managementAuthClient.from("feedback").delete().eq("id", id);
   if (error) throw error;
+  managementMutationVersion++;
+  markManagementWorkspacesDirty("overview");
 }
 async function saveProductToSupabase(product) {
   if (!managementAuthClient) return;
@@ -2059,6 +2309,8 @@ async function saveProductToSupabase(product) {
   };
   const {error} = await managementAuthClient.from("products").upsert(payload, {onConflict:"id"});
   if (error) throw error;
+  managementMutationVersion++;
+  markManagementWorkspacesDirty("overview");
 }
 async function saveProductStatusToSupabase(product, nextActive) {
   if (!managementAuthClient) throw new Error("Management authentication is unavailable.");
@@ -2095,12 +2347,16 @@ async function saveProductStatusToSupabase(product, nextActive) {
     });
     throw new Error("Supabase returned an unexpected product status. Please refresh and try again.");
   }
+  managementMutationVersion++;
+  markManagementWorkspacesDirty("overview");
   return confirmedProduct;
 }
 async function deleteProductFromSupabase(id) {
   if (!managementAuthClient) return;
   const {error} = await managementAuthClient.from("products").delete().eq("id", id);
   if (error) throw error;
+  managementMutationVersion++;
+  markManagementWorkspacesDirty("overview");
 }
 async function saveFeeSettingsToSupabase(settings) {
   if (!managementAuthClient) return;
@@ -2111,6 +2367,8 @@ async function saveFeeSettingsToSupabase(settings) {
     updated_by:managementProfile?.user_id || null
   }, {onConflict:"key"});
   if (error) throw error;
+  managementMutationVersion++;
+  markManagementWorkspacesDirty("orders", "reports");
 }
 window.saveOrderToSupabase = saveOrderToSupabase;
 window.saveFeedbackToSupabase = saveFeedbackToSupabase;
@@ -2127,8 +2385,7 @@ async function openAdminShell() {
     ["adminUserEmail","adminSidebarEmail","settingsUserEmail"].forEach(id => { if ($(`#${id}`)) $(`#${id}`).textContent = managementProfile.email; });
   }
   if ($("#settingsMfaState")) $("#settingsMfaState").textContent = managementProfile?.mfa_required ? "MFA is required for this Management profile." : "Management authentication is active.";
-  if (managementAuthClient) await loadManagementData();
-  renderAdmin();
+  await showAdminView(currentAdminView);
 }
 
 async function checkAndOpenManagement({silent = false} = {}) {
@@ -2164,6 +2421,13 @@ if ($("#adminLogout")) $("#adminLogout").onclick = async () => {
   }
   managementProfile = null;
   window.managementAccessGranted = false;
+  managementDataLoaded = false;
+  lunaInsightsLoaded = false;
+  orders = [];
+  feedbackRecords = [];
+  lunaInsights = [];
+  managementSupabaseProductIds = new Set();
+  MANAGEMENT_WORKSPACE_NAMES.forEach(view => Object.assign(managementWorkspaceStates[view], {status:"idle",initialized:false,dirty:false,promise:null}));
   $("#adminShell").classList.remove("open");
   location.href = isManagementPage ? "/management/login.html" : "#home";
   $("#adminUserEmail").textContent = "Property Management";
@@ -2215,13 +2479,6 @@ function bindProductFilters() {
   syncProductFilterControls();
 }
 
-bindProductFilters();
-$$('[data-report-action]').forEach(button => button.onclick = () => {
-  if (button.dataset.reportAction === "orders") $("#exportOrders")?.click();
-  if (button.dataset.reportAction === "feedback") $("#exportFeedback")?.click();
-  if (button.dataset.reportAction === "luna") exportLunaInsightsCsv();
-});
-
 function trapManagementFocus(event, container) {
   if (event.key !== "Tab" || !container) return false;
   const focusable = [...container.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])')].filter(element => element.offsetParent !== null);
@@ -2253,10 +2510,6 @@ window.addEventListener("resize", () => {
   else syncManagementScrollLock();
 });
 window.addEventListener("pagehide", () => document.body.classList.remove("management-scroll-lock"));
-
-const categorySelect = $('#productForm select[name="category"]');
-if (categorySelect) categorySelect.innerHTML = CATEGORIES.map(category => `<option>${category}</option>`).join("");
-bindProductImageEditor();
 
 if ($("#addProduct")) $("#addProduct").onclick = () => {
   $("#productForm").reset();
@@ -2380,9 +2633,6 @@ if ($("#exportOrders")) $("#exportOrders").onclick = () => {
   auditManagement("export_orders", "export", "orders", null, {rows:orders.length});
 };
 
-const observer = new IntersectionObserver(entries => entries.forEach(entry => entry.isIntersecting && entry.target.classList.add("visible")), {threshold:.12});
-$$(".reveal").forEach(element => observer.observe(element));
-
 let parallaxFrame = 0;
 function updateParallax() {
   parallaxFrame = 0;
@@ -2399,18 +2649,21 @@ function updateParallax() {
     heroImage.style.transform = `translate3d(0, ${window.scrollY * .12}px, 0) scale(1.04)`;
   }
 }
-window.addEventListener("scroll", () => {
-  if (!parallaxFrame) parallaxFrame = requestAnimationFrame(updateParallax);
-}, {passive:true});
-window.addEventListener("resize", updateParallax);
-
-persist();
-renderTabs();
-renderProducts();
-renderCart();
-renderLegalNotice();
-updateParallax();
-loadPublicProductCatalog();
+if (!isManagementPage) {
+  const observer = new IntersectionObserver(entries => entries.forEach(entry => entry.isIntersecting && entry.target.classList.add("visible")), {threshold:.12});
+  $$(".reveal").forEach(element => observer.observe(element));
+  window.addEventListener("scroll", () => {
+    if (!parallaxFrame) parallaxFrame = requestAnimationFrame(updateParallax);
+  }, {passive:true});
+  window.addEventListener("resize", updateParallax);
+  persist();
+  renderTabs();
+  renderProducts();
+  renderCart();
+  renderLegalNotice();
+  updateParallax();
+  loadPublicProductCatalog();
+}
 
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, character => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
@@ -2569,15 +2822,22 @@ function renderManagementOrderTable() {
   const container = $("#orderTable");
   if (!container) return;
   const groups = matchingOrderGroups();
+  const pageData = managementPageSlice(groups, orderListPage);
+  orderListPage = pageData.page;
   if (selectedOrderNumber && !groups.some(group => group.number === selectedOrderNumber)) selectedOrderNumber = "";
-  container.innerHTML = groups.length ? groups.map(group => {
+  container.innerHTML = groups.length ? pageData.rows.map(group => {
     const order = group.first;
     const itemLabel = group.lines.length === 1 ? group.lines[0].product : `${group.lines.length} line items`;
     return `<button class="order-record ${selectedOrderNumber === group.number ? "selected" : ""}" type="button" data-order-select="${escapeHtml(group.number)}"><div class="order-record-main"><div class="order-record-head"><span class="admin-order-number">${escapeHtml(group.number)}</span><span class="status-pill ${statusClass(order.status)}">${escapeHtml(order.status || "Received")}</span></div><strong>${escapeHtml(order.name)} · Unit ${escapeHtml(order.unit)}</strong><p>${escapeHtml(itemLabel)} · ${escapeHtml(orderProvider(order))}</p></div><div class="order-record-side"><strong>${money(groupedOrderTotal(group))}</strong><span class="payment-pill ${orderPaymentClass(order.paymentStatus)}">${escapeHtml(order.paymentStatus || "Not recorded")}</span><small>${relativeRecordAge(order.date)}</small></div></button>`;
-  }).join("") : `<div class="workspace-empty">No orders match the current filters.</div>`;
-  $("#orderSearchCount").textContent = `${groups.length} order${groups.length === 1 ? "" : "s"} shown`;
+  }).join("") + managementPaginationMarkup("orders", pageData.page, pageData.totalPages, groups.length) : `<div class="workspace-empty">No orders match the current filters.</div>`;
+  const visibleStart = groups.length ? pageData.start + 1 : 0;
+  const visibleEnd = Math.min(pageData.start + pageData.rows.length, groups.length);
+  $("#orderSearchCount").textContent = groups.length > MANAGEMENT_LIST_PAGE_SIZE
+    ? `Showing ${visibleStart}-${visibleEnd} of ${groups.length} orders`
+    : `${groups.length} order${groups.length === 1 ? "" : "s"} shown`;
   renderOrderSummary(groups);
   renderOrderDetail(groups.find(group => group.number === selectedOrderNumber));
+  bindManagementPagination("orders", page => { orderListPage = page; selectedOrderNumber = ""; renderManagementOrderTable(); });
 
   $$('[data-order-select]').forEach(button => button.onclick = () => {
     selectedOrderNumber = button.dataset.orderSelect;
@@ -2733,17 +2993,20 @@ function renderManagementFeedback() {
   const container = $("#feedbackAdminList");
   if (!container) return;
   const matches = matchingFeedback().sort((a,b) => b.dateSubmitted.localeCompare(a.dateSubmitted));
+  const pageData = managementPageSlice(matches, feedbackListPage);
+  feedbackListPage = pageData.page;
   if (selectedFeedbackId && !matches.some(record => record.id === selectedFeedbackId)) selectedFeedbackId = "";
   const newCount = feedbackRecords.filter(record => normalizeFeedbackStatus(record.status) === "New").length;
   const reviewCount = feedbackRecords.filter(record => normalizeFeedbackStatus(record.status) === "In Review").length;
   const completedCount = feedbackRecords.filter(record => normalizeFeedbackStatus(record.status) === "Completed").length;
   $("#feedbackSummaryBar").innerHTML = `<div class="summary-stat attention"><span>New messages</span><strong>${newCount}</strong><small>Awaiting initial Management review</small></div><div class="summary-stat"><span>In review</span><strong>${reviewCount}</strong><small>Follow-up currently in progress</small></div><div class="summary-stat success"><span>Completed</span><strong>${completedCount}</strong><small>Resident issues with completed status</small></div><div class="summary-stat"><span>Visible records</span><strong>${matches.length}</strong><small>Matching the current inbox filters</small></div>`;
-  container.innerHTML = matches.length ? `<div class="feedback-inbox-list">${matches.map(record => {
+  container.innerHTML = matches.length ? `<div class="feedback-inbox-list">${pageData.rows.map(record => {
     const status = normalizeFeedbackStatus(record.status);
     return `<article class="feedback-record ${selectedFeedbackId === record.id ? "selected" : ""}" data-feedback-record="${record.id}"><button class="feedback-record-toggle" type="button" data-feedback-select="${record.id}"><div><strong>${escapeHtml(record.name)} · Unit ${escapeHtml(record.unit)}</strong><p>${escapeHtml(record.message)}</p><small>${escapeHtml(record.category)} · ${formatResidentDateTime(record.dateSubmitted)}</small></div><span><b class="status-pill ${feedbackStatusClass(status)}">${escapeHtml(status)}</b><small>${record.email ? escapeHtml(record.email) : "No email"}</small></span></button></article>`;
-  }).join("")}</div>` : `<div class="workspace-empty">No feedback matches the current filters.</div>`;
+  }).join("")}</div>${managementPaginationMarkup("feedback", pageData.page, pageData.totalPages, matches.length)}` : `<div class="workspace-empty">No feedback matches the current filters.</div>`;
   const selected = feedbackRecords.find(record => record.id === selectedFeedbackId);
   renderFeedbackDetail(selected);
+  bindManagementPagination("feedback", page => { feedbackListPage = page; selectedFeedbackId = ""; renderManagementFeedback(); });
   $$('[data-feedback-select]').forEach(button => button.onclick = () => {
     selectedFeedbackId = button.dataset.feedbackSelect;
     renderManagementFeedback();
@@ -2783,26 +3046,10 @@ function renderManagementFeedback() {
 }
 
 function renderFeedbackMetric() {
-  const grid = $("#adminOverview .metric-grid");
-  if (!grid) return;
-  $("#feedbackMetric")?.remove();
-  const newFeedback = feedbackRecords.filter(record => ["New", "In Review"].includes(normalizeFeedbackStatus(record.status))).length;
-  grid.insertAdjacentHTML("beforeend", `<button class="metric metric-button" id="feedbackMetric"><span>New feedback</span><strong>${newFeedback}</strong><small>Review messages</small></button>`);
-  $("#feedbackMetric").onclick = () => showAdminView("feedback");
+  markManagementWorkspacesDirty("overview");
+  if (currentAdminView === "overview") renderManagementWorkspace("overview");
+  else updateManagementNavigationBadges();
 }
-
-const renderAdminBase = renderAdmin;
-renderAdmin = function renderCompleteManagementDashboard() {
-  if (!window.managementAccessGranted) return;
-  renderAdminBase();
-  renderManagementOrderTable();
-  renderManagementFeedback();
-  renderFeedbackMetric();
-};
-
-["feedbackSearch","feedbackStatusFilter","feedbackCategoryFilter","feedbackDateFilter"].forEach(id => {
-  if ($(`#${id}`)) $(`#${id}`).addEventListener(id === "feedbackSearch" ? "input" : "change", renderManagementFeedback);
-});
 
 if ($("#exportFeedback")) $("#exportFeedback").onclick = () => {
   downloadCsv(`BrickellHouse-Feedback-${fileDate()}.csv`, [
