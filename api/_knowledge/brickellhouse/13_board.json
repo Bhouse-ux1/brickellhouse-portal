@@ -1,5 +1,10 @@
 {
   "id": "board",
+  "canonical_category": "board_of_directors",
+  "active": true,
+  "source_priority": "current_approved_directory",
+  "aliases_en": ["board", "board members", "board of directors", "condominium board", "association board", "association leadership", "bord", "bord members"],
+  "aliases_es": ["junta", "junta directiva", "miembros de la junta", "directores", "liderazgo de la asociaci\u00f3n", "junta diretiva"],
   "rule": "Luna may disclose Board names and titles only. Never disclose address, phone number, email, unit number, or personal information. If asked how to contact Board members, route to Management. If asked who is on the Board, use bullet points and provide names only. If asked for titles, use bullet points with title.",
   "contact_refusal_en": "Board member contact information is not provided through chat. If you need to contact the Board or submit information, please contact Management at admin@brickellhouse.net or use the feedback form at the bottom of this page.",
   "contact_refusal_es": "La información de contacto de los miembros de la Junta no se proporciona por este chat. Si necesitas contactar a la Junta o enviar información, puedes comunicarte con Management en admin@brickellhouse.net o usar el formulario de feedback al final de esta página.",

@@ -1,5 +1,17 @@
-const OPENAI_MODEL = "gpt-5.6-luna";
-const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
+const {
+  OPENAI_MODEL,
+  OPENAI_RESPONSES_URL,
+  MAX_MESSAGE_LENGTH,
+  MAX_HISTORY_MESSAGES,
+  MAX_HISTORY_MESSAGE_LENGTH,
+  MAX_RETRIEVED_MODULES,
+  OPENAI_MAX_OUTPUT_TOKENS,
+  SAFE_ERROR_MESSAGE
+} = require("./luna/utils/_constants");
+const {normalizeText, normalizeAliases, foldText} = require("./luna/utils/_strings");
+const {isSpanish, preferredLanguage, shouldReplyInSpanish, languagePreferenceReply} = require("./luna/utils/_language");
+const {createPackageResponders} = require("./luna/responders/_packages");
+const {parkingIntent, parkingContributionReply} = require("./luna/responders/_parking");
 const crypto = require("crypto");
 const {supabaseRequest} = require("./_supabase");
 const {enforceRateLimit} = require("./_rate-limit");
@@ -16,12 +28,32 @@ const {
   toApprovedEntityId,
   appendTrustedConversationTurn
 } = require("./_luna-context");
-const MAX_MESSAGE_LENGTH = 1500;
-const MAX_HISTORY_MESSAGES = 20;
-const MAX_HISTORY_MESSAGE_LENGTH = 900;
-const MAX_RETRIEVED_MODULES = 4;
-const OPENAI_MAX_OUTPUT_TOKENS = 450;
-const SAFE_ERROR_MESSAGE = "Sorry, I could not respond right now. Please try again.";
+
+function loadBoardKnowledge() {
+  try {
+    return require("./_knowledge/brickellhouse/13_board.json");
+  } catch (error) {
+    console.warn("Luna Board directory load failed", error?.name || "Error");
+    const contactRefusalEn = "Board member contact information is not provided through chat. Please contact Management at admin@brickellhouse.net.";
+    const contactRefusalEs = "La información de contacto de los miembros de la Junta no se proporciona por este chat. Contacta a Management en admin@brickellhouse.net.";
+    return {
+      id:"board",
+      canonical_category:"board_of_directors",
+      active:false,
+      source_priority:"current_approved_directory",
+      members:[],
+      retrieval_terms_en:["board", "board members", "board of directors", "president", "treasurer", "director"],
+      retrieval_terms_es:["junta", "junta directiva", "miembros de la junta", "presidente", "tesorero", "director"],
+      contact_refusal_en:contactRefusalEn,
+      contact_refusal_es:contactRefusalEs,
+      authority_claim_response_en:contactRefusalEn,
+      authority_claim_response_es:contactRefusalEs,
+      repeated_contact_refusal_en:contactRefusalEn,
+      repeated_contact_refusal_es:contactRefusalEs
+    };
+  }
+}
+
 const KNOWLEDGE = {
   constitution: require("./_knowledge/brickellhouse/00_constitution.json"),
   identityContacts: require("./_knowledge/brickellhouse/01_identity_contacts.json"),
@@ -36,7 +68,7 @@ const KNOWLEDGE = {
   faq: require("./_knowledge/brickellhouse/10_faq.json"),
   conversationStyle: require("./_knowledge/brickellhouse/11_conversation_style.json"),
   vendors: require("./_knowledge/brickellhouse/12_vendors.json"),
-  board: require("./_knowledge/brickellhouse/13_board.json")
+  board: loadBoardKnowledge()
 };
 
 const SYSTEM_INSTRUCTIONS = [
@@ -152,75 +184,6 @@ const INSIGHT_CATEGORY_LABELS = {
   unknown:"Unknown"
 };
 
-function normalizeText(value) {
-  return String(value || "").toLowerCase();
-}
-
-function normalizeAliases(text) {
-  const replacements = [
-    [/\b(amenitie|amenites|amenitys|amenitis|ammenity|amenety|amenetys|amenit|amen)\b/g, "amenity"],
-    [/\b(amenidade|amenida|ameniad)\b/g, "amenidad"],
-    [/\b(pol|poool|plol|pooll)\b/g, "pool"],
-    [/\b(piscna|picina|piscinaa)\b/g, "piscina"],
-    [/\b(gim|gymm|gymn)\b/g, "gym"],
-    [/\b(gimnacio|gimansio|jimnasio|gimnasioo)\b/g, "gimnasio"],
-    [/\b(souna|suna|saunna)\b/g, "sauna"],
-    [/\b(steem|steamm)\b/g, "steam"],
-    [/\b(vapoor|bapor)\b/g, "vapor"],
-    [/\b(massge|masage|massagee)\b/g, "massage"],
-    [/\b(masajesa|masje)\b/g, "masaje"],
-    [/\b(bbqq|barbeque|barbecue)\b/g, "bbq"],
-    [/\b(pakage|packagee|packge|pacakge|paket)\b/g, "package"],
-    [/\b(paqute|pakete|paquetee|paqete)\b/g, "paquete"],
-    [/\b(recieving|receving|receivin|receivng)\b/g, "receiving"],
-    [/\b(reciviendo|recibiendo|recepcion paquetes)\b/g, "receiving"],
-    [/\b(parkng|parkin|parcking)\b/g, "parking"],
-    [/\b(garag|garadge)\b/g, "garage"],
-    [/\b(elevater|elevtor|elevatorr)\b/g, "elevator"],
-    [/\b(fridge|frig|refridgerator|refrigator|refrigerater|refridger|refridg)\b/g, "refrigerator"],
-    [/\b(refri|refrigerado|refrijerador)\b/g, "refrigerador"],
-    [/\bdish\s+washer\b/g, "dishwasher"],
-    [/\b(dishwahser|dishwaser)\b/g, "dishwasher"],
-    [/\b(ac|a\/c|air conditioning|airconditioner|air cond|aircon)\b/g, "air conditioner"],
-    [/\b(my air|air broke)\b/g, "my air conditioner"],
-    [/\b(airee|aire malo)\b/g, "aire"],
-    [/\b(maint|maintanance|maintenence|maintnance)\b/g, "maintenance"],
-    [/\b(theatree)\b/g, "theater"],
-    [/\b(loungee|owner lounge)\b/g, "owners lounge"],
-    [/\b(clubroom|clubrm)\b/g, "club room"],
-    [/\b(paqute|pakete|paqete)\b/g, "paquete"],
-    [/\b(yave|labe|llabe|yavee)\b/g, "llave"],
-    [/\b(buson)\b/g, "buzon"],
-    [/\b(correoo|coreo)\b/g, "correo"],
-    [/\b(unidadd|uniddad)\b/g, "unidad"],
-    [/\b(lavadra|labadora)\b/g, "lavadora"],
-    [/\b(secadoda|secadoraa)\b/g, "secadora"],
-    [/\b(plomer)\b/g, "plomeria"],
-    [/\b(electrisidad|electricida)\b/g, "electricidad"],
-    [/\b(administracion|admin)\b/g, "administrador"],
-    [/\b(resepcion)\b/g, "recepcion"],
-    [/\b(fridge broke|my fridge)\b/g, "refrigerator not working"],
-    [/\b(dishwasher broke|washer broke|dryer broke)\b/g, "$1 not working"],
-    [/\b(my ac|my air conditioner|air conditioner broke)\b/g, "my air conditioner"],
-    [/\blost key\b/g, "key"],
-    [/\bmail key\b/g, "mailbox key"],
-    [/\b(garage remote|parking remote|garage clicker|parking clicker)\b/g, "parking fob"],
-    [/\b(mail room|package room|package locker|amazon locker)\b/g, "receiving package locker"],
-    [/\b(se dano|se daño|no sirve|no prende|se rompio|se rompió)\b/g, "no funciona"],
-    [/\b(no enfria|no enfría)\b/g, "no enfria"],
-    [/\b(perdi la llave|perdí la llave)\b/g, "perdi mi llave"],
-    [/\b(llave correo)\b/g, "llave del correo"],
-    [/\b(llave buzon|llave buzón)\b/g, "llave del buzon"],
-    [/\b(llave apartamento)\b/g, "llave del apartamento"],
-    [/\b(paquete amazon|locker amazon)\b/g, "amazon locker package"]
-  ];
-  return replacements.reduce((result, [pattern, replacement]) => result.replace(pattern, replacement), text);
-}
-
-function foldText(value) {
-  return normalizeAliases(normalizeText(value).normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
-}
-
 function validateHistory(history) {
   if (!Array.isArray(history)) return [];
   return history.slice(-MAX_HISTORY_MESSAGES).map(item => {
@@ -236,13 +199,43 @@ function buildContextText(message, history) {
   return `${recent}\n${message}`;
 }
 
+function approvedStructuredTerms(moduleName, knowledge) {
+  if (!knowledge || typeof knowledge !== "object") return [];
+  if (moduleName === "identityContacts") {
+    return Object.values(knowledge.contacts || {}).flatMap(contact => {
+      if (!contact || typeof contact !== "object" || contact.active === false) return [];
+      return [contact.name, contact.title, ...(contact.aliases_en || []), ...(contact.aliases_es || [])].filter(Boolean);
+    });
+  }
+  if (moduleName === "board") {
+    const directory = boardDirectoryStatus(knowledge);
+    return [
+      ...(knowledge.aliases_en || []),
+      ...(knowledge.aliases_es || []),
+      ...directory.members.flatMap(member => [member.name, member.title])
+    ];
+  }
+  if (moduleName === "vendors") {
+    return Object.entries(knowledge).flatMap(([category, entries]) => {
+      if (!Array.isArray(entries)) return [];
+      return [category.replace(/_/g, " "), ...entries.map(entry => String(entry).split(":")[0].trim())];
+    });
+  }
+  if (moduleName === "residentStore") {
+    return Object.values(knowledge.product_topics || {}).flatMap(topic => topic.aliases || []);
+  }
+  return [];
+}
+
 function moduleTerms(rule) {
   const knowledge = KNOWLEDGE[rule.module] || {};
   return [
     ...rule.keywords,
     ...(knowledge.retrieval_terms_en || []),
     ...(knowledge.retrieval_terms_es || []),
-    ...(knowledge.aliases_es || [])
+    ...(knowledge.aliases_en || []),
+    ...(knowledge.aliases_es || []),
+    ...approvedStructuredTerms(rule.module, knowledge)
   ];
 }
 
@@ -337,8 +330,35 @@ function uniqueEntities(entities) {
   });
 }
 
-function boardEntityRecords() {
-  return KNOWLEDGE.board.members.map(member => ({
+function boardDirectoryStatus(boardKnowledge = KNOWLEDGE.board) {
+  if (!boardKnowledge || typeof boardKnowledge !== "object" || boardKnowledge.active === false || !Array.isArray(boardKnowledge.members)) {
+    return {status:"unavailable",members:[],reason:"source-unavailable"};
+  }
+  const members = boardKnowledge.members.filter(member => member && String(member.name || "").trim() && String(member.title || "").trim());
+  if (!members.length) return {status:"unavailable",members:[],reason:"source-unavailable"};
+  const names = new Map();
+  const exclusiveRoles = new Map();
+  let conflict = members.length !== boardKnowledge.members.length;
+  for (const member of members) {
+    const name = foldText(member.name);
+    const priorTitle = names.get(name);
+    if (priorTitle && priorTitle !== foldText(member.title)) conflict = true;
+    names.set(name, foldText(member.title));
+    const title = foldText(member.title);
+    if (["president", "treasurer", "vp", "vice president"].includes(title)) {
+      if (exclusiveRoles.has(title) && exclusiveRoles.get(title) !== name) conflict = true;
+      exclusiveRoles.set(title, name);
+    }
+  }
+  return conflict
+    ? {status:"conflict",members,reason:"conflicting-approved-directory"}
+    : {status:"available",members,reason:null};
+}
+
+function boardEntityRecords(boardKnowledge = KNOWLEDGE.board) {
+  const directory = boardDirectoryStatus(boardKnowledge);
+  if (directory.status !== "available") return [];
+  return directory.members.map(member => ({
     type:"board",
     id:toApprovedEntityId(member.name),
     name:member.name,
@@ -346,10 +366,10 @@ function boardEntityRecords() {
   }));
 }
 
-function findBoardMember(query) {
+function findBoardMember(query, boardKnowledge = KNOWLEDGE.board) {
   const text = foldText(query);
   if (!text) return [];
-  const records = boardEntityRecords();
+  const records = boardEntityRecords(boardKnowledge);
   const fullMatches = records.filter(member => text.includes(foldText(member.name)));
   if (fullMatches.length) return fullMatches;
   const tokens = new Set(text.match(/[a-z0-9]+/g) || []);
@@ -437,10 +457,12 @@ function findVendor(query) {
     handyman:["handyman"],
     movers_storage_trash_pickup:["mover", "moving", "storage", "trash pickup", "mudanza"]
   };
-  return vendorEntityRecords().filter(vendor => {
-    if (text.includes(foldText(vendor.name))) return true;
-    return vendor.services.some(service => (serviceAliases[service] || []).some(alias => text.includes(foldText(alias))));
-  });
+  const records = vendorEntityRecords();
+  const namedMatches = records.filter(vendor => text.includes(foldText(vendor.name)));
+  if (namedMatches.length) return namedMatches;
+  return records.filter(vendor => vendor.services.some(service => (
+    (serviceAliases[service] || []).some(alias => text.includes(foldText(alias)))
+  )));
 }
 
 function amenityEntityRecords() {
@@ -494,7 +516,7 @@ function findParkingEntity(query) {
 function contactEntityRecords() {
   const contacts = KNOWLEDGE.identityContacts.contacts;
   return [
-    {type:"contact",id:"management",name:"Management",...getApprovedContact("management")},
+    {type:"contact",id:"management",name:contacts.management?.name || "Management Office",...getApprovedContact("management")},
     {type:"contact",id:"receiving",name:"Receiving Office",...getApprovedContact("receiving")},
     {type:"contact",id:"front_desk",name:"Front Desk",...getApprovedContact("front_desk")},
     {type:"contact",id:"maintenance",name:"Maintenance",...getApprovedContact("maintenance")}
@@ -504,6 +526,12 @@ function contactEntityRecords() {
 function findContactEntity(query) {
   const text = foldText(query);
   if (!text) return [];
+  const contacts = KNOWLEDGE.identityContacts.contacts;
+  const managementAliases = [
+    ...(contacts.management?.aliases_en || []),
+    ...(contacts.management?.aliases_es || [])
+  ];
+  const namesAnotherOffice = /\b(receiving(?: office)?|package office|front desk|reception|recepcion|maintenance office|oficina de mantenimiento)\b/.test(text);
   return contactEntityRecords().filter(entity => {
     const aliases = entity.id === "receiving"
       ? ["receiving", "receiving office", "package office", "recepcion de paquetes"]
@@ -511,7 +539,7 @@ function findContactEntity(query) {
         ? ["front desk", "reception", "recepcion"]
         : entity.id === "maintenance"
           ? ["maintenance", "mantenimiento"]
-          : ["management", "management office", "oficina de management"];
+          : managementAliases.filter(alias => foldText(alias) !== "office" || !namesAnotherOffice);
     return aliases.some(alias => text.includes(foldText(alias)));
   });
 }
@@ -538,11 +566,23 @@ function getApprovedContact(role) {
   const contacts = KNOWLEDGE.identityContacts.contacts;
   const key = role === "front desk" ? "front_desk" : foldText(role).replace(/\s+/g, "_");
   const contact = contacts[key];
-  if (!contact || typeof contact !== "object") return null;
+  if (!contact || typeof contact !== "object" || contact.active === false) return null;
+  const approvedHours = [contact.hours, contact.office_hours].filter(Boolean);
+  const hoursConflict = new Set(approvedHours.map(value => foldText(value))).size > 1;
   return {
+    name:contact.name || null,
+    active:contact.active !== false,
+    sourcePriority:contact.source_priority || "current_approved_structured_building_record",
     email:contact.email || null,
     extension:contact.extension || null,
-    hours:contact.hours || contact.office_hours || null,
+    hours:hoursConflict ? null : approvedHours[0] || null,
+    location:contact.location || null,
+    locationEs:contact.location_es || null,
+    opensAt:contact.opens_at || null,
+    closesAt:contact.closes_at || null,
+    openDays:Array.isArray(contact.open_days) ? [...contact.open_days] : [],
+    aliases:[...(contact.aliases_en || []), ...(contact.aliases_es || [])],
+    conflict:hoursConflict,
     mainNumber:contacts.main_number || null
   };
 }
@@ -599,17 +639,22 @@ function hydrateEntityReference(reference, products = []) {
 }
 
 function detectRequestedAttribute(message) {
+  return detectRequestedAttributes(message)[0] || "unknown";
+}
+
+function detectRequestedAttributes(message) {
   const text = foldText(message);
-  if (/\b(position|title|role|cargo|puesto)\b/.test(text)) return "position";
-  if (/\b(email|correo)\b/.test(text)) return "email";
-  if (/\b(phone|phone number|number|telefono|numero)\b/.test(text)) return "phone";
-  if (/\b(hours|open|close|horario|abre|cierra)\b/.test(text)) return "hours";
-  if (/\b(price|cost|how much|precio|cuanto cuesta|cuánto cuesta)\b/.test(text)) return "price";
-  if (/\b(rule|rules|policy|allowed|permitido|regla|reglas|politica)\b/.test(text)) return "policy";
-  if (/\b(contact|reach|contacto|comunicar)\b/.test(text)) return "contact";
-  if (/\b(available|availability|disponible|disponibilidad)\b/.test(text)) return "availability";
-  if (/\b(where|location|donde|ubicacion)\b/.test(text)) return "location";
-  return "unknown";
+  const attributes = [];
+  if (/\b(position|title|role|cargo|puesto)\b/.test(text)) attributes.push("position");
+  if (/\b(email|correo)\b/.test(text)) attributes.push("email");
+  if (/\b(phone|phone number|number|telefono|numero)\b/.test(text)) attributes.push("phone");
+  if (/\b(hours|open|close|horario|abre|cierra|opening|closing)\b/.test(text)) attributes.push("hours");
+  if (/\b(price|cost|how much|precio|cuanto cuesta|cuánto cuesta)\b/.test(text)) attributes.push("price");
+  if (/\b(rule|rules|policy|allowed|permitido|regla|reglas|politica)\b/.test(text)) attributes.push("policy");
+  if (/\b(contact|reach|contacto|comunicar)\b/.test(text)) attributes.push("contact");
+  if (/\b(available|availability|disponible|disponibilidad)\b/.test(text)) attributes.push("availability");
+  if (/\b(where|location|floor|find|donde|ubicacion|piso|encuentro)\b/.test(text)) attributes.push("location");
+  return attributes;
 }
 
 function hasUnverifiedIdentityClaim(message) {
@@ -622,7 +667,64 @@ function hasSingularReference(message) {
 }
 
 function hasPluralReference(message) {
-  return /\b(they|them|their|those|ellos|ellas|sus|esos|esas)\b/.test(foldText(message));
+  return /\b(they|them|their|those|both|ellos|ellas|sus|esos|esas|ambos|ambas)\b/.test(foldText(message));
+}
+
+function hasEitherReference(message) {
+  return /\b(either|cualquiera de los dos|cualquiera de las dos)\b/.test(foldText(message));
+}
+
+function alternativeReference(message) {
+  const text = foldText(message);
+  if (/\b(the second one|second one|el segundo|la segunda)\b/.test(text)) return "second";
+  if (/\b(the other one|other one|the other|el otro|la otra)\b/.test(text) || /^other[.!?]?$/.test(text.trim())) return "other";
+  return null;
+}
+
+function entityKey(entity) {
+  return entity ? `${entity.type}:${entity.id}` : "";
+}
+
+function negatedEntityKeys(message, products, priorEntities) {
+  const text = foldText(message);
+  const rejected = new Set();
+  const pattern = /\bnot\s+(.+?)(?=,|;|\bbut\b|\binstead\b|$)/g;
+  let match;
+  while ((match = pattern.exec(text)) !== null) {
+    findApprovedEntities(match[1], products).forEach(entity => rejected.add(entityKey(entity)));
+  }
+  if (/\bnot\s+(him|her|it)\b/.test(text) && priorEntities.length === 1) {
+    rejected.add(entityKey(priorEntities[0]));
+  }
+  return rejected;
+}
+
+function hasCorrectionNegation(message) {
+  return /^(?:no[,.]?\s+)?not\b/.test(foldText(message).trim());
+}
+
+function explicitTopicForMessage(message, products) {
+  const topics = [...new Set(findApprovedEntities(message, products).map(entityTopic).filter(topic => topic !== "unknown"))];
+  if (topics.length === 1) return topics[0];
+  const detected = detectTopic(message);
+  return {
+    board:"board",
+    vendor:"vendors",
+    parking:"parkingAps",
+    amenity:"amenities",
+    package:"packagesReceiving",
+    mailbox_key:"residentStore",
+    parking_fob:"residentStore"
+  }[detected] || "unknown";
+}
+
+function latestExplicitTopic(history, products) {
+  for (const item of history.slice().reverse()) {
+    if (item.role !== "user") continue;
+    const topic = explicitTopicForMessage(item.content, products);
+    if (topic !== "unknown") return topic;
+  }
+  return "unknown";
 }
 
 function entityTopic(entity) {
@@ -645,7 +747,19 @@ function publicLookupResult(entity) {
   if (entity.type === "vendor") return {...base,service:entity.service,contact:entity.contact};
   if (entity.type === "amenity") return {...base,hours:entity.hours,details:entity.details};
   if (entity.type === "parking") return {...base,hours:entity.hours};
-  if (entity.type === "contact") return {...base,email:entity.email,extension:entity.extension,hours:entity.hours,mainNumber:entity.mainNumber};
+  if (entity.type === "contact") return {
+    ...base,
+    email:entity.email,
+    extension:entity.extension,
+    hours:entity.hours,
+    location:entity.location,
+    opensAt:entity.opensAt,
+    closesAt:entity.closesAt,
+    openDays:entity.openDays,
+    sourcePriority:entity.sourcePriority,
+    conflict:entity.conflict,
+    mainNumber:entity.mainNumber
+  };
   if (entity.type === "product") return {...base,category:entity.category,description:entity.description,price:entity.price};
   return base;
 }
@@ -665,24 +779,55 @@ function resolveConversationContext(message, history = [], products = [], priorS
   const approvedProductIds = products.map(product => product.id);
   const stateOptions = {approvedProductIds};
   const safePrior = sanitizeConversationState(priorState, stateOptions);
-  const currentEntities = findApprovedEntities(message, products);
   const priorCandidates = safePrior.candidateReferents
     .map(reference => hydrateEntityReference(reference, products))
     .filter(Boolean);
   const priorEntities = safePrior.entities
     .map(reference => hydrateEntityReference(reference, products))
     .filter(Boolean);
-  const recentEntities = uniqueEntities(history.slice(-8).reverse().flatMap(item => findApprovedEntities(item.content, products)));
-  let candidates = currentEntities.length ? currentEntities : uniqueEntities([...priorCandidates, ...priorEntities, ...recentEntities]);
-  let requestedAttribute = detectRequestedAttribute(message);
-  if (requestedAttribute === "unknown" && currentEntities.length && safePrior.lastRequestedAttribute !== "unknown") {
-    requestedAttribute = safePrior.lastRequestedAttribute;
+  const rejectedKeys = negatedEntityKeys(message, products, priorEntities);
+  let currentEntities = findApprovedEntities(message, products)
+    .filter(entity => !rejectedKeys.has(entityKey(entity)));
+  const hasEntityReference = hasSingularReference(message) || hasPluralReference(message);
+  if (hasEntityReference && priorEntities.length === 1 && currentEntities.length > 1) {
+    const stableEntity = currentEntities.find(entity => entityKey(entity) === entityKey(priorEntities[0]));
+    if (stableEntity) currentEntities = [stableEntity];
   }
-  const referenceOnly = hasSingularReference(message) || hasPluralReference(message) || needsRecentContext(message);
-  const currentTopic = currentEntities.length === 1
-    ? entityTopic(currentEntities[0])
-    : retrieval.ranked?.[0]?.module || (referenceOnly ? safePrior.activeTopic : "unknown");
-  if (!currentEntities.length && currentTopic !== "unknown") {
+  const recentEntities = uniqueEntities(history.slice(-8).reverse().flatMap(item => findApprovedEntities(item.content, products)));
+  let candidates = (currentEntities.length ? currentEntities : uniqueEntities([...priorCandidates, ...priorEntities, ...recentEntities]))
+    .filter(entity => !rejectedKeys.has(entityKey(entity)));
+  const alternative = alternativeReference(message);
+  let unresolvedAlternative = false;
+  if (alternative === "second" && candidates.length === 2) {
+    candidates = [candidates[1]];
+  } else if (alternative === "other" && candidates.length === 2 && priorEntities.length === 1) {
+    const otherCandidates = candidates.filter(entity => entityKey(entity) !== entityKey(priorEntities[0]));
+    if (otherCandidates.length === 1) candidates = otherCandidates;
+    else unresolvedAlternative = true;
+  } else if (alternative) {
+    unresolvedAlternative = true;
+  }
+  let requestedAttributes = detectRequestedAttributes(message);
+  let requestedAttribute = requestedAttributes[0] || "unknown";
+  if (requestedAttribute === "unknown" && (currentEntities.length || rejectedKeys.size || alternative) && safePrior.lastRequestedAttribute !== "unknown") {
+    requestedAttribute = safePrior.lastRequestedAttribute;
+    requestedAttributes = [requestedAttribute];
+  }
+  const referenceOnly = hasEntityReference || hasEitherReference(message) || alternative || hasCorrectionNegation(message) || needsRecentContext(message);
+  const currentEntityTopics = [...new Set(currentEntities.map(entityTopic).filter(topic => topic !== "unknown"))];
+  const recentExplicitTopic = referenceOnly ? latestExplicitTopic(history, products) : "unknown";
+  const currentTopic = currentEntityTopics.length === 1
+    ? currentEntityTopics[0]
+    : referenceOnly
+      ? recentExplicitTopic !== "unknown"
+        ? recentExplicitTopic
+        : safePrior.activeTopic !== "unknown"
+          ? safePrior.activeTopic
+          : retrieval.ranked?.[0]?.module || "unknown"
+      : retrieval.ranked?.[0]?.module || "unknown";
+  const candidateTopics = new Set(candidates.map(entityTopic));
+  const preserveCrossCategory = hasPluralReference(message) && candidateTopics.size > 1;
+  if (!currentEntities.length && currentTopic !== "unknown" && !preserveCrossCategory) {
     const sameTopic = candidates.filter(entity => entityTopic(entity) === currentTopic);
     if (sameTopic.length) candidates = sameTopic;
   }
@@ -694,6 +839,10 @@ function resolveConversationContext(message, history = [], products = [], priorS
   const ambiguous = (currentEntities.length > 1 && (requestedAttribute !== "unknown" || hasSingularReference(message) || sharedBoardName))
     || (hasSingularReference(message) && candidates.length > 1)
     || (hasPluralReference(message) && candidateTypes.size > 1)
+    || (hasEitherReference(message) && candidates.length !== 1)
+    || unresolvedAlternative
+    || (hasCorrectionNegation(message) && rejectedKeys.size === 0 && candidates.length !== 1)
+    || (rejectedKeys.size > 0 && candidates.length === 0)
     || ((hasSingularReference(message) || hasPluralReference(message)) && candidates.length === 0);
   const selectedEntity = !ambiguous && candidates.length === 1 ? candidates[0] : null;
   const state = sanitizeConversationState({
@@ -708,11 +857,132 @@ function resolveConversationContext(message, history = [], products = [], priorS
     candidates,
     selectedEntity,
     requestedAttribute,
+    requestedAttributes,
     ambiguity:ambiguous ? clarificationForCandidates(candidates, shouldReplyInSpanish(message, history)) : null,
     identityClaim:hasUnverifiedIdentityClaim(message),
     lookupResults:candidates.map(publicLookupResult).filter(Boolean),
     policy,
     approvedProductIds
+  };
+}
+
+function strengthenRetrievalForResolution(retrieval, resolution) {
+  const category = resolution?.selectedEntity
+    ? entityTopic(resolution.selectedEntity)
+    : resolution?.state?.activeTopic || "unknown";
+  const canRetry = category !== "unknown" && Boolean(KNOWLEDGE[category]);
+  const alreadySelected = retrieval.selectedModules.includes(category);
+  if (!canRetry || alreadySelected) {
+    return {...retrieval,retry:{performed:false,category:canRetry ? category : "unknown",attribute:resolution?.requestedAttribute || "unknown"}};
+  }
+  return {
+    ...retrieval,
+    selectedModules:[...retrieval.selectedModules, category],
+    retry:{performed:true,category,attribute:resolution?.requestedAttribute || "unknown"}
+  };
+}
+
+function approvedAttributeAvailable(entity, attribute, resolution) {
+  if (!entity) return false;
+  if (attribute === "unknown") return true;
+  if (attribute === "position") return Boolean(entity.title);
+  if (attribute === "email") return Boolean(entity.email);
+  if (attribute === "phone") return Boolean(entity.mainNumber || entity.contact);
+  if (attribute === "hours") return Boolean(entity.hours);
+  if (attribute === "price") return entity.price !== undefined && entity.price !== null;
+  if (attribute === "policy") return Boolean(resolution?.policy);
+  if (attribute === "contact") return Boolean(entity.email || entity.mainNumber || entity.contact);
+  if (attribute === "availability") return entity.type === "product";
+  if (attribute === "location") return Boolean(entity.location);
+  return false;
+}
+
+function groundingFallbackDirective(outcome) {
+  return {
+    answered:"Answer directly from the approved structured result.",
+    "approved-knowledge-retrieved":"Use only the retrieved approved knowledge. Do not infer missing building facts.",
+    ambiguity:"Ask one concise clarification question and do not guess.",
+    "source-unavailable":"State that the current approved information could not be retrieved at the moment and provide approved Management guidance when appropriate.",
+    "knowledge-missing":"State that no approved information supports the requested fact and provide approved Management guidance when appropriate.",
+    conflict:"State that the approved information needs verification; do not select one conflicting value.",
+    restricted:"Refuse only the restricted portion and answer any separate safe portion from approved knowledge.",
+    "retrieval-miss":"Do not treat model knowledge as building authority; clarify or use a safe unavailable-information response."
+  }[outcome] || "Use only approved knowledge and do not guess.";
+}
+
+function assessKnowledgeGrounding(message, retrieval, resolution, options = {}) {
+  const category = resolution?.selectedEntity
+    ? entityTopic(resolution.selectedEntity)
+    : resolution?.state?.activeTopic !== "unknown"
+      ? resolution.state.activeTopic
+      : retrieval.ranked?.[0]?.module || "unknown";
+  const boardStatus = options.boardStatus || (category === "board" ? boardDirectoryStatus().status : "available");
+  const sourceUnavailable = options.sourceUnavailable === true
+    || boardStatus === "unavailable"
+    || (options.needsCatalog && options.catalogStatus === "unavailable");
+  const conflict = options.conflict === true
+    || boardStatus === "conflict"
+    || Boolean(resolution?.selectedEntity?.conflict);
+  const restricted = paymentDataRequest(message)
+    || privateInfoRequest(message)
+    || privateBoardContactRequest(message)
+    || protectedInternalRequest(message);
+  let confidence = "NONE";
+  let outcome = "retrieval-miss";
+  if (restricted) {
+    outcome = "restricted";
+  } else if (conflict) {
+    outcome = "conflict";
+  } else if (sourceUnavailable) {
+    outcome = "source-unavailable";
+  } else if (resolution?.ambiguity) {
+    confidence = "LOW";
+    outcome = "ambiguity";
+  } else if (resolution?.selectedEntity) {
+    const requestedAttributes = resolution.requestedAttributes?.length
+      ? resolution.requestedAttributes
+      : [resolution.requestedAttribute || "unknown"];
+    const attributesAvailable = requestedAttributes.every(attribute => approvedAttributeAvailable(resolution.selectedEntity, attribute, resolution));
+    confidence = attributesAvailable ? "HIGH" : "NONE";
+    outcome = attributesAvailable ? "answered" : "knowledge-missing";
+  } else if (category !== "unknown" && retrieval.selectedModules.includes(category)) {
+    confidence = retrieval.strength === "weak" ? "LOW" : "MEDIUM";
+    outcome = confidence === "LOW" ? "retrieval-miss" : "approved-knowledge-retrieved";
+  } else if (retrieval.strength !== "none") {
+    confidence = "LOW";
+    outcome = "retrieval-miss";
+  } else {
+    outcome = "knowledge-missing";
+  }
+  return {
+    confidence,
+    outcome,
+    category,
+    approvedKnowledgeExists:category !== "unknown" && Boolean(KNOWLEDGE[category]),
+    retrievalSucceeded:category !== "unknown" && retrieval.selectedModules.includes(category),
+    clarificationRequired:outcome === "ambiguity" || confidence === "LOW",
+    sourceCategory:category,
+    fallbackDirective:groundingFallbackDirective(outcome)
+  };
+}
+
+function assessResponseCompleteness(message, reply, resolution) {
+  const response = foldText(reply);
+  const requestedAttributes = resolution?.requestedAttributes || [];
+  const managementSelected = resolution?.selectedEntity?.type === "contact" && resolution.selectedEntity.id === "management";
+  const missingAttributes = managementSelected
+    ? requestedAttributes.filter(attribute => {
+      if (attribute === "location") return !/\b(third floor|tercer piso)\b/.test(response);
+      if (attribute === "hours") return !(/\b9:00 am\b/.test(response) && /\b5:00 pm\b/.test(response));
+      return false;
+    })
+    : [];
+  const intentCount = splitCompoundIntents(message).length;
+  return {
+    status:missingAttributes.length ? "incomplete" : "complete",
+    intentCount,
+    requestedAttributeCount:requestedAttributes.length,
+    missingAttributes
   };
 }
 
@@ -760,6 +1030,9 @@ function structuredConversationReply(message, history, resolution) {
     return spanish ? `${entity.name} está disponible ${entity.hours}.` : `${entity.name} is available ${entity.hours}.`;
   }
   if (entity.type === "contact") {
+    if (entity.id === "management" && resolution.requestedAttributes?.some(value => ["hours", "location"].includes(value))) {
+      return managementOfficeInformationReply(message, history, entity);
+    }
     if (attribute === "email" && entity.email) return spanish ? `El correo de ${entity.name} es ${entity.email}.` : `${entity.name} email is ${entity.email}.`;
     if (attribute === "hours" && entity.hours) return spanish ? `El horario de ${entity.name} es ${entity.hours}.` : `${entity.name} hours are ${entity.hours}.`;
     if ((attribute === "phone" || attribute === "contact") && entity.mainNumber) {
@@ -820,51 +1093,20 @@ function buildOpenAiRequest(message, history, products, retrieval, structuredCon
   };
 }
 
-function logLunaRoute(path, retrieval) {
+function logLunaRoute(path, retrieval, diagnostics = {}) {
   console.info("Luna routing", {
     path,
     route:retrieval.route,
     strength:retrieval.strength,
-    sources:retrieval.selectedModules
+    sources:retrieval.selectedModules,
+    category:diagnostics.category || "unknown",
+    outcome:diagnostics.outcome || (path === "model" ? "model-fallback" : "answered"),
+    confidence:diagnostics.confidence || "NONE",
+    approvedKnowledgeExists:Boolean(diagnostics.approvedKnowledgeExists),
+    retrievalSucceeded:Boolean(diagnostics.retrievalSucceeded),
+    clarificationIssued:Boolean(diagnostics.clarificationRequired),
+    completeness:diagnostics.completeness || "not-assessed"
   });
-}
-
-function isSpanish(message) {
-  const text = normalizeText(message);
-  return /[¿¡ñáéíóúü]/i.test(message)
-    || /\b(necesito|puedes|puedo|reservar|paquete|plomero|contesta|contestan|unidad|quien|quién|vive|hoy|proveedor|proveedores|gracias|hola|no encuentro|perdí|perdi|llave|correo|buzón|buzon|se puede|hablando|jefe|modelo|administra|junta|gimnasio|dime|soy|presidente|monto|saldo|cuenta|aceite|alfombra|recepción|recepcion|administrador|aire|enfria|enfría|lavadora|secadora|nevera|refrigerador|refri|lavaplatos|horno|microondas|plomeria|plomería|sirve|prende|daño|dano|rompio|rompió)\b/.test(text);
-}
-
-function preferredLanguage(message, history = []) {
-  const current = foldText(message);
-  if (/\b(let'?s continue in english|please answer in english|answer in english|speak english|english please)\b/.test(current)) return "en";
-  if (/\b(solo hablo espanol|solo hablo español|solo hablo espa.ol|hablame en espanol|háblame en español|prefiero espanol|prefiero español|en espanol por favor|en español por favor)\b/.test(current)) return "es";
-  for (const item of history.slice().reverse()) {
-    if (item.role !== "user") continue;
-    const text = foldText(item.content);
-    if (/\b(let'?s continue in english|please answer in english|answer in english|speak english|english please)\b/.test(text)) return "en";
-    if (/\b(solo hablo espanol|solo hablo español|solo hablo espa.ol|hablame en espanol|háblame en español|prefiero espanol|prefiero español|en espanol por favor|en español por favor)\b/.test(text)) return "es";
-  }
-  return null;
-}
-
-function shouldReplyInSpanish(message, history = []) {
-  const preference = preferredLanguage(message, history);
-  if (preference === "es") return true;
-  if (preference === "en") return false;
-  return isSpanish(message) || history.slice(-4).some(item => isSpanish(item.content));
-}
-
-function languagePreferenceReply(message) {
-  const preference = preferredLanguage(message, []);
-  if (preference === "es") return "Claro, seguimos en español.";
-  if (preference === "en") return "Of course, we can continue in English.";
-  return null;
-}
-
-function hasPackageContext(message, history) {
-  const text = normalizeText(buildContextText(message, history.slice(-4)));
-  return /\b(package|packages|receiving|amazon|locker|paquete|paquetes|receiving office|recepción|recepcion)\b/.test(text);
 }
 
 function alreadyTried(message) {
@@ -895,6 +1137,17 @@ function alreadyTried(message) {
     "que pasa si no contestan"
   ].some(phrase => text.includes(phrase));
 }
+
+const {
+  hasPackageContext,
+  packageIntent,
+  packageReply,
+  packageContributionReply
+} = createPackageResponders({
+  buildContextText,
+  alreadyTried,
+  receivingEmail:KNOWLEDGE.identityContacts.contacts.receiving.email
+});
 
 function detectTopic(value) {
   const text = foldText(value);
@@ -1026,7 +1279,7 @@ function hasBoardContext(message, history) {
   const terms = [
     ...(KNOWLEDGE.board.retrieval_terms_en || []),
     ...(KNOWLEDGE.board.retrieval_terms_es || []),
-    ...KNOWLEDGE.board.members.flatMap(member => [member.name, member.title])
+    ...(Array.isArray(KNOWLEDGE.board.members) ? KNOWLEDGE.board.members : []).flatMap(member => [member.name, member.title])
   ];
   return terms.some(term => text.includes(foldText(term)));
 }
@@ -1054,11 +1307,13 @@ function boardContactRequest(message, history) {
   return (boardContext && asksContact) || (boardContext && hasAuthorityClaim(message)) || (boardContext && pressure);
 }
 
-function boardInfoReply(message, history) {
+function boardInfoReply(message, history, boardKnowledge = KNOWLEDGE.board) {
   const text = foldText(message);
   const spanish = shouldReplyInSpanish(message, history);
   const boardWasRecent = history.slice(-4).some(item => hasBoardContext(item.content, []));
-  const referencedMembers = KNOWLEDGE.board.members.filter(member => history.slice(-4).some(item => foldText(item.content).includes(foldText(member.name))));
+  const directory = boardDirectoryStatus(boardKnowledge);
+  const members = directory.members;
+  const referencedMembers = members.filter(member => history.slice(-4).some(item => foldText(item.content).includes(foldText(member.name))));
   const asksAmbiguousSingular = boardWasRecent
     && referencedMembers.length !== 1
     && /\b(who is he|who is she|what is his title|what is her title|quien es el|quien es ella|cual es su cargo)\b/.test(text);
@@ -1068,13 +1323,25 @@ function boardInfoReply(message, history) {
       : "Which Board member are you asking about?";
   }
 
-  const asksBoardMembers = /\b(who are the board members|who is on the board|who sits on the condominium board|who sits on the board|board members|tell me about the board|who are the directors|quienes son los miembros de la junta|quien esta en la junta|miembros de la junta|quienes integran la junta directiva|quienes son los directores)\b/.test(text);
-  const asksConfirmation = hasBoardContext(message, history) && /\b(are these the board members|are they the board members|son los miembros de la junta|estos son los miembros de la junta|son ellos los miembros)\b/.test(text);
+  const asksBoardMembers = /\b(who are the board members|who is on the board|who sits on the condominium board|who sits on the board|who serves on the association board|list the board|list the board members|board members|board of directors|tell me about the board|who are the directors|quienes estan en la junta|quienes son los miembros de la junta|quien esta en la junta|miembros de la junta|quienes integran la junta directiva|quienes sirven en la junta|quienes son los directores)\b/.test(text);
+  const asksConfirmation = hasBoardContext(message, history) && /\b(are these the board members|are they the board members|estos son los miembros de la junta|son ellos los miembros)\b/.test(text);
   const asksTitles = /\b(title|titles|role|roles|cargo|cargos|what are their titles|cuales son sus cargos)\b/.test(text);
   const asksPresident = /\b(who leads the association|who is the board president|who is president|who is the president|quien preside la asociacion|quien es el presidente)\b/.test(text);
   const asksTreasurer = /\b(who is the treasurer|quien es el tesorero)\b/.test(text);
   const asksVicePresident = /\b(who is the vice president|who is the vp|quien es el vicepresidente)\b/.test(text);
   const asksDirectors = /\b(who are the directors|quienes son los directores)\b/.test(text);
+  const asksUnlistedRole = /\b(who is the (?:board )?(secretary|chair|chairperson)|quien es (?:el|la) (?:secretario|secretaria) de la junta)\b/.exec(text);
+  const asksDirectoryInformation = asksBoardMembers || asksConfirmation || asksTitles || asksPresident || asksTreasurer || asksVicePresident || asksDirectors || Boolean(asksUnlistedRole);
+  if (asksDirectoryInformation && directory.status === "unavailable") {
+    return spanish
+      ? "No se pudo recuperar el directorio actual de la Junta en este momento. Para obtener información verificada, escribe a Management en admin@brickellhouse.net."
+      : "The current Board directory could not be retrieved at the moment. For verified information, please email Management at admin@brickellhouse.net.";
+  }
+  if (asksDirectoryInformation && directory.status === "conflict") {
+    return spanish
+      ? "El directorio aprobado de la Junta necesita verificación. Para confirmar la información actual, escribe a Management en admin@brickellhouse.net."
+      : "The approved Board directory needs verification. Please email Management at admin@brickellhouse.net to confirm the current information.";
+  }
   if (asksConfirmation) return spanish ? "Sí, ellos son los miembros de la Junta." : "Yes, they are the Board members.";
   const displayTitle = title => {
     if (!spanish) return title;
@@ -1084,24 +1351,34 @@ function boardInfoReply(message, history) {
     return title;
   };
   const titleReply = title => {
-    const member = KNOWLEDGE.board.members.find(entry => foldText(entry.title) === foldText(title));
-    if (!member) return null;
+    const member = members.find(entry => foldText(entry.title) === foldText(title));
+    if (!member) {
+      return spanish
+        ? `El directorio actual de la Junta no incluye el cargo de ${displayTitle(title)}. Para verificar, escribe a Management en admin@brickellhouse.net.`
+        : `The current Board directory does not list a ${title}. Please email Management at admin@brickellhouse.net to verify.`;
+    }
     return spanish ? `${member.name} es ${displayTitle(title)} de la Junta.` : `${member.name} is the Board ${title}.`;
   };
   if (asksPresident) return titleReply("President");
   if (asksTreasurer) return titleReply("Treasurer");
   if (asksVicePresident) return titleReply("VP");
+  if (asksUnlistedRole) {
+    const role = asksUnlistedRole[2] || "requested role";
+    return spanish
+      ? "El directorio actual de la Junta no incluye ese cargo. Para verificar, escribe a Management en admin@brickellhouse.net."
+      : `The current Board directory does not list a ${role}. Please email Management at admin@brickellhouse.net to verify.`;
+  }
   if (asksDirectors) {
-    return KNOWLEDGE.board.members
+    return members
       .filter(member => member.title === "Director")
       .map(member => `* ${member.name}`)
       .join("\n");
   }
   if (!asksBoardMembers && !(boardWasRecent && asksTitles)) return null;
   if (asksTitles) {
-    return KNOWLEDGE.board.members.map(member => `* ${member.name} — ${displayTitle(member.title)}`).join("\n");
+    return members.map(member => `* ${member.name} — ${displayTitle(member.title)}`).join("\n");
   }
-  return KNOWLEDGE.board.members.map(member => `* ${member.name}`).join("\n");
+  return members.map(member => `* ${member.name}`).join("\n");
 }
 
 function boardContactReply(message, history) {
@@ -1644,45 +1921,94 @@ function bbqReply(message) {
   return "I can't make the reservation for you, but you can reserve the BBQ through ONR. If you don't have an ONR account yet, email admin@brickellhouse.net and Management can help you get registered.";
 }
 
-function packageReply(message, history) {
-  const text = normalizeText(message);
-  const spanish = isSpanish(message);
-  if (!hasPackageContext(message, history)) return null;
-  if (/\b(food delivery|food order|comida|entrega de comida)\b/.test(text)) {
-    return spanish
-      ? "Las entregas de comida son manejadas por el Front Desk. Ellos te contactarán cuando llegue tu comida."
-      : "Food deliveries are handled by the Front Desk. They'll contact you when your food arrives.";
+const responderRegistry = {
+  language: {
+    languagePreferenceReply
+  },
+  conversation: {
+    correctionReply,
+    structuredConversationReply,
+    topicFollowUpReply
+  },
+  emergency: {
+    immediateDangerReply,
+    urgentBuildingIssueReply
+  },
+  payment: {
+    paymentDataProtectionReply
+  },
+  privacy: {
+    privateInfoRequest,
+    privacyContextPushback,
+    privateResidentContactRequest,
+    privacyReply
+  },
+  board: {
+    boardContactReply,
+    boardInfoReply,
+    boardListContributionReply,
+    privateBoardContactProtectionReply
+  },
+  internal: {
+    protectedInternalRequest,
+    assistantIdentityReply
+  },
+  hoa: {
+    hoaBalanceReply
+  },
+  management: {
+    managementStaffReply,
+    managementOfficeInformationReply
+  },
+  maintenance: {
+    commonAreaSpillReply,
+    unitMaintenanceIssueReply
+  },
+  property: {
+    unitPurchaseReply
+  },
+  amenities: {
+    amenityReservationReply,
+    bbqReply
+  },
+  keys: {
+    keyClarificationReply
+  },
+  packages: {
+    packageIntent,
+    packageReply,
+    packageContributionReply
+  },
+  parking: {
+    parkingIntent,
+    parkingContributionReply
+  },
+  vendors: {
+    vendorReply
+  },
+  store: {
+    catalogTemporarilyUnavailableReply,
+    residentStoreReply
   }
-  if (alreadyTried(message)) {
-    const firstFollowup = text.includes("what if")
-      || text.includes("qué pasa")
-      || text.includes("que pasa")
-      || text.includes("pasa si no contestan");
-    if (spanish) {
-      return firstFollowup
-        ? "Por favor permite algo de tiempo para que Receiving responda. Si todavía no recibes respuesta, el Front Desk puede ayudarte a dirigir la solicitud."
-        : "Si ya contactaste a Receiving y no has recibido respuesta, por favor contacta al Front Desk para que puedan ayudarte a dirigir tu solicitud.";
-    }
-    return firstFollowup
-      ? "Please allow some time for Receiving to respond. If you still don't hear back, the Front Desk can help point you in the right direction."
-      : "If you already contacted Receiving and haven't received a response, please contact the Front Desk so they can help direct your request.";
-  }
-  if (/\b(email again|what'?s the email|their email|correo|email)\b/.test(text)) {
-    const receivingEmail = KNOWLEDGE.identityContacts.contacts.receiving.email;
-    return spanish
-      ? `El correo de Receiving es ${receivingEmail}.`
-      : `The Receiving Office email is ${receivingEmail}.`;
-  }
-  if (/\b(can'?t find|cant find|missing|not found|no encuentro|no encuentro mi paquete|perdido)\b/.test(text)) {
-    const receivingEmail = KNOWLEDGE.identityContacts.contacts.receiving.email;
-    return spanish
-      ? `Por favor contacta a la oficina de Receiving en ${receivingEmail} para que puedan ayudarte.`
-      : `Please contact the Receiving Office at ${receivingEmail} so they can assist you.`;
-  }
-  return null;
-}
+};
 
-function deterministicReply(message, history, publicProducts = [], options = {}) {
+function singleDeterministicReply(message, history, publicProducts = [], options = {}) {
+  const {
+    language:{languagePreferenceReply},
+    conversation:{correctionReply,structuredConversationReply,topicFollowUpReply},
+    internal:{assistantIdentityReply},
+    board:{boardContactReply,boardInfoReply},
+    hoa:{hoaBalanceReply},
+    privacy:{privateInfoRequest,privacyContextPushback,privacyReply},
+    property:{unitPurchaseReply},
+    amenities:{amenityReservationReply,bbqReply},
+    keys:{keyClarificationReply},
+    management:{managementStaffReply,managementOfficeInformationReply},
+    maintenance:{commonAreaSpillReply,unitMaintenanceIssueReply},
+    store:{catalogTemporarilyUnavailableReply,residentStoreReply},
+    vendors:{vendorReply},
+    packages:{packageReply}
+  } = responderRegistry;
   const languagePreference = languagePreferenceReply(message);
   if (languagePreference) return languagePreference;
   const unitPurchase = unitPurchaseReply(message, history);
@@ -1693,13 +2019,15 @@ function deterministicReply(message, history, publicProducts = [], options = {})
     const identityClaimReply = structuredConversationReply(message, history, options.resolution);
     if (identityClaimReply) return identityClaimReply;
   }
-  const boardContact = boardContactReply(message, history);
+  const boardContact = options.resolution?.ambiguity ? null : boardContactReply(message, history);
   if (boardContact) return boardContact;
   const identity = assistantIdentityReply(message, history);
   if (identity) return identity;
   const hoaBalance = hoaBalanceReply(message, history);
   if (hoaBalance) return hoaBalance;
   if (privateInfoRequest(message) || privacyContextPushback(message, history)) return privacyReply(message, history);
+  const managementOffice = managementOfficeInformationReply(message, history);
+  if (managementOffice) return managementOffice;
   const structuredReply = structuredConversationReply(message, history, options.resolution);
   if (structuredReply) return structuredReply;
   const boardInfo = boardInfoReply(message, history);
@@ -1722,6 +2050,340 @@ function deterministicReply(message, history, publicProducts = [], options = {})
     || bbqReply(message)
     || vendorReply(message, history)
     || packageReply(message, history);
+}
+
+function emergencyEntry(intent) {
+  return (KNOWLEDGE.emergencyUrgent.entries || []).find(entry => entry.intent === intent) || null;
+}
+
+function approvedEmergencyReply(intent, message, history = []) {
+  const entry = emergencyEntry(intent);
+  if (!entry) return null;
+  return shouldReplyInSpanish(message, history) ? entry.response_es || entry.response_en : entry.response_en;
+}
+
+function immediateDangerReply(message, history = []) {
+  const text = foldText(message);
+  const ordinaryAlarm = /\b(smoke alarm|smoke detector|detector de humo|alarma de humo)\b/.test(text)
+    && /\b(beep|beeping|chirp|chirping|pita|pitando|suena|sonando)\b/.test(text);
+  const explicitDanger = /\b(there is smoke|smoke in|smoke coming|smell smoke|burning smell|fire|flames|gas leak|medical emergency|can'?t breathe|cannot breathe|unconscious|sparks|immediate danger|life safety|hay humo|humo en|olor a humo|olor a quemado|incendio|fuego|llamas|fuga de gas|emergencia medica|emergencia médica|no puede respirar|inconsciente|chispas|peligro inmediato)\b/.test(text);
+  if (!explicitDanger || (ordinaryAlarm && !/\b(there is smoke|smoke in|smell smoke|burning smell|fire|flames|hay humo|humo en|olor a humo|olor a quemado|incendio|fuego|llamas)\b/.test(text))) return null;
+  return approvedEmergencyReply("fire_police_medical", message, history);
+}
+
+function urgentBuildingIssueReply(message, history = []) {
+  const text = foldText(message);
+  if (/\b(active leak|water coming|major leak|flooding|flood|fuga activa|entra agua|inundacion|inundación)\b/.test(text)) {
+    return approvedEmergencyReply("active_leak", message, history);
+  }
+  if (/\b(stuck in (?:the )?elevator|elevator (?:is )?stuck|trapped in (?:the )?elevator|atrapado en (?:el )?ascensor|atrapada en (?:el )?ascensor)\b/.test(text)) {
+    return approvedEmergencyReply("elevator_emergency", message, history);
+  }
+  if (/\b(car|vehicle|carro|vehiculo|vehículo)\b.*\b(stuck|atascado|atorado)\b/.test(text)) {
+    return approvedEmergencyReply("garage_vehicle_stuck", message, history);
+  }
+  if (/\b(power outage|no power|corte de luz|sin electricidad)\b/.test(text)) {
+    return approvedEmergencyReply("power_outage", message, history);
+  }
+  if (/\b(security concern|immediate security|problema de seguridad|preocupacion de seguridad|preocupación de seguridad)\b/.test(text)) {
+    return approvedEmergencyReply("security_concern", message, history);
+  }
+  return null;
+}
+
+function paymentDataRequest(message) {
+  const text = foldText(message);
+  return /\b(card number|credit card|debit card|payment card|cvv|cvc|security code|tarjeta de credito|tarjeta de crédito|tarjeta de debito|tarjeta de débito|numero de tarjeta|número de tarjeta|codigo de seguridad|código de seguridad)\b/.test(text)
+    || /(?:\d[ -]*?){13,19}/.test(String(message || ""));
+}
+
+function paymentDataProtectionReply(message, history = []) {
+  if (!paymentDataRequest(message)) return null;
+  return shouldReplyInSpanish(message, history)
+    ? "No puedo aceptar datos de tarjetas de pago por este chat. Por favor no envíes números de tarjeta ni códigos de seguridad aquí."
+    : "I can't accept payment-card details in chat. Please do not send card numbers or security codes here.";
+}
+
+function privateResidentContactRequest(message) {
+  const text = foldText(message);
+  return /\b(another resident|other resident|resident phone|resident phone number|resident email|phone number for (?:a|the) resident|email for (?:a|the) resident|private resident contact|otro residente|telefono de (?:un|otro) residente|teléfono de (?:un|otro) residente|correo de (?:un|otro) residente)\b/.test(text);
+}
+
+function privateBoardContactRequest(message) {
+  const text = foldText(message);
+  const boardReference = /\b(board|board member|board president|president|treasurer|director|junta|miembro de la junta|presidente|tesorero|director)\b/.test(text);
+  const privateContact = /\b(personal cell|private cell|cell phone|personal phone|private phone|personal email|private email|celular personal|telefono personal|teléfono personal|correo personal|correo privado)\b/.test(text);
+  return boardReference && privateContact;
+}
+
+function privateBoardContactProtectionReply(message, history = []) {
+  if (!privateBoardContactRequest(message)) return null;
+  return shouldReplyInSpanish(message, history)
+    ? KNOWLEDGE.board.contact_refusal_es
+    : KNOWLEDGE.board.contact_refusal_en;
+}
+
+function protectedInternalRequest(message) {
+  const text = foldText(message);
+  return /\b(system prompt|hidden prompt|show (?:me )?(?:your )?instructions|show (?:me )?(?:your )?json|ignore (?:your|previous) instructions|api key|access token|secret key|source code|backend|security details|prompt del sistema|instrucciones internas|clave api|codigo fuente|código fuente)\b/.test(text);
+}
+
+function managementOfficeInformationReply(message, history = [], approvedContact = null, contextMessage = "") {
+  const text = foldText(message);
+  const contextText = foldText(`${message}\n${contextMessage}`);
+  const management = approvedContact === false ? null : approvedContact || getApprovedContact("management");
+  const aliases = management?.aliases || ["management", "management office", "administration", "oficina de administracion"];
+  const explicitManagement = approvedContact?.id === "management" || aliases
+    .filter(alias => foldText(alias) !== "office")
+    .some(alias => contextText.includes(foldText(alias)));
+  const anotherOffice = /\b(receiving(?: office)?|package office|front desk|reception|recepcion|maintenance office|oficina de mantenimiento)\b/.test(contextText);
+  const contextualOffice = /\boffice\b/.test(contextText) && !anotherOffice;
+  const asksLocation = /\b(where|location|floor|find|donde|ubicacion|piso|encuentro)\b/.test(text);
+  const asksHours = /\b(hours|schedule|open|close|opening|closing|when|horario|abre|abierta|abierto|cierra|cuando)\b/.test(text);
+  if ((!explicitManagement && !contextualOffice) || (!asksLocation && !asksHours)) return null;
+
+  const spanish = shouldReplyInSpanish(message, history);
+  if (!management) {
+    return spanish
+      ? "No se pudo recuperar la información actual de la oficina de administración en este momento. Puedes comunicarte con el Front Desk al 305-400-9661."
+      : "The current Management Office information could not be retrieved at the moment. Please contact the Front Desk at 305-400-9661.";
+  }
+  if (management.conflict) {
+    return spanish
+      ? "La información aprobada de la oficina de administración necesita verificación. Para confirmar, escribe a admin@brickellhouse.net."
+      : "The approved Management Office information needs verification. Please email admin@brickellhouse.net to confirm.";
+  }
+
+  const asksSaturday = /\b(saturday|sabado)\b/.test(text);
+  const asksClosing = /\b(close|closing|cierra)\b/.test(text);
+  const location = spanish ? management.locationEs || management.location : management.location;
+  const parts = [];
+  if (asksLocation && location) {
+    parts.push(spanish
+      ? `La oficina de administración está en el ${String(location).toLowerCase()}.`
+      : `The Management Office is on the ${String(location).toLowerCase()}.`);
+  }
+  if (asksHours) {
+    if (asksSaturday) {
+      parts.push(spanish
+        ? "La oficina de administración no figura como abierta los sábados. Su horario aprobado es de lunes a viernes, de 9:00 AM a 5:00 PM."
+        : "The Management Office is not listed as open on Saturday. Its approved hours are Monday through Friday, 9:00 AM to 5:00 PM.");
+    } else if (asksClosing && management.closesAt) {
+      parts.push(spanish
+        ? `La oficina de administración cierra a las ${management.closesAt} de lunes a viernes.`
+        : `The Management Office closes at ${management.closesAt} Monday through Friday.`);
+    } else if (management.hours) {
+      parts.push(spanish
+        ? "El horario de Management es de lunes a viernes, de 9:00 AM a 5:00 PM."
+        : "Management hours are Monday through Friday, 9:00 AM to 5:00 PM.");
+    }
+  }
+  return parts.join(" ") || null;
+}
+
+function boardListContributionReply(message, history = []) {
+  const existing = boardInfoReply(message, history);
+  if (existing) return existing;
+  const text = foldText(message);
+  if (!/\b(who is on (?:the )?board|who are (?:the )?board members|quienes estan en la junta|quienes son de la junta|miembros de la junta)\b/.test(text)) return null;
+  return boardInfoReply("Who is on the Board?", history);
+}
+
+function splitCompoundIntents(message) {
+  const {immediateDangerReply} = responderRegistry.emergency;
+  const value = String(message || "");
+  const sentenceSeparated = immediateDangerReply(value, [])
+    ? value.replace(/([?!.;])\s+(?=[¿¡]?(?:who|what|where|when|how|tell|give|take|show|there|qui[eé]n|qu[eé]|d[oó]nde|cu[aá]ndo|c[oó]mo|dime|hay)\b)/gi, "$1\n")
+    : value;
+  const connector = /\s+(?:and|also|plus|y|ademas|además)\s+(?=[¿¡]?(?:who(?:'s)?|what|where|when|how|which|tell|give|take|show|can|could|do|does|is|are|i|my|there|qui[eé]n|qu[eé]|d[oó]nde|cu[aá]ndo|c[oó]mo|cu[aá]l|dime|puedo|puedes|hay)\b)/gi;
+  return sentenceSeparated
+    .split(/\n+/)
+    .flatMap(sentence => sentence.split(connector))
+    .map(segment => segment.trim())
+    .filter(Boolean);
+}
+
+function compoundResolution(message, history, publicProducts) {
+  const retrieval = retrieveKnowledge(message, history);
+  return resolveConversationContext(message, history, publicProducts, {}, retrieval);
+}
+
+function addCompoundPart(parts, key, priority, reply, order) {
+  const text = String(reply || "").trim();
+  if (!text) return;
+  if (parts.some(part => part.reply === text)) return;
+  parts.push({key,priority,reply:text,order});
+}
+
+function compoundPartsForSegment(message, history, publicProducts, options, order) {
+  const {
+    conversation:{structuredConversationReply},
+    emergency:{immediateDangerReply,urgentBuildingIssueReply},
+    payment:{paymentDataProtectionReply},
+    privacy:{privateInfoRequest,privateResidentContactRequest,privacyReply},
+    board:{boardContactReply,boardListContributionReply,privateBoardContactProtectionReply},
+    internal:{protectedInternalRequest,assistantIdentityReply},
+    hoa:{hoaBalanceReply},
+    management:{managementStaffReply,managementOfficeInformationReply},
+    maintenance:{unitMaintenanceIssueReply},
+    amenities:{amenityReservationReply,bbqReply},
+    packages:{packageIntent,packageContributionReply},
+    parking:{parkingIntent,parkingContributionReply},
+    vendors:{vendorReply},
+    store:{catalogTemporarilyUnavailableReply,residentStoreReply}
+  } = responderRegistry;
+  const parts = [];
+  const resolution = compoundResolution(message, history, publicProducts);
+  const danger = immediateDangerReply(message, history);
+  addCompoundPart(parts, "immediate-danger", 1, danger, order);
+
+  const payment = paymentDataProtectionReply(message, history);
+  addCompoundPart(parts, "payment-protection", 2, payment, order);
+
+  const boardContact = boardContactReply(message, history) || privateBoardContactProtectionReply(message, history);
+  const residentPrivacy = privateInfoRequest(message) || privateResidentContactRequest(message)
+    ? privacyReply(message, history)
+    : null;
+  const internalProtection = protectedInternalRequest(message) ? assistantIdentityReply(message, history) : null;
+  const hoaProtection = hoaBalanceReply(message, history);
+  addCompoundPart(parts, "board-contact-protection", 2, boardContact, order);
+  addCompoundPart(parts, "resident-privacy", 2, residentPrivacy, order);
+  addCompoundPart(parts, "internal-protection", 2, internalProtection, order);
+  addCompoundPart(parts, "hoa-protection", 2, hoaProtection, order);
+
+  const urgent = danger ? null : urgentBuildingIssueReply(message, history);
+  addCompoundPart(parts, "urgent-building", 3, urgent, order);
+
+  const maintenance = urgent ? null : unitMaintenanceIssueReply(message, history);
+  addCompoundPart(parts, "maintenance", 4, maintenance, order);
+
+  const explicitZeroCandidateRoute = resolution.candidates.length === 0
+    && (packageIntent(message)
+      || parkingIntent(message)
+      || Boolean(managementOfficeInformationReply(message, history, null, options.compoundMessage))
+      || Boolean(boardListContributionReply(message, history)));
+  const structuredReply = resolution.ambiguity
+    ? (explicitZeroCandidateRoute ? null : resolution.ambiguity)
+    : structuredConversationReply(message, history, resolution);
+  const structuredType = resolution.selectedEntity?.type || (resolution.ambiguity && !explicitZeroCandidateRoute ? "ambiguity" : null);
+  const structuredPriority = {
+    ambiguity:2,
+    amenity:7,
+    board:8,
+    staff:9,
+    contact:9,
+    vendor:10,
+    product:11,
+    parking:6
+  }[structuredType];
+  if (structuredPriority) addCompoundPart(parts, `structured-${structuredType}`, structuredPriority, structuredReply, order);
+
+  const packagePart = packageContributionReply(message, history);
+  if (!(structuredType === "contact" && resolution.selectedEntity?.id === "receiving" && structuredReply)) {
+    addCompoundPart(parts, "package", 5, packagePart, order);
+  }
+
+  if (!(structuredType === "parking" && structuredReply)) {
+    addCompoundPart(parts, "parking", 6, parkingContributionReply(message, history), order);
+  }
+
+  if (!(structuredType === "amenity" && structuredReply)) {
+    addCompoundPart(parts, "amenity-reservation", 7, amenityReservationReply(message, history), order);
+    addCompoundPart(parts, "bbq", 7, bbqReply(message), order);
+  }
+
+  if (!boardContact && !(structuredType === "board" && structuredReply)) {
+    addCompoundPart(parts, "board", 8, boardListContributionReply(message, history), order);
+  }
+
+  if (!hoaProtection && !(structuredType === "staff" && structuredReply) && !(structuredType === "contact" && structuredReply)) {
+    addCompoundPart(parts, "office", 9, managementOfficeInformationReply(message, history, null, options.compoundMessage), order);
+    addCompoundPart(parts, "staff", 9, managementStaffReply(message, history), order);
+  }
+
+  if (!(structuredType === "vendor" && structuredReply)) {
+    addCompoundPart(parts, "vendor", 10, vendorReply(message, history), order);
+  }
+
+  if (!(structuredType === "product" && structuredReply)) {
+    const storeReply = options.needsCatalog && options.catalogStatus === "unavailable"
+      ? catalogTemporarilyUnavailableReply(message, history)
+      : residentStoreReply(message, history, publicProducts);
+    addCompoundPart(parts, "store", 11, storeReply, order);
+  }
+
+  if (!parts.length) {
+    const fallback = singleDeterministicReply(message, history, publicProducts, {...options,resolution});
+    addCompoundPart(parts, "legacy-single", 12, fallback, order);
+  }
+  return parts;
+}
+
+function composeCompoundReply(parts) {
+  return parts
+    .slice()
+    .sort((left, right) => left.priority - right.priority || left.order - right.order)
+    .map(part => part.reply)
+    .join("\n\n");
+}
+
+function deterministicReply(message, history, publicProducts = [], options = {}) {
+  const {
+    language:{languagePreferenceReply},
+    conversation:{correctionReply},
+    emergency:{immediateDangerReply,urgentBuildingIssueReply},
+    payment:{paymentDataProtectionReply},
+    privacy:{privateResidentContactRequest,privacyReply},
+    board:{privateBoardContactProtectionReply},
+    maintenance:{unitMaintenanceIssueReply},
+    property:{unitPurchaseReply}
+  } = responderRegistry;
+  const languagePreference = languagePreferenceReply(message);
+  if (languagePreference) return languagePreference;
+  const unitPurchase = unitPurchaseReply(message, history);
+  if (unitPurchase) return unitPurchase;
+  const directCorrection = correctionReply(message, history);
+  if (directCorrection) return directCorrection;
+
+  const segments = splitCompoundIntents(message);
+  const explicitCompound = segments.length > 1;
+  if (!explicitCompound) {
+    const danger = immediateDangerReply(message, history);
+    if (danger) return danger;
+    const payment = paymentDataProtectionReply(message, history);
+    if (payment) return payment;
+    if (privateResidentContactRequest(message)) return privacyReply(message, history);
+    const privateBoardContact = privateBoardContactProtectionReply(message, history);
+    if (privateBoardContact) return privateBoardContact;
+    const urgent = urgentBuildingIssueReply(message, history);
+    if (urgent) return urgent;
+    const smokeAlarmMaintenance = /\b(smoke alarm|smoke detector|detector de humo|alarma de humo)\b/.test(foldText(message))
+      && Boolean(unitMaintenanceIssueReply(message, history));
+    if (!smokeAlarmMaintenance) return singleDeterministicReply(message, history, publicProducts, options);
+  }
+
+  const segmentParts = segments.map((segment, order) => (
+    compoundPartsForSegment(segment, history, publicProducts, {...options,compoundMessage:message}, order)
+  ));
+  const parts = segmentParts.flat();
+  const semanticCompound = new Set(parts.map(part => part.key)).size > 1;
+  const requiredProtectionKeys = new Set([
+    "immediate-danger",
+    "payment-protection",
+    "board-contact-protection",
+    "resident-privacy",
+    "internal-protection",
+    "hoa-protection"
+  ]);
+  const requiredProtection = parts.some(part => requiredProtectionKeys.has(part.key));
+  const allSegmentsHandled = segmentParts.every(segment => segment.length > 0);
+
+  if (explicitCompound) {
+    if (allSegmentsHandled || requiredProtection) return composeCompoundReply(parts);
+    return null;
+  }
+  if (semanticCompound || requiredProtection) return composeCompoundReply(parts);
+  return singleDeterministicReply(message, history, publicProducts, options);
 }
 
 function insightLanguage(message, history = []) {
@@ -1920,13 +2582,23 @@ async function logLunaConversationReview(conversationId, message, history, reply
   }
 }
 
-function structuredContextForModel(resolution) {
+function structuredContextForModel(resolution, grounding = null) {
   if (!resolution) return null;
   return {
     conversationState:sanitizeConversationState(resolution.state, {approvedProductIds:resolution.approvedProductIds}),
     lookupResults:resolution.lookupResults || [],
     policyLookup:resolution.policy || null,
-    ambiguity:resolution.ambiguity || null
+    ambiguity:resolution.ambiguity || null,
+    requestedAttributes:resolution.requestedAttributes || [],
+    grounding:grounding ? {
+      confidence:grounding.confidence,
+      outcome:grounding.outcome,
+      category:grounding.category,
+      approvedKnowledgeExists:grounding.approvedKnowledgeExists,
+      retrievalSucceeded:grounding.retrievalSucceeded,
+      clarificationRequired:grounding.clarificationRequired,
+      fallbackDirective:grounding.fallbackDirective
+    } : null
   };
 }
 
@@ -2027,7 +2699,7 @@ function freshConversationIdentity() {
 async function generateLunaTurn(message, trustedContext, interfaceLanguage = "en") {
   const history = validateTrustedHistory(trustedContext.messages);
   const generationMessage = applyInterfaceLanguagePreference(message, history, interfaceLanguage);
-  const retrieval = retrieveKnowledge(generationMessage, history);
+  let retrieval = retrieveKnowledge(generationMessage, history);
   let publicProducts = [];
   const needsCatalog = shouldLoadPublicCatalog(generationMessage, history, retrieval);
   let catalogStatus = needsCatalog ? "unavailable" : "not-requested";
@@ -2041,11 +2713,14 @@ async function generateLunaTurn(message, trustedContext, interfaceLanguage = "en
   }
 
   const resolution = resolveConversationContext(generationMessage, history, publicProducts, trustedContext.state, retrieval);
-  const structuredContext = structuredContextForModel(resolution);
+  retrieval = strengthenRetrievalForResolution(retrieval, resolution);
+  const grounding = assessKnowledgeGrounding(generationMessage, retrieval, resolution, {needsCatalog,catalogStatus});
+  const structuredContext = structuredContextForModel(resolution, grounding);
   const directReply = deterministicReply(generationMessage, history, publicProducts, {needsCatalog,catalogStatus,resolution});
   if (directReply) {
-    logLunaRoute("deterministic", retrieval);
-    return {success:true,httpStatus:200,reply:directReply,source:"deterministic",history,resolution,publicProducts,retrieval};
+    const completeness = assessResponseCompleteness(generationMessage, directReply, resolution);
+    logLunaRoute("deterministic", retrieval, {...grounding,completeness:completeness.status});
+    return {success:true,httpStatus:200,reply:directReply,source:"deterministic",history,resolution,publicProducts,retrieval,grounding,completeness};
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
@@ -2055,7 +2730,7 @@ async function generateLunaTurn(message, trustedContext, interfaceLanguage = "en
   }
 
   try {
-    logLunaRoute("model", retrieval);
+    logLunaRoute("model", retrieval, {...grounding,completeness:"pending-model-response"});
     const openAiResponse = await fetch(OPENAI_RESPONSES_URL, {
       method:"POST",
       headers:{
@@ -2075,7 +2750,8 @@ async function generateLunaTurn(message, trustedContext, interfaceLanguage = "en
     if (!reply) {
       return {success:false,httpStatus:502,reply:SAFE_ERROR_MESSAGE,source:"error",history,resolution,publicProducts,retrieval};
     }
-    return {success:true,httpStatus:200,reply,source:"model",history,resolution,publicProducts,retrieval};
+    const completeness = assessResponseCompleteness(generationMessage, reply, resolution);
+    return {success:true,httpStatus:200,reply,source:"model",history,resolution,publicProducts,retrieval,grounding,completeness};
   } catch (error) {
     console.error("OpenAI chat route failed", error?.name || "Error");
     return {success:false,httpStatus:500,reply:SAFE_ERROR_MESSAGE,source:"error",history,resolution,publicProducts,retrieval};
@@ -2264,6 +2940,7 @@ module.exports.__test = {
   buildOpenAiInput,
   buildOpenAiRequest,
   findBoardMember,
+  boardDirectoryStatus,
   findStaffMember,
   findVendor,
   findAmenity,
@@ -2272,12 +2949,18 @@ module.exports.__test = {
   getPolicy,
   findApprovedEntities,
   resolveConversationContext,
+  detectRequestedAttribute,
+  detectRequestedAttributes,
+  strengthenRetrievalForResolution,
+  assessKnowledgeGrounding,
+  assessResponseCompleteness,
   buildPersistedConversationState,
   structuredConversationReply,
   structuredContextForModel,
   boardInfoReply,
   boardContactReply,
   managementStaffReply,
+  managementOfficeInformationReply,
   residentStoreReply,
   shouldLoadPublicCatalog,
   catalogTemporarilyUnavailableReply,

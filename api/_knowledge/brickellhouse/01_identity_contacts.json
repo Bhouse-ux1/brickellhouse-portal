@@ -6,7 +6,22 @@
     "who_are_you_es": "Soy Luna, estoy aquí para ayudarte con cualquier cosa que necesites."
   },
   "contacts": {
-    "management": {"email": "admin@brickellhouse.net", "extension": "7002", "office_hours": "Monday through Friday, 9:00 AM to 5:00 PM"},
+    "management": {
+      "canonical_category": "management_office",
+      "name": "Management Office",
+      "active": true,
+      "source_priority": "current_approved_structured_building_record",
+      "email": "admin@brickellhouse.net",
+      "extension": "7002",
+      "location": "Third Floor",
+      "location_es": "Tercer Piso",
+      "office_hours": "Monday through Friday, 9:00 AM to 5:00 PM",
+      "opens_at": "9:00 AM",
+      "closes_at": "5:00 PM",
+      "open_days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+      "aliases_en": ["management", "management office", "property management", "building management", "administration", "administrative office", "office", "management team", "managment", "managment office", "mangement office"],
+      "aliases_es": ["administraci\u00f3n", "oficina de administraci\u00f3n", "oficina administrativa", "equipo de administraci\u00f3n", "adminstraci\u00f3n", "oficina de adminstraci\u00f3n"]
+    },
     "maintenance": {"email": "maintenance@brickellhouse.net", "extension": null},
     "receiving": {"email": "receiving@brickellhouse.net", "extension": "7007", "hours": "Monday through Saturday, 9:00 AM to 5:00 PM"},
     "front_desk": {"email": "frontdesk@brickellhouse.net", "hours": "24/7"},
