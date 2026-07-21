@@ -21,7 +21,6 @@
     </a>
     <nav aria-label="Main navigation" data-i18n-aria-label="nav.mainLabel">
       <a href="#shop" data-i18n="nav.services">Services</a>
-      <a href="#track" data-i18n="nav.trackOrder">Track Order</a>
       <a href="#feedback" data-i18n="nav.feedback">Feedback</a>
       <a href="#concierge" data-i18n="nav.concierge">Concierge</a>
       <a href="lifestyle.html" data-i18n="common.lifestyle">Lifestyle</a>
@@ -93,18 +92,8 @@
       </div>
     </section>
 
-    <section class="resident-tools" id="track">
-      <div class="resident-tool-card reveal">
-        <p class="eyebrow" data-i18n="tracker.eyebrow">Order updates</p>
-        <h2 data-i18n="tracker.title">Track your order</h2>
-        <p data-i18n="tracker.copy">Enter your BrickellHouse order number to see its current status.</p>
-        <form id="trackingForm" class="compact-form">
-          <label><span data-i18n="tracker.orderId">Order ID</span><input name="orderNumber" required placeholder="BH-7K4P9" autocomplete="off"></label>
-          <button class="primary-button" type="submit" data-i18n="tracker.check">Check status</button>
-        </form>
-        <div class="tracking-result hidden" id="trackingResult" aria-live="polite"></div>
-      </div>
-      <div class="resident-tool-card feedback-entry-card reveal" id="feedback">
+    <section class="resident-tools" id="feedback" style="grid-template-columns:1fr">
+      <div class="resident-tool-card feedback-entry-card reveal">
         <p class="eyebrow" data-i18n="feedback.eyebrow">Resident voice</p>
         <h2 data-i18n="feedback.title">Tell us what you think.</h2>
         <p data-i18n="feedback.entryCopy">Your perspective helps us shape a better BrickellHouse resident experience.</p>
