@@ -266,7 +266,7 @@ function lexicalScore(value, terms) {
 
 function needsRecentContext(message) {
   const text = foldText(message);
-  return /\b(their|his|her|that|it|those|them|they|title|titles|role|roles|who is the president|who is president|email|correo|cost|price|cuanto|where|when|hours|today|now|next|yes|okay|ok|and the|y el|y la|cargos)\b/.test(text);
+  return /\b(their|his|her|that|it|those|them|they|that person|that office|the vendor|the company|title|titles|role|roles|who is the president|who is president|email|correo|cost|price|cuanto|where|when|hours|how late|what time|today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|weekday|weekend|hoy|mañana|lunes|martes|miercoles|jueves|viernes|sabado|domingo|elevator|ascensor|insurance|insured|coi|seguro|arrive|arrival|llegar|llegada|now|next|yes|okay|ok|and the|y el|y la|cargos)\b/.test(text);
 }
 
 function retrieveKnowledge(message, history = []) {
@@ -401,7 +401,7 @@ function staffEntityRecords() {
       id:"general-manager",
       name:manager.name,
       title:manager.title,
-      aliases:[manager.name, manager.title, "building manager"]
+      aliases:[manager.name, "Buriel", manager.title, "building manager", "manager", "the manager", "property manager", "manager of the building", "gerente general", "gerente del edificio"]
     },
     {
       type:"staff",
@@ -460,6 +460,8 @@ function findVendor(query) {
   const records = vendorEntityRecords();
   const namedMatches = records.filter(vendor => text.includes(foldText(vendor.name)));
   if (namedMatches.length) return namedMatches;
+  const movingReference = /\b(mover|movers|moving|mudanza)\b/.test(text);
+  if (movingReference && !asksForVendorRecommendation(query)) return [];
   return records.filter(vendor => vendor.services.some(service => (
     (serviceAliases[service] || []).some(alias => text.includes(foldText(alias)))
   )));
@@ -647,23 +649,44 @@ function detectRequestedAttributes(message) {
   const attributes = [];
   if (/\b(position|title|role|cargo|puesto)\b/.test(text)) attributes.push("position");
   if (/\b(email|correo)\b/.test(text)) attributes.push("email");
-  if (/\b(phone|phone number|number|telefono|numero)\b/.test(text)) attributes.push("phone");
-  if (/\b(hours|open|close|horario|abre|cierra|opening|closing)\b/.test(text)) attributes.push("hours");
+  if (/\b(phone|phone number|number|cell|cell phone|mobile|telefono|numero|celular)\b/.test(text)) attributes.push("phone");
+  if (/\b(hours|open|close|horario|abre|cierra|opening|closing|how late|what time|today|tomorrow|weekday|weekend|monday|tuesday|wednesday|thursday|friday|saturday|sunday|hoy|mañana|lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo)\b/.test(text)) attributes.push("hours");
   if (/\b(price|cost|how much|precio|cuanto cuesta|cuánto cuesta)\b/.test(text)) attributes.push("price");
   if (/\b(rule|rules|policy|allowed|permitido|regla|reglas|politica)\b/.test(text)) attributes.push("policy");
-  if (/\b(contact|reach|contacto|comunicar)\b/.test(text)) attributes.push("contact");
+  if (/\b(contact|reach|call|email them|email him|email her|contacto|comunicar|llamar)\b/.test(text)) attributes.push("contact");
   if (/\b(available|availability|disponible|disponibilidad)\b/.test(text)) attributes.push("availability");
   if (/\b(where|location|floor|find|donde|ubicacion|piso|encuentro)\b/.test(text)) attributes.push("location");
   return attributes;
 }
 
-function hasUnverifiedIdentityClaim(message) {
+function detectIdentityClaim(message, products = [], priorEntities = []) {
   const text = foldText(message);
-  return /\b(i'?m him|i am him|i'?m her|i am her|that'?s me|that is me|soy el|soy ella|ese soy yo|esa soy yo)\b/.test(text);
+  const genericReference = /\b(i'?m him|i am him|i'?m her|i am her|that'?s me|that is me|soy el|soy ella|ese soy yo|esa soy yo)\b/.test(text);
+  const claimMatch = text.match(/\b(?:i am|i'?m|im|soy)\s+([^,.!?]+)/);
+  const claimedText = claimMatch?.[1]?.trim() || "";
+  if (/^(?:moving|planning|trying|looking|asking|going|having|renting|selling|buying)\b/.test(claimedText)) return null;
+  const claimedEntities = claimedText ? findApprovedEntities(claimedText, products) : [];
+  const claimedEntity = claimedEntities.find(entity => entity.type === "board" || entity.type === "staff")
+    || claimedEntities[0]
+    || (genericReference && priorEntities.length === 1 ? priorEntities[0] : null);
+  const roleClaim = /\b(i am|i'?m|im|soy)\s+(?:the\s+|el\s+|la\s+)?(owner|board president|president|general manager|manager|management|administrator|staff|employee|dueño|dueno|dueña|duena|presidente|gerente|administrador|administradora)\b/.exec(text);
+  const workClaim = /\b(i work here|i work for (?:the )?building|trabajo aqui|trabajo aquí|trabajo para el edificio)\b/.test(text);
+  if (!genericReference && !claimedEntity && !roleClaim && !workClaim) return null;
+  const claimedRole = roleClaim?.[2] || (workClaim ? "staff" : null);
+  return {
+    kind:"identity-claim",
+    entity:entityReference(claimedEntity),
+    displayName:claimedEntity?.name || claimedRole || null,
+    generic:!claimedEntity
+  };
+}
+
+function hasUnverifiedIdentityClaim(message) {
+  return Boolean(detectIdentityClaim(message));
 }
 
 function hasSingularReference(message) {
-  return /\b(he|him|his|she|her|hers|it|that|el|ella|su|eso|esa)\b/.test(foldText(message));
+  return /\b(he|him|his|she|her|hers|it|that|that person|this person|that office|this office|that company|this company|the vendor|the company|el|ella|su|eso|esa|esa persona|esa oficina|la empresa|el proveedor)\b/.test(foldText(message));
 }
 
 function hasPluralReference(message) {
@@ -676,9 +699,24 @@ function hasEitherReference(message) {
 
 function alternativeReference(message) {
   const text = foldText(message);
+  if (/\b(the first one|first one|el primero|la primera)\b/.test(text)) return "first";
   if (/\b(the second one|second one|el segundo|la segunda)\b/.test(text)) return "second";
   if (/\b(the other one|other one|the other|el otro|la otra)\b/.test(text) || /^other[.!?]?$/.test(text.trim())) return "other";
   return null;
+}
+
+function contextualEntityType(message) {
+  const text = foldText(message);
+  if (/\b(that office|this office|esa oficina|esta oficina)\b/.test(text)) return "contact";
+  if (/\b(that person|this person|esa persona|esta persona)\b/.test(text)) return "person";
+  if (/\b(the vendor|the company|that company|this company|el proveedor|la empresa|esa empresa)\b/.test(text)) return "vendor";
+  return null;
+}
+
+function detectTimeReference(message) {
+  const text = foldText(message);
+  const match = text.match(/\b(today|tomorrow|tonight|this morning|this afternoon|this evening|monday|tuesday|wednesday|thursday|friday|saturday|sunday|weekday|weekend|hoy|mañana|esta noche|lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|fin de semana)\b/);
+  return match?.[0] || null;
 }
 
 function entityKey(entity) {
@@ -713,6 +751,9 @@ function explicitTopicForMessage(message, products) {
     parking:"parkingAps",
     amenity:"amenities",
     package:"packagesReceiving",
+    move_in:"movesContractorsDeliveries",
+    contractor:"movesContractorsDeliveries",
+    delivery:"movesContractorsDeliveries",
     mailbox_key:"residentStore",
     parking_fob:"residentStore"
   }[detected] || "unknown";
@@ -789,6 +830,14 @@ function resolveConversationContext(message, history = [], products = [], priorS
   let currentEntities = findApprovedEntities(message, products)
     .filter(entity => !rejectedKeys.has(entityKey(entity)));
   const hasEntityReference = hasSingularReference(message) || hasPluralReference(message);
+  const contextualType = contextualEntityType(message);
+  if (contextualType && priorEntities.length === 1) {
+    const prior = priorEntities[0];
+    const typeMatches = contextualType === "person"
+      ? ["board", "staff"].includes(prior.type)
+      : prior.type === contextualType;
+    if (typeMatches) currentEntities = [prior];
+  }
   if (hasEntityReference && priorEntities.length === 1 && currentEntities.length > 1) {
     const stableEntity = currentEntities.find(entity => entityKey(entity) === entityKey(priorEntities[0]));
     if (stableEntity) currentEntities = [stableEntity];
@@ -796,9 +845,14 @@ function resolveConversationContext(message, history = [], products = [], priorS
   const recentEntities = uniqueEntities(history.slice(-8).reverse().flatMap(item => findApprovedEntities(item.content, products)));
   let candidates = (currentEntities.length ? currentEntities : uniqueEntities([...priorCandidates, ...priorEntities, ...recentEntities]))
     .filter(entity => !rejectedKeys.has(entityKey(entity)));
+  if (hasEntityReference && !currentEntities.length && priorEntities.length === 1 && rejectedKeys.size === 0) {
+    candidates = priorEntities.filter(entity => !rejectedKeys.has(entityKey(entity)));
+  }
   const alternative = alternativeReference(message);
   let unresolvedAlternative = false;
-  if (alternative === "second" && candidates.length === 2) {
+  if (alternative === "first" && candidates.length >= 1) {
+    candidates = [candidates[0]];
+  } else if (alternative === "second" && candidates.length === 2) {
     candidates = [candidates[1]];
   } else if (alternative === "other" && candidates.length === 2 && priorEntities.length === 1) {
     const otherCandidates = candidates.filter(entity => entityKey(entity) !== entityKey(priorEntities[0]));
@@ -809,15 +863,25 @@ function resolveConversationContext(message, history = [], products = [], priorS
   }
   let requestedAttributes = detectRequestedAttributes(message);
   let requestedAttribute = requestedAttributes[0] || "unknown";
-  if (requestedAttribute === "unknown" && (currentEntities.length || rejectedKeys.size || alternative) && safePrior.lastRequestedAttribute !== "unknown") {
+  if (currentEntities.some(entity => entity.type === "contact" && entity.id === "management")
+    && currentEntities.some(entity => entity.type === "staff" && entity.id === "administrator")
+    && requestedAttributes.some(attribute => ["hours", "location"].includes(attribute))) {
+    currentEntities = currentEntities.filter(entity => entity.type === "contact" && entity.id === "management");
+    candidates = currentEntities;
+  }
+  const asksEntityIdentity = /\b(who is|who'?s|quien es|quién es)\b/.test(foldText(message));
+  if (requestedAttribute === "unknown" && !asksEntityIdentity && (currentEntities.length || rejectedKeys.size || alternative) && safePrior.lastRequestedAttribute !== "unknown") {
     requestedAttribute = safePrior.lastRequestedAttribute;
     requestedAttributes = [requestedAttribute];
   }
   const referenceOnly = hasEntityReference || hasEitherReference(message) || alternative || hasCorrectionNegation(message) || needsRecentContext(message);
   const currentEntityTopics = [...new Set(currentEntities.map(entityTopic).filter(topic => topic !== "unknown"))];
+  const explicitTopic = explicitTopicForMessage(message, products);
   const recentExplicitTopic = referenceOnly ? latestExplicitTopic(history, products) : "unknown";
   const currentTopic = currentEntityTopics.length === 1
     ? currentEntityTopics[0]
+    : explicitTopic !== "unknown"
+      ? explicitTopic
     : referenceOnly
       ? recentExplicitTopic !== "unknown"
         ? recentExplicitTopic
@@ -830,6 +894,7 @@ function resolveConversationContext(message, history = [], products = [], priorS
   if (!currentEntities.length && currentTopic !== "unknown" && !preserveCrossCategory) {
     const sameTopic = candidates.filter(entity => entityTopic(entity) === currentTopic);
     if (sameTopic.length) candidates = sameTopic;
+    else if (explicitTopic !== "unknown") candidates = [];
   }
   const candidateTypes = new Set(candidates.map(entity => entity.type));
   const currentTokens = new Set(foldText(message).match(/[a-z0-9]+/g) || []);
@@ -845,6 +910,11 @@ function resolveConversationContext(message, history = [], products = [], priorS
     || (rejectedKeys.size > 0 && candidates.length === 0)
     || ((hasSingularReference(message) || hasPluralReference(message)) && candidates.length === 0);
   const selectedEntity = !ambiguous && candidates.length === 1 ? candidates[0] : null;
+  const identityClaim = detectIdentityClaim(message, products, priorEntities);
+  const timeReference = detectTimeReference(message);
+  const topicSwitched = safePrior.activeTopic !== "unknown"
+    && currentTopic !== "unknown"
+    && safePrior.activeTopic !== currentTopic;
   const state = sanitizeConversationState({
     activeTopic:currentTopic,
     entities:(currentEntities.length ? currentEntities : candidates).map(entityReference),
@@ -859,7 +929,15 @@ function resolveConversationContext(message, history = [], products = [], priorS
     requestedAttribute,
     requestedAttributes,
     ambiguity:ambiguous ? clarificationForCandidates(candidates, shouldReplyInSpanish(message, history)) : null,
-    identityClaim:hasUnverifiedIdentityClaim(message),
+    identityClaim,
+    contextSignals:{
+      identityClaim:Boolean(identityClaim),
+      pronounResolved:Boolean(hasEntityReference && selectedEntity),
+      contextualReference:contextualType || null,
+      topicSwitched,
+      timeReference:Boolean(timeReference),
+      clarificationReason:ambiguous ? "multiple-approved-candidates" : null
+    },
     lookupResults:candidates.map(publicLookupResult).filter(Boolean),
     policy,
     approvedProductIds
@@ -994,15 +1072,33 @@ function buildPersistedConversationState(resolution, assistantReply, products = 
   return sanitizeConversationState({...state,entities:replyEntities,candidateReferents:replyEntities}, stateOptions);
 }
 
+function identityAwarePrivacyReply(message, history, resolution) {
+  const claim = resolution?.identityClaim;
+  if (!claim) return null;
+  const text = foldText(message);
+  const attribute = resolution.requestedAttribute;
+  const contactRequest = /\b(email|phone|contact|call|cell|mobile|correo|telefono|teléfono|contacto|llamar|celular)\b/.test(text)
+    || privateBoardContactRequest(message);
+  const identitySensitive = contactRequest
+    && (/\b(my|mine|his|hers|her|their|private|personal|cell|mobile|mi|mio|mía|su|privado|privada|personal|celular)\b/.test(text)
+      || privateInfoRequest(message)
+      || privateBoardContactRequest(message));
+  if (!identitySensitive || !["phone", "email", "contact", "unknown"].includes(attribute)) return null;
+  const spanish = shouldReplyInSpanish(message, history);
+  const subject = claim.displayName
+    ? spanish ? `Aunque seas ${claim.displayName}, ` : `Even if you are ${claim.displayName}, `
+    : "";
+  return spanish
+    ? `${subject}no puedo verificar identidades por chat. Para proteger la privacidad de todos, no puedo proporcionar información privada de contacto aquí. Puedes comunicarte con Management en admin@brickellhouse.net.`
+    : `${subject}I'm unable to verify identity through chat. To protect everyone's privacy, I can't provide private contact information here. You can contact Management at admin@brickellhouse.net.`;
+}
+
 function structuredConversationReply(message, history, resolution) {
   if (!resolution) return null;
   const spanish = shouldReplyInSpanish(message, history);
   const attribute = resolution.requestedAttribute;
-  if (resolution.identityClaim && ["phone", "email", "contact"].includes(attribute)) {
-    return spanish
-      ? "No puedo verificar identidades ni proporcionar números de teléfono privados. Puedo compartir información de contacto pública aprobada o ayudarte a contactar a Management."
-      : "I'm unable to verify identity or provide private phone numbers. I can share approved public contact information or help you contact Management.";
-  }
+  const identityPrivacy = identityAwarePrivacyReply(message, history, resolution);
+  if (identityPrivacy) return identityPrivacy;
   if (resolution.ambiguity) return resolution.ambiguity;
   const entity = resolution.selectedEntity;
   if (!entity) return null;
@@ -1024,6 +1120,16 @@ function structuredConversationReply(message, history, resolution) {
     }
   }
   if (entity.type === "amenity" && attribute === "hours" && entity.hours) {
+    if (entity.id === "gym_fitness_center") {
+      return spanish
+        ? "El Fitness Center está abierto todos los días, 7:00 AM - 11:00 PM."
+        : "The Fitness Center is open daily, 7:00 AM - 11:00 PM.";
+    }
+    if (entity.id === "pool_spa") {
+      return spanish
+        ? "El horario de Pool / Spa es 8:00 AM - Sundown."
+        : "The Pool / Spa is open daily, 8:00 AM - Sundown.";
+    }
     return spanish ? `El horario de ${entity.name} es ${entity.hours}.` : `${entity.name} hours are ${entity.hours}.`;
   }
   if (entity.type === "parking" && attribute === "hours" && entity.hours) {
@@ -1105,7 +1211,13 @@ function logLunaRoute(path, retrieval, diagnostics = {}) {
     approvedKnowledgeExists:Boolean(diagnostics.approvedKnowledgeExists),
     retrievalSucceeded:Boolean(diagnostics.retrievalSucceeded),
     clarificationIssued:Boolean(diagnostics.clarificationRequired),
-    completeness:diagnostics.completeness || "not-assessed"
+    completeness:diagnostics.completeness || "not-assessed",
+    identityClaim:Boolean(diagnostics.identityClaim),
+    pronounResolved:Boolean(diagnostics.pronounResolved),
+    topicSwitched:Boolean(diagnostics.topicSwitched),
+    timeReference:Boolean(diagnostics.timeReference),
+    clarificationReason:diagnostics.clarificationReason || null,
+    retrievalRetried:Boolean(diagnostics.retrievalRetried)
   });
 }
 
@@ -1163,7 +1275,7 @@ function detectTopic(value) {
   if (/\b(hoa|owner portal|portal|cuenta|balance)\b/.test(text)) return "hoa";
   if (privateInfoRequest(text)) return "privacy";
   if (/\b(board|junta|president|presidente)\b/.test(text)) return "board";
-  if (/\b(move|move-in|mudanza)\b/.test(text)) return "move_in";
+  if (/\b(move|moving|mover|movers|move-in|move-out|mudanza)\b/.test(text)) return "move_in";
   if (/\b(contractor|contratista|coi)\b/.test(text)) return "contractor";
   if (/\b(delivery|deliveries|entrega|mueble|furniture|appliance)\b/.test(text)) return "delivery";
   if (/\b(parking|estacionamiento|aps|valet|garage|garaje)\b/.test(text)) return "parking";
@@ -1492,7 +1604,9 @@ function managementStaffReply(message, history = []) {
   if (asksAdministrator) {
     return spanish ? administrator.answer_es : administrator.answer_en;
   }
-  if (/\b(who is the general manager|general manager|quien es el general manager|y el general manager|buriel noel)\b/.test(text)) {
+  const managementWasRecent = history.slice(-6).some(item => /\b(management|management office|administration|administracion|oficina administrativa)\b/.test(foldText(item.content)));
+  if (/\b(who is the general manager|who is the manager|who'?s the manager|who manages the building|building manager|general manager|quien es el general manager|quien es el manager|quien administra el edificio|y el general manager|buriel|buriel noel)\b/.test(text)
+    || (managementWasRecent && /\b(who'?s in charge|who is in charge|quien esta a cargo|quién está a cargo)\b/.test(text))) {
     return spanish ? manager.answer_es : manager.answer_en;
   }
   return null;
@@ -1518,16 +1632,29 @@ function unitPurchaseReply(message, history) {
   const text = foldText(message);
   const spanish = isSpanish(message) || history.slice(-4).some(item => isSpanish(item.content));
   const corrected = /\b(a unit not a key|unit not a key|not a key|una unidad no una llave|no una llave)\b/.test(text);
-  const buyingUnit = /\b(i need to buy a unit|buy a unit|buy an apartment|purchase a unit|purchase an apartment|comprar una unidad|comprar apartamento|comprar un apartamento)\b/.test(text);
+  const buyingUnit = /\b(i need to buy a unit|i would like to buy a unit|i'?d like to buy a unit|buy a unit|buy an apartment|purchase a unit|purchase an apartment|comprar una unidad|comprar apartamento|comprar un apartamento)\b/.test(text)
+    && !/\b(key|llave)\b/.test(text);
+  const sellingUnit = /\b(i would like to sell|i'?d like to sell|sell my unit|sell my apartment|selling my unit|thinking of selling|thinking of listing|list my unit|list my apartment|need a realtor|selling unit|quiero vender|vender mi unidad|poner mi unidad en venta|necesito un realtor)\b/.test(text);
+  const rentingUnit = /\b(can i rent|rent my unit|rent out my unit|lease my unit|leasing my unit|long-term rental|short-term rental|airbnb|puedo alquilar|alquilar mi unidad|arrendar mi unidad|rentar mi unidad)\b/.test(text);
   if (corrected) {
     return spanish
-      ? "Tienes razón — entendí mal. Si preguntas por comprar una unidad, contacta a Management en admin@brickellhouse.net para que puedan orientarte."
-      : "You're right — I misunderstood. If you're asking about purchasing a unit, please contact Management at admin@brickellhouse.net.";
+      ? "Tienes razón — entendí mal. Management no vende unidades directamente; las unidades se venden a través de sus propietarios y Realtors con licencia. Management puede ayudarte con preguntas generales del edificio en admin@brickellhouse.net."
+      : "You're right — I misunderstood. Management does not sell units directly; units are sold through their owners and licensed Realtors. Management can help with general building questions at admin@brickellhouse.net.";
   }
   if (buyingUnit) {
     return spanish
-      ? "Si estás interesado en comprar una unidad, contacta a Management en admin@brickellhouse.net para que puedan orientarte."
-      : "If you're interested in purchasing a unit, please contact Management at admin@brickellhouse.net so they can point you in the right direction.";
+      ? "Management no vende unidades directamente; las unidades se venden a través de sus propietarios y Realtors con licencia. Management puede ayudarte con preguntas generales sobre BrickellHouse en admin@brickellhouse.net."
+      : "Management does not sell units directly; units are sold through their owners and licensed Realtors. Management can help with general questions about BrickellHouse at admin@brickellhouse.net.";
+  }
+  if (sellingUnit) {
+    return spanish
+      ? "Si estás pensando en vender o anunciar tu unidad, Management puede orientarte sobre los requisitos del edificio y de la Asociación. Escribe a admin@brickellhouse.net."
+      : "If you're planning to sell or list your unit, Management can guide you on building and Association requirements. Please email admin@brickellhouse.net.";
+  }
+  if (rentingUnit) {
+    return spanish
+      ? "Los alquileres a corto plazo y Airbnb están prohibidos. Para preguntas sobre un arrendamiento permitido o los requisitos para alquilar tu unidad, escribe a Management en admin@brickellhouse.net."
+      : "Short-term rentals and Airbnb are prohibited. For questions about a permitted lease or the requirements for renting your unit, please email Management at admin@brickellhouse.net.";
   }
   return null;
 }
@@ -1921,6 +2048,62 @@ function bbqReply(message) {
   return "I can't make the reservation for you, but you can reserve the BBQ through ONR. If you don't have an ONR account yet, email admin@brickellhouse.net and Management can help you get registered.";
 }
 
+function moveConversationReply(message, history = []) {
+  const text = foldText(message);
+  const recentAssistant = history.slice().reverse().find(item => item.role === "assistant")?.content || "";
+  const currentTopic = detectTopic(message);
+  const moveContext = ["move_in", "contractor", "delivery"].includes(currentTopic)
+    || /\b(move|moving|mover|movers|mudanza|coi|service elevator|ascensor de servicio|receiving when you schedule|receiving proporciona)\b/.test(foldText(recentAssistant));
+  if (!moveContext) return null;
+
+  const spanish = shouldReplyInSpanish(message, history);
+  const mentionsMove = /\b(move|moving|mover|movers|move-in|move-out|mudanza)\b/.test(text);
+  const asksCoi = /\b(coi|insurance|insured|certificate|seguro|certificado)\b/.test(text);
+  const asksElevator = /\b(elevator|ascensor)\b/.test(text);
+  const asksParking = /\b(park|parking|estacionar|estacionamiento)\b/.test(text);
+  const asksArrival = /\b(how early|arrive early|arrival|que tan temprano|qué tan temprano|llegar temprano|llegada)\b/.test(text);
+  const asksWeekend = /\b(weekend|saturday|sunday|fin de semana|sabado|sábado|domingo)\b/.test(text);
+  const asksFriday = /\b(friday|viernes)\b/.test(text);
+  const asksFee = /\b(fee|deposit|cost|charge|tarifa|deposito|depósito|costo|cuesta)\b/.test(text);
+  const asksSchedule = /\b(schedule|book|reserve|when|date|programar|reservar|cuando|cuándo|fecha)\b/.test(text);
+
+  if (asksParking) {
+    return spanish
+      ? "No tengo instrucciones aprobadas específicas sobre dónde deben estacionarse los proveedores de mudanza. Confírmalo con Receiving cuando programes la mudanza."
+      : "I don't have approved instructions for where movers should park. Please confirm that with Receiving when you schedule the move.";
+  }
+  if (asksArrival) {
+    return spanish
+      ? "No tengo un requisito aprobado sobre llegar temprano. Sigue el horario de mudanza confirmado por Receiving."
+      : "I don't have an approved early-arrival requirement. Please follow the move time confirmed by Receiving.";
+  }
+  if (asksWeekend) {
+    return spanish ? "Las mudanzas no están permitidas los fines de semana." : "Moves are not allowed on weekends.";
+  }
+  if (asksFriday) {
+    return spanish
+      ? "El viernes es un día permitido, pero la mudanza debe programarse únicamente a través de Receiving con al menos 5 días de anticipación."
+      : "Friday is an allowed move day, but the move must be scheduled through Receiving at least 5 days in advance.";
+  }
+  if (asksFee && mentionsMove) {
+    return spanish ? "No se requiere depósito de seguridad ni tarifa de mudanza." : "There is no security deposit and no moving fee.";
+  }
+  if (asksElevator) {
+    return spanish ? "Las mudanzas deben usar el ascensor de servicio." : "Move-ins must use the service elevator.";
+  }
+  if (asksCoi || /\b(mover|movers)\b/.test(text)) {
+    return spanish
+      ? "Los proveedores de mudanza necesitan un COI. Receiving proporciona la muestra requerida y debe aprobarla antes de la mudanza."
+      : "Movers need a COI. Receiving provides the required sample and must approve it before the move.";
+  }
+  if (asksSchedule || mentionsMove) {
+    return spanish
+      ? "Programa la mudanza únicamente a través de Receiving con al menos 5 días de anticipación. Las mudanzas no están permitidas los fines de semana."
+      : "Schedule the move through Receiving at least 5 days in advance. Moves are not allowed on weekends.";
+  }
+  return null;
+}
+
 const responderRegistry = {
   language: {
     languagePreferenceReply
@@ -1967,6 +2150,9 @@ const responderRegistry = {
   property: {
     unitPurchaseReply
   },
+  moves: {
+    moveConversationReply
+  },
   amenities: {
     amenityReservationReply,
     bbqReply
@@ -1992,15 +2178,43 @@ const responderRegistry = {
   }
 };
 
+const DETERMINISTIC_ANSWER_RANK = Object.freeze({
+  safety:1000,
+  emergency:950,
+  privacy:900,
+  protectedInternal:850,
+  structuredKnowledge:800,
+  deterministicResponder:700,
+  structuredRetrieval:600,
+  knowledgeRetrieval:500,
+  modelGeneration:400,
+  fallback:300
+});
+
+function selectHighestRankedAnswer(candidates = []) {
+  return candidates
+    .filter(candidate => String(candidate?.reply || "").trim())
+    .sort((left, right) => right.rank - left.rank || left.order - right.order)[0]?.reply || null;
+}
+
+function formatBoardDirectoryAnswer(reply, message, history = []) {
+  const value = String(reply || "");
+  if (!value.startsWith("* ") || !value.includes("\n* ")) return value;
+  return shouldReplyInSpanish(message, history)
+    ? `La Junta Directiva actual incluye:\n${value}`
+    : `The current Board of Directors includes:\n${value}`;
+}
+
 function singleDeterministicReply(message, history, publicProducts = [], options = {}) {
   const {
     language:{languagePreferenceReply},
     conversation:{correctionReply,structuredConversationReply,topicFollowUpReply},
-    internal:{assistantIdentityReply},
+    internal:{protectedInternalRequest,assistantIdentityReply},
     board:{boardContactReply,boardInfoReply},
     hoa:{hoaBalanceReply},
     privacy:{privateInfoRequest,privacyContextPushback,privacyReply},
     property:{unitPurchaseReply},
+    moves:{moveConversationReply},
     amenities:{amenityReservationReply,bbqReply},
     keys:{keyClarificationReply},
     management:{managementStaffReply,managementOfficeInformationReply},
@@ -2021,23 +2235,28 @@ function singleDeterministicReply(message, history, publicProducts = [], options
   }
   const boardContact = options.resolution?.ambiguity ? null : boardContactReply(message, history);
   if (boardContact) return boardContact;
-  const identity = assistantIdentityReply(message, history);
-  if (identity) return identity;
   const hoaBalance = hoaBalanceReply(message, history);
   if (hoaBalance) return hoaBalance;
   if (privateInfoRequest(message) || privacyContextPushback(message, history)) return privacyReply(message, history);
   const managementOffice = managementOfficeInformationReply(message, history);
-  if (managementOffice) return managementOffice;
+  const moveKnowledge = moveConversationReply(message, history);
   const structuredReply = structuredConversationReply(message, history, options.resolution);
-  if (structuredReply) return structuredReply;
   const boardInfo = boardInfoReply(message, history);
-  if (boardInfo) return boardInfo;
+  const staff = managementStaffReply(message, history);
+  const identity = assistantIdentityReply(message, history);
+  const rankedAnswer = selectHighestRankedAnswer([
+    {reply:moveKnowledge,rank:DETERMINISTIC_ANSWER_RANK.structuredKnowledge,order:0},
+    {reply:structuredReply,rank:DETERMINISTIC_ANSWER_RANK.structuredKnowledge,order:1},
+    {reply:staff,rank:DETERMINISTIC_ANSWER_RANK.structuredKnowledge,order:2},
+    {reply:managementOffice,rank:DETERMINISTIC_ANSWER_RANK.structuredKnowledge,order:3},
+    {reply:formatBoardDirectoryAnswer(boardInfo, message, history),rank:DETERMINISTIC_ANSWER_RANK.structuredKnowledge,order:4},
+    {reply:identity,rank:protectedInternalRequest(message) ? DETERMINISTIC_ANSWER_RANK.protectedInternal : DETERMINISTIC_ANSWER_RANK.deterministicResponder,order:5}
+  ]);
+  if (rankedAnswer) return rankedAnswer;
   const amenityReservation = amenityReservationReply(message, history);
   if (amenityReservation) return amenityReservation;
   const keyClarification = keyClarificationReply(message, history);
   if (keyClarification) return keyClarification;
-  const staff = managementStaffReply(message, history);
-  if (staff) return staff;
   const spill = commonAreaSpillReply(message, history);
   if (spill) return spill;
   const unitMaintenance = unitMaintenanceIssueReply(message, history);
@@ -2139,7 +2358,8 @@ function managementOfficeInformationReply(message, history = [], approvedContact
   const anotherOffice = /\b(receiving(?: office)?|package office|front desk|reception|recepcion|maintenance office|oficina de mantenimiento)\b/.test(contextText);
   const contextualOffice = /\boffice\b/.test(contextText) && !anotherOffice;
   const asksLocation = /\b(where|location|floor|find|donde|ubicacion|piso|encuentro)\b/.test(text);
-  const asksHours = /\b(hours|schedule|open|close|opening|closing|when|horario|abre|abierta|abierto|cierra|cuando)\b/.test(text);
+  const asksHours = /\b(hours|schedule|open|close|opening|closing|when|how late|what time|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|weekday|weekend|horario|abre|abierta|abierto|cierra|cuando|hoy|mañana|lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo)\b/.test(text);
+  const compoundAsksHours = Boolean(contextMessage) && /\b(hours|schedule|open|close|opening|closing|when|how late|what time|horario|abre|cierra|cuando|cuándo)\b/.test(contextText);
   if ((!explicitManagement && !contextualOffice) || (!asksLocation && !asksHours)) return null;
 
   const spanish = shouldReplyInSpanish(message, history);
@@ -2162,6 +2382,11 @@ function managementOfficeInformationReply(message, history = [], approvedContact
     parts.push(spanish
       ? `La oficina de administración está en el ${String(location).toLowerCase()}.`
       : `The Management Office is on the ${String(location).toLowerCase()}.`);
+    if (!asksHours && !compoundAsksHours && management.hours) {
+      parts.push(spanish
+        ? "Está abierta de lunes a viernes, de 9:00 AM a 5:00 PM."
+        : "It is open Monday through Friday from 9:00 AM to 5:00 PM.");
+    }
   }
   if (asksHours) {
     if (asksSaturday) {
@@ -2183,10 +2408,10 @@ function managementOfficeInformationReply(message, history = [], approvedContact
 
 function boardListContributionReply(message, history = []) {
   const existing = boardInfoReply(message, history);
-  if (existing) return existing;
+  if (existing) return formatBoardDirectoryAnswer(existing, message, history);
   const text = foldText(message);
   if (!/\b(who is on (?:the )?board|who are (?:the )?board members|quienes estan en la junta|quienes son de la junta|miembros de la junta)\b/.test(text)) return null;
-  return boardInfoReply("Who is on the Board?", history);
+  return formatBoardDirectoryAnswer(boardInfoReply("Who is on the Board?", history), message, history);
 }
 
 function splitCompoundIntents(message) {
@@ -2195,8 +2420,9 @@ function splitCompoundIntents(message) {
   const sentenceSeparated = immediateDangerReply(value, [])
     ? value.replace(/([?!.;])\s+(?=[¿¡]?(?:who|what|where|when|how|tell|give|take|show|there|qui[eé]n|qu[eé]|d[oó]nde|cu[aá]ndo|c[oó]mo|dime|hay)\b)/gi, "$1\n")
     : value;
+  const commaSeparated = sentenceSeparated.replace(/,\s+(?=[¿¡]?(?:who(?:'s)?|what|where|when|how|which|qui[eé]n|qu[eé]|d[oó]nde|cu[aá]ndo|c[oó]mo|cu[aá]l)\b)/gi, "\n");
   const connector = /\s+(?:and|also|plus|y|ademas|además)\s+(?=[¿¡]?(?:who(?:'s)?|what|where|when|how|which|tell|give|take|show|can|could|do|does|is|are|i|my|there|qui[eé]n|qu[eé]|d[oó]nde|cu[aá]ndo|c[oó]mo|cu[aá]l|dime|puedo|puedes|hay)\b)/gi;
-  return sentenceSeparated
+  return commaSeparated
     .split(/\n+/)
     .flatMap(sentence => sentence.split(connector))
     .map(segment => segment.trim())
@@ -2226,6 +2452,7 @@ function compoundPartsForSegment(message, history, publicProducts, options, orde
     hoa:{hoaBalanceReply},
     management:{managementStaffReply,managementOfficeInformationReply},
     maintenance:{unitMaintenanceIssueReply},
+    moves:{moveConversationReply},
     amenities:{amenityReservationReply,bbqReply},
     packages:{packageIntent,packageContributionReply},
     parking:{parkingIntent,parkingContributionReply},
@@ -2256,6 +2483,7 @@ function compoundPartsForSegment(message, history, publicProducts, options, orde
 
   const maintenance = urgent ? null : unitMaintenanceIssueReply(message, history);
   addCompoundPart(parts, "maintenance", 4, maintenance, order);
+  addCompoundPart(parts, "move", 5, moveConversationReply(message, history), order);
 
   const explicitZeroCandidateRoute = resolution.candidates.length === 0
     && (packageIntent(message)
@@ -2320,11 +2548,12 @@ function compoundPartsForSegment(message, history, publicProducts, options, orde
 }
 
 function composeCompoundReply(parts) {
-  return parts
+  const ordered = parts
     .slice()
-    .sort((left, right) => left.priority - right.priority || left.order - right.order)
-    .map(part => part.reply)
-    .join("\n\n");
+    .sort((left, right) => left.priority - right.priority || left.order - right.order);
+  const managementOnly = ordered.length > 1
+    && ordered.every(part => ["office", "staff", "structured-contact", "structured-staff"].includes(part.key));
+  return ordered.map(part => part.reply).join(managementOnly ? " " : "\n\n");
 }
 
 function deterministicReply(message, history, publicProducts = [], options = {}) {
@@ -2335,13 +2564,10 @@ function deterministicReply(message, history, publicProducts = [], options = {})
     payment:{paymentDataProtectionReply},
     privacy:{privateResidentContactRequest,privacyReply},
     board:{privateBoardContactProtectionReply},
-    maintenance:{unitMaintenanceIssueReply},
-    property:{unitPurchaseReply}
+    maintenance:{unitMaintenanceIssueReply}
   } = responderRegistry;
   const languagePreference = languagePreferenceReply(message);
   if (languagePreference) return languagePreference;
-  const unitPurchase = unitPurchaseReply(message, history);
-  if (unitPurchase) return unitPurchase;
   const directCorrection = correctionReply(message, history);
   if (directCorrection) return directCorrection;
 
@@ -2353,6 +2579,10 @@ function deterministicReply(message, history, publicProducts = [], options = {})
     const payment = paymentDataProtectionReply(message, history);
     if (payment) return payment;
     if (privateResidentContactRequest(message)) return privacyReply(message, history);
+    if (options.resolution?.identityClaim) {
+      const identityClaimReply = responderRegistry.conversation.structuredConversationReply(message, history, options.resolution);
+      if (identityClaimReply) return identityClaimReply;
+    }
     const privateBoardContact = privateBoardContactProtectionReply(message, history);
     if (privateBoardContact) return privateBoardContact;
     const urgent = urgentBuildingIssueReply(message, history);
@@ -2590,6 +2820,7 @@ function structuredContextForModel(resolution, grounding = null) {
     policyLookup:resolution.policy || null,
     ambiguity:resolution.ambiguity || null,
     requestedAttributes:resolution.requestedAttributes || [],
+    conversationSignals:resolution.contextSignals || {},
     grounding:grounding ? {
       confidence:grounding.confidence,
       outcome:grounding.outcome,
@@ -2715,11 +2946,15 @@ async function generateLunaTurn(message, trustedContext, interfaceLanguage = "en
   const resolution = resolveConversationContext(generationMessage, history, publicProducts, trustedContext.state, retrieval);
   retrieval = strengthenRetrievalForResolution(retrieval, resolution);
   const grounding = assessKnowledgeGrounding(generationMessage, retrieval, resolution, {needsCatalog,catalogStatus});
+  const diagnosticSignals = {
+    ...resolution.contextSignals,
+    retrievalRetried:Boolean(retrieval.retry?.performed)
+  };
   const structuredContext = structuredContextForModel(resolution, grounding);
   const directReply = deterministicReply(generationMessage, history, publicProducts, {needsCatalog,catalogStatus,resolution});
   if (directReply) {
     const completeness = assessResponseCompleteness(generationMessage, directReply, resolution);
-    logLunaRoute("deterministic", retrieval, {...grounding,completeness:completeness.status});
+    logLunaRoute("deterministic", retrieval, {...grounding,...diagnosticSignals,completeness:completeness.status});
     return {success:true,httpStatus:200,reply:directReply,source:"deterministic",history,resolution,publicProducts,retrieval,grounding,completeness};
   }
 
@@ -2730,7 +2965,7 @@ async function generateLunaTurn(message, trustedContext, interfaceLanguage = "en
   }
 
   try {
-    logLunaRoute("model", retrieval, {...grounding,completeness:"pending-model-response"});
+    logLunaRoute("model", retrieval, {...grounding,...diagnosticSignals,completeness:"pending-model-response"});
     const openAiResponse = await fetch(OPENAI_RESPONSES_URL, {
       method:"POST",
       headers:{
@@ -2949,6 +3184,8 @@ module.exports.__test = {
   getPolicy,
   findApprovedEntities,
   resolveConversationContext,
+  detectIdentityClaim,
+  detectTimeReference,
   detectRequestedAttribute,
   detectRequestedAttributes,
   strengthenRetrievalForResolution,
@@ -2956,6 +3193,9 @@ module.exports.__test = {
   assessResponseCompleteness,
   buildPersistedConversationState,
   structuredConversationReply,
+  selectHighestRankedAnswer,
+  formatBoardDirectoryAnswer,
+  moveConversationReply,
   structuredContextForModel,
   boardInfoReply,
   boardContactReply,
