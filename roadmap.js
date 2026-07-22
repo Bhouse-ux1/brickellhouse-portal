@@ -17,6 +17,10 @@ let acceptedLegalNoticeVersion = "";
 let legalScrollGateReached = false;
 let legalReviewReturnFocus = null;
 const LEGAL_SCROLL_TOLERANCE = 12;
+const VALET_RECURRING_PRODUCT_ID = "svc13";
+const VALET_RECURRING_VALET_CENTS = 25000;
+const VALET_RECURRING_FEE_CENTS = 755;
+const VALET_RECURRING_TOTAL_CENTS = 25755;
 const unitValidationMessage = () => tr("checkout.unitInvalid");
 
 window.BH_GET_CHECKOUT_SNAPSHOT = () => checkoutSnapshot;
@@ -45,7 +49,7 @@ function captureCheckoutSnapshot() {
     return {id:product.id,name:display.name,quantity:cartItem.quantity,price:product.price};
   }).filter(Boolean);
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const fee = processingFee(subtotal);
+  const fee = checkoutProcessingFee(subtotal);
   return immutableCheckoutSnapshot({items,subtotal,processingFee:fee,total:subtotal + fee});
 }
 
@@ -246,7 +250,54 @@ function clearPaymentMessage() {
 
 function paidCheckoutRequired() {
   const subtotal = cartSubtotal();
-  return cart.length > 0 && subtotal + processingFee(subtotal) > 0;
+  return cart.length > 0 && subtotal + checkoutProcessingFee(subtotal) > 0;
+}
+
+function valetRecurringEligible() {
+  if (cart.length !== 1) return false;
+  const cartItem = cart[0];
+  const product = products.find(candidate => candidate.id === cartItem.id && candidate.active);
+  if (!product || cartItem.id !== VALET_RECURRING_PRODUCT_ID || cartItem.quantity !== 1) return false;
+  const subtotalCents = Math.round(Number(product.price || 0) * 100);
+  return subtotalCents === VALET_RECURRING_VALET_CENTS
+    && subtotalCents + VALET_RECURRING_FEE_CENTS === VALET_RECURRING_TOTAL_CENTS;
+}
+
+function recurringPaymentSelected() {
+  return valetRecurringEligible() && $('#checkoutForm [name="paymentOption"]:checked')?.value === "recurring";
+}
+
+function checkoutProcessingFee(subtotal) {
+  return recurringPaymentSelected() ? VALET_RECURRING_FEE_CENTS / 100 : processingFee(subtotal);
+}
+
+function syncCheckoutRecurringTotals() {
+  if (!isCheckoutPage || checkoutSnapshot) return;
+  const subtotal = cartSubtotal();
+  const fee = checkoutProcessingFee(subtotal);
+  if ($("#checkoutFee")) $("#checkoutFee").textContent = money(fee);
+  if ($("#checkoutTotal")) $("#checkoutTotal").textContent = money(subtotal + fee);
+  if ($("#checkoutAmountDue")) $("#checkoutAmountDue").textContent = money(subtotal + fee);
+}
+
+function recurringAuthorizationAccepted() {
+  return !recurringPaymentSelected() || Boolean($("#recurringAuthorization")?.checked);
+}
+
+function syncValetRecurringOptions() {
+  const options = $("#valetPaymentOptions");
+  if (!options) return;
+  const eligible = valetRecurringEligible();
+  options.classList.toggle("hidden", !eligible);
+  if (!eligible) {
+    const oneTime = options.querySelector('[name="paymentOption"][value="one_time"]');
+    if (oneTime) oneTime.checked = true;
+    if ($("#recurringAuthorization")) $("#recurringAuthorization").checked = false;
+  }
+  const recurring = eligible && recurringPaymentSelected();
+  $("#valetRecurringDetails")?.classList.toggle("hidden", !recurring);
+  $("#recurringAuthorizationMessage")?.classList.toggle("hidden", !recurring || recurringAuthorizationAccepted());
+  syncCheckoutRecurringTotals();
 }
 
 function setCheckoutSubmitLabel(label) {
@@ -391,7 +442,7 @@ function syncCheckoutSubmitState() {
   if (!submit) return;
   const detailsComplete = checkoutDetailsComplete();
   const accepted = legalTermsAccepted();
-  submit.disabled = paymentInProgress || Boolean(stripeEmbeddedCheckout) || Boolean(checkoutSnapshot) || !detailsComplete || !accepted || !cart.length || !checkoutPageCatalogReady;
+  submit.disabled = paymentInProgress || Boolean(stripeEmbeddedCheckout) || Boolean(checkoutSnapshot) || !detailsComplete || !accepted || !recurringAuthorizationAccepted() || !cart.length || !checkoutPageCatalogReady;
 }
 
 function checkoutDetailsComplete() {
@@ -441,10 +492,11 @@ function syncStripeCheckoutDisplay() {
   }
 
   container.classList.remove("hidden");
-  const readyToContinue = checkoutDetailsComplete() && legalTermsAccepted();
-  embedded.innerHTML = `<div class="stripe-payment-notice" data-stripe-placeholder>${readyToContinue
-    ? tr("checkout.detailsReady")
-    : tr("checkout.detailsNeeded")}</div>`;
+  const readyToContinue = checkoutDetailsComplete() && legalTermsAccepted() && recurringAuthorizationAccepted();
+  const readinessMessage = recurringPaymentSelected() && !recurringAuthorizationAccepted()
+    ? tr("checkout.recurringAuthorizationError")
+    : readyToContinue ? tr("checkout.detailsReady") : tr("checkout.detailsNeeded");
+  embedded.innerHTML = `<div class="stripe-payment-notice" data-stripe-placeholder>${readinessMessage}</div>`;
   setCheckoutSubmitLabel(tr("checkout.continueSecure"));
   syncCheckoutSubmitState();
 }
@@ -519,14 +571,16 @@ function preloadPaymentProvider() {
   void preparePaymentProvider();
 }
 
-async function createStripeCheckoutSession({resident, acceptedAt, snapshot}) {
+async function createStripeCheckoutSession({resident, acceptedAt, snapshot, paymentOption}) {
+  const recurring = paymentOption === "recurring";
   const response = await fetch("/api/stripe?action=session", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
       resident,
       items:snapshot.items.map(item => ({id:item.id,quantity:item.quantity})),
-      legalAccepted:true,legalNoticeVersion:LEGAL_NOTICE_VERSION,legalAcceptedAt:acceptedAt
+      legalAccepted:true,legalNoticeVersion:LEGAL_NOTICE_VERSION,legalAcceptedAt:acceptedAt,
+      ...(recurring ? {paymentOption:"recurring",recurringAuthorizationAccepted:true} : {})
     })
   });
   const result = await response.json();
@@ -565,6 +619,7 @@ function showSuccessMessage({title, body, orderNumber = ""}) {
   $("#successName") && ($("#successName").textContent = "");
   $("#successOrder") && ($("#successOrder").textContent = orderNumber);
   $("#successPaymentNote") && ($("#successPaymentNote").textContent = "");
+  $("#recurringSuccessDetails")?.classList.add("hidden");
   if (isCheckoutPage) {
     $("#checkoutMain")?.classList.add("hidden");
     $("#successModal")?.classList.remove("hidden");
@@ -582,7 +637,32 @@ function showPaidOrderConfirmation(orderNumber = "") {
   });
 }
 
+function showRecurringValetConfirmation() {
+  $("#successEyebrow") && ($("#successEyebrow").textContent = tr("checkout.recurringSuccessEyebrow"));
+  $("#successTitle") && ($("#successTitle").textContent = tr("checkout.recurringSuccessTitle"));
+  $("#successBody") && ($("#successBody").textContent = tr("checkout.recurringSuccessBody"));
+  const details = $("#recurringSuccessDetails");
+  if (details) {
+    details.innerHTML = `<div class="valet-recurring-breakdown" aria-label="${escapeHtml(tr("checkout.monthlyBreakdownLabel"))}">
+      <div><span>${escapeHtml(tr("checkout.valetParking"))}</span><strong>$250.00</strong></div>
+      <div><span>${escapeHtml(tr("cart.processingFee"))}</span><strong>$7.55</strong></div>
+      <div class="valet-recurring-total"><span>${escapeHtml(tr("checkout.monthlyTotal"))}</span><strong>$257.55</strong></div>
+    </div>
+    <p>${escapeHtml(tr("checkout.recurringAutoCharge"))}</p>
+    <p>${escapeHtml(tr("checkout.cancellationBeforeEmail"))} <a href="mailto:admin@brickellhouse.net">admin@brickellhouse.net</a> ${escapeHtml(tr("checkout.cancellationAfterEmail"))}</p>`;
+    details.classList.remove("hidden");
+  }
+  if (isCheckoutPage) {
+    $("#checkoutMain")?.classList.add("hidden");
+    $("#successModal")?.classList.remove("hidden");
+    window.scrollTo({top:0, behavior:"auto"});
+  } else {
+    openModal("#successModal");
+  }
+}
+
 function showResidentOrderConfirmation({name = "", orderNumber = "", note = ""}) {
+  $("#recurringSuccessDetails")?.classList.add("hidden");
   $("#successEyebrow") && ($("#successEyebrow").textContent = tr("success.requestReceived"));
   $("#successTitle") && ($("#successTitle").textContent = tr("success.thankYou", {name:name ? `, ${name}` : ""}));
   if ($("#successBody")) {
@@ -612,7 +692,8 @@ async function mountStripeCheckout(session, records, resident, number) {
         $("#checkoutForm").reset();
         resetStripeCheckout();
         closeModal("#checkoutModal");
-        showPaidOrderConfirmation(result.order?.orderNumber || number);
+        if (result.recurring === true) showRecurringValetConfirmation();
+        else showPaidOrderConfirmation(result.order?.orderNumber || number);
       } catch (error) {
         showPaymentError(tr("checkout.confirmFailed"));
       }
@@ -652,7 +733,8 @@ async function handleStripeReturnConfirmation() {
     resetStripeCheckout();
     $("#checkoutForm")?.reset();
     closeModal("#checkoutModal");
-    showPaidOrderConfirmation(result.order?.orderNumber || "");
+    if (result.recurring === true) showRecurringValetConfirmation();
+    else showPaidOrderConfirmation(result.order?.orderNumber || "");
   } catch (error) {
     console.error("Stripe return confirmation failed", error);
     showSuccessMessage({
@@ -699,6 +781,7 @@ function checkoutValidationMessage(form, resident) {
   if (!normalizeUnitNumber(resident.unit)) return unitValidationMessage();
   if (!form.elements.email.validity.valid) return tr("checkout.emailError");
   if (!normalizeUsPhone(resident.phone)) return tr("checkout.phoneError");
+  if (recurringPaymentSelected() && !recurringAuthorizationAccepted()) return tr("checkout.recurringAuthorizationError");
   if (!legalTermsAccepted()) return tr("checkout.legalError");
   return "";
 }
@@ -717,6 +800,7 @@ function finalizeSuccessfulOrder(records) {
 
 if ($("#checkoutForm")) {
   const syncCheckoutFormState = () => {
+    syncValetRecurringOptions();
     preloadPaymentProvider();
     syncCheckoutSubmitState();
     syncStripeCheckoutDisplay();
@@ -725,6 +809,11 @@ if ($("#checkoutForm")) {
   $("#checkoutForm").addEventListener("input", syncCheckoutFormState);
   $("#checkoutForm").addEventListener("change", syncCheckoutFormState);
   $("#checkoutForm").addEventListener("reset", resetLegalAcceptance);
+  $("#checkoutForm").addEventListener("reset", () => queueMicrotask(() => {
+    syncValetRecurringOptions();
+    syncStripeCheckoutDisplay();
+    syncCheckoutSubmitState();
+  }));
   $("#checkoutForm").onsubmit = async event => {
   event.preventDefault();
   if (paymentInProgress || stripeEmbeddedCheckout || checkoutSnapshot) return;
@@ -744,7 +833,7 @@ if ($("#checkoutForm")) {
   form.elements.unit.value = resident.unit;
 
   const subtotal = cartSubtotal();
-  const fee = processingFee(subtotal);
+  const fee = checkoutProcessingFee(subtotal);
   const requiresPayment = subtotal + fee > 0;
   const submit = $("#checkoutSubmit");
   const message = $("#paymentMessage");
@@ -754,6 +843,7 @@ if ($("#checkoutForm")) {
   clearPaymentMessage();
 
   const acceptedAt = legalAcceptedAt;
+  const paymentOption = recurringPaymentSelected() ? "recurring" : "one_time";
   const snapshot = setCheckoutSnapshot(captureCheckoutSnapshot());
   if (!snapshot) {
     message.textContent = tr("checkout.catalogUnavailable");
@@ -799,7 +889,7 @@ if ($("#checkoutForm")) {
       if (!orderNumber) throw new Error("Order reference was not returned");
       payment = {status:"No Payment Required",id:"",createdAt:acceptedAt};
     } else if (checkoutProvider === "stripe") {
-      const session = await createStripeCheckoutSession({resident,acceptedAt,snapshot});
+      const session = await createStripeCheckoutSession({resident,acceptedAt,snapshot,paymentOption});
       await mountStripeCheckout(session, records, resident, session.orderNumber);
       submit.textContent = tr("checkout.completeBelow");
       paymentInProgress = false;
@@ -863,6 +953,7 @@ function applyCheckoutCatalogState(success) {
     loading.innerHTML = `<p>${tr("checkout.catalogUnavailable")}</p>`;
   }
   syncCheckoutPageState();
+  syncValetRecurringOptions();
   syncStripeCheckoutDisplay();
   syncCheckoutSubmitState();
 }
@@ -873,6 +964,7 @@ document.addEventListener("bh:catalog-ready", event => {
 
 document.addEventListener("bh:cart-updated", () => {
   syncCheckoutPageState();
+  syncValetRecurringOptions();
   syncStripeCheckoutDisplay();
   syncCheckoutSubmitState();
 });
@@ -890,12 +982,21 @@ document.addEventListener("bh:language-changed", () => {
   if ($("#legalReviewAccept")) {
     $("#legalReviewAccept").textContent = legalTermsAccepted() ? tr("checkout.legalAccepted") : tr("legal.accept");
   }
+  syncValetRecurringOptions();
   syncStripeCheckoutDisplay();
   syncCheckoutSubmitState();
 });
 
 window.addEventListener("pageshow", event => {
-  if (!isCheckoutPage || !event.persisted || (!paymentInProgress && !stripeEmbeddedCheckout && !checkoutSnapshot)) return;
+  if (!isCheckoutPage) return;
+  const oneTime = $('#checkoutForm [name="paymentOption"][value="one_time"]');
+  const authorization = $("#recurringAuthorization");
+  if (oneTime) oneTime.checked = true;
+  if (authorization) authorization.checked = false;
+  syncValetRecurringOptions();
+  syncStripeCheckoutDisplay();
+  syncCheckoutSubmitState();
+  if (!event.persisted || (!paymentInProgress && !stripeEmbeddedCheckout && !checkoutSnapshot)) return;
   paymentInProgress = false;
   resetStripeCheckout();
   releaseCheckoutSnapshot();
@@ -903,6 +1004,7 @@ window.addEventListener("pageshow", event => {
 });
 
 syncCheckoutPageState();
+syncValetRecurringOptions();
 syncCheckoutSubmitState();
 if (isCheckoutPage && window.BH_CATALOG_STATE?.complete) {
   applyCheckoutCatalogState(window.BH_CATALOG_STATE.success);

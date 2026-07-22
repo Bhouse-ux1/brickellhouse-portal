@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="Secure BrickellHouse resident checkout" data-i18n-content="checkout.metaDescription">
   <title>Resident Checkout | BrickellHouse</title>
-  <script src="i18n.js?v=20260713-resident-i18n1"></script>
+  <script src="i18n.js?v=20260722-valet-recurring1"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260713-resident-i18n1">
+  <link rel="stylesheet" href="styles.css?v=20260722-valet-recurring1">
 </head>
 <body class="checkout-page" data-i18n-title="checkout.pageTitle">
   <header class="checkout-header">
@@ -73,6 +73,36 @@
             <label><span data-i18n="common.phone">Phone</span><input name="phone" type="tel" required autocomplete="tel" placeholder="(305) 555-0000" data-i18n-placeholder="checkout.phoneExample"></label>
           </div>
 
+          <fieldset class="valet-payment-options hidden" id="valetPaymentOptions" data-checkout-prepayment>
+            <legend data-i18n="checkout.paymentOptions">Payment options</legend>
+            <label class="valet-payment-choice">
+              <input type="radio" name="paymentOption" value="one_time" checked>
+              <span><strong data-i18n="checkout.oneTimeTitle">One-Time Payment</strong><small data-i18n="checkout.oneTimeDescription">Pay your valet parking fee for the current billing period only.</small></span>
+            </label>
+            <label class="valet-payment-choice">
+              <input type="radio" name="paymentOption" value="recurring">
+              <span><strong data-i18n="checkout.recurringTitle">Automatic Monthly Payments (Optional)</strong><small data-i18n="checkout.recurringDescription">Enroll in a recurring monthly Valet Parking subscription. Your selected payment method will automatically be charged each month until your subscription is canceled.</small></span>
+            </label>
+
+            <div class="valet-recurring-details hidden" id="valetRecurringDetails">
+              <div class="valet-recurring-breakdown" aria-label="Monthly charge breakdown" data-i18n-aria-label="checkout.monthlyBreakdownLabel">
+                <div><span data-i18n="checkout.valetParking">Valet Parking</span><strong>$250.00/month</strong></div>
+                <div><span data-i18n="cart.processingFee">Processing Fee</span><strong>$7.55/month</strong></div>
+                <div class="valet-recurring-total"><span data-i18n="checkout.monthlyTotal">Monthly Total</span><strong>$257.55/month</strong></div>
+              </div>
+              <p class="valet-recurring-notice" data-i18n="checkout.recurringNotice">By selecting this option, you authorize BrickellHouse to automatically charge your selected payment method $257.55 each month for your recurring Valet Parking subscription until you request cancellation.</p>
+              <p class="valet-recurring-notice"><span data-i18n="checkout.cancellationBeforeEmail">Cancellation requests must be emailed to</span> <a href="mailto:admin@brickellhouse.net">admin@brickellhouse.net</a> <span data-i18n="checkout.cancellationAfterEmail">at least five (5) business days before your next scheduled billing date. Recurring charges continue until Management processes your cancellation.</span></p>
+              <label class="valet-recurring-authorization">
+                <input id="recurringAuthorization" name="recurringAuthorization" type="checkbox">
+                <span>
+                  <strong data-i18n="checkout.recurringAuthorizationTitle">I authorize recurring monthly payments.</strong>
+                  <small data-i18n="checkout.recurringAuthorizationText">I authorize BrickellHouse to automatically charge my selected payment method $257.55 each month for my recurring Valet Parking subscription until I request cancellation. I understand cancellation requests must be emailed to admin@brickellhouse.net at least five (5) business days before my next scheduled billing date. I understand recurring charges continue until Management processes my cancellation.</small>
+                </span>
+              </label>
+              <p class="valet-recurring-validation" id="recurringAuthorizationMessage" role="status" data-i18n="checkout.recurringAuthorizationError">Please acknowledge the recurring payment authorization before continuing.</p>
+            </div>
+          </fieldset>
+
           <div class="checkout-security" data-checkout-prepayment aria-label="Secure payment information" data-i18n-aria-label="checkout.securityLabel">
             <span class="checkout-lock" aria-hidden="true"></span>
             <div>
@@ -118,6 +148,7 @@
     <p class="eyebrow" id="successEyebrow" data-i18n="success.requestReceived">Request received</p>
     <h1 id="successTitle">Thank you<span id="successName"></span>.</h1>
     <p id="successBody">Your order <strong id="successOrder"></strong> has been received. <span id="successPaymentNote"></span></p>
+    <div class="recurring-success-details hidden" id="recurringSuccessDetails"></div>
     <a class="primary-button" href="./#shop" data-i18n="checkout.returnResidentStore">Return to Resident Store</a>
   </section>
 
@@ -144,6 +175,6 @@
   <script src="legal.js?v=20260615-legal1"></script>
   <script src="processing-fee.js?v=20260716-fee1"></script>
   <script src="app.js?v=20260717-product-images1"></script>
-  <script src="roadmap.js?v=20260720-checkout-mount-fix"></script>
+  <script src="roadmap.js?v=20260722-valet-recurring1"></script>
 </body>
 </html>

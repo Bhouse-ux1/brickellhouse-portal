@@ -1873,12 +1873,21 @@ async function approvedManagementSession() {
   return {session, profile};
 }
 
+function financialOrderDate(order) {
+  const recurringRenewal = String(order?.internal_note || "").startsWith("Recurring monthly Valet renewal for enrollment ");
+  if (!recurringRenewal || !order?.payment_at) return String(order?.created_at || "").slice(0, 10);
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+    timeZone:"America/New_York", year:"numeric", month:"2-digit", day:"2-digit"
+  }).formatToParts(new Date(order.payment_at)).map(part => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
 function mapSupabaseOrderRows(rows) {
   return (rows || []).flatMap(order => {
     const items = order.order_items || [];
     if (!items.length) {
       return [{
-        id:order.id,number:order.order_number,date:(order.created_at || "").slice(0, 10),
+        id:order.id,number:order.order_number,date:financialOrderDate(order),
         name:order.resident_name,unit:order.unit_number,email:order.email,phone:order.phone || "",
         product:"Order total",internalName:"No line items recorded",productId:"",
         quantity:1,price:centsToDollars(order.subtotal_cents),glCode:"",
@@ -1892,7 +1901,7 @@ function mapSupabaseOrderRows(rows) {
       }];
     }
     return items.map((item, index) => ({
-      id:order.id,itemId:item.id,number:order.order_number,date:(order.created_at || "").slice(0, 10),
+      id:order.id,itemId:item.id,number:order.order_number,date:financialOrderDate(order),
       name:order.resident_name,unit:order.unit_number,email:order.email,phone:order.phone || "",
       product:item.resident_name_snapshot,internalName:item.internal_name_snapshot,productId:item.product_id,
       quantity:item.quantity,price:centsToDollars(item.unit_price_cents),glCode:item.gl_code_snapshot,

@@ -1,10 +1,13 @@
 const {
+  assertValetRecurringPriceConfiguration,
   assertStripeStorageReady,
   attachStripeSessionToPendingOrder,
   buildTrustedCheckout,
   createCheckoutSession,
   createPendingStripeOrder,
+  fulfillPaidValetRecurringInvoice,
   fulfillPaidStripeSession,
+  recordValetRecurringAuthorization,
   readRawBody,
   retrieveCheckoutSession,
   stripeKeyConfig,
@@ -23,6 +26,8 @@ const RESIDENT_SAFE_SESSION_MESSAGES = new Set([
   "Cart is empty",
   "One of the selected items is no longer available",
   "Invalid quantity for one of the selected items",
+  "Please acknowledge the recurring payment authorization before continuing.",
+  "Recurring monthly payments are only available for one eligible Valet Parking selection.",
   "Stripe checkout is only used for paid orders"
 ]);
 
@@ -98,9 +103,13 @@ async function createSession(request, response) {
       buildTrustedCheckout(body),
       assertStripeStorageReady()
     ]);
+    const recurringPriceIds = checkout.recurring
+      ? await assertValetRecurringPriceConfiguration()
+      : null;
     const pendingOrder = await createPendingStripeOrder(checkout);
+    if (checkout.recurring) await recordValetRecurringAuthorization(pendingOrder, checkout);
     const trustedCheckout = {...checkout, orderNumber:pendingOrder.order_number};
-    const session = await createCheckoutSession(trustedCheckout, originFromRequest(request));
+    const session = await createCheckoutSession(trustedCheckout, originFromRequest(request), recurringPriceIds);
     await attachStripeSessionToPendingOrder(pendingOrder.id, session);
     return send(response, 200, {
       success:true,
@@ -130,7 +139,8 @@ async function confirmOrder(request, response) {
     return send(response, 200, {
       success:true,
       order:{id:result.order.id, orderNumber:result.order.order_number},
-      existing:result.existing
+      existing:result.existing,
+      ...(result.recurring === true ? {recurring:true} : {})
     });
   } catch (error) {
     return send(response, error.status || 500, {
@@ -152,6 +162,8 @@ async function webhook(request, response) {
       if (session.payment_status === "paid") {
         await fulfillPaidStripeSession(session, {eventId:event.id, eventType:event.type});
       }
+    } else if (event.type === "invoice.paid") {
+      await fulfillPaidValetRecurringInvoice(event.data?.object, {eventId:event.id});
     }
 
     return send(response, 200, {received:true});

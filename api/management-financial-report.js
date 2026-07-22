@@ -103,7 +103,7 @@ function paidOrdersPath(period, offset) {
   const select = [
     "id", "order_number", "resident_name", "unit_number",
     "subtotal_cents", "processing_fee_cents", "total_cents",
-    "status", "payment_status", "payment_at", "created_at",
+    "status", "payment_status", "payment_at", "created_at", "internal_note",
     "payment_provider", "payment_processor_reference", "square_payment_id",
     "stripe_checkout_session_id", "stripe_payment_intent_id", "stripe_charge_id",
     "order_items(id,resident_name_snapshot,internal_name_snapshot,gl_code_snapshot,quantity,unit_price_cents,created_at)"

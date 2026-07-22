@@ -206,8 +206,12 @@ function allocateFeeCents(lineGrosses, feeCents) {
 }
 
 function preferredPaymentReference(order) {
+  const recurringRenewalReference = String(order.internal_note || "").startsWith("Recurring monthly Valet renewal for enrollment ")
+    ? order.payment_processor_reference
+    : "";
   return cleanText(
-    order.stripe_payment_intent_id
+    recurringRenewalReference
+      || order.stripe_payment_intent_id
       || order.stripe_checkout_session_id
       || order.payment_processor_reference
       || order.square_payment_id

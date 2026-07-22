@@ -381,6 +381,160 @@ function buildManagementEmail(rawOrder) {
   };
 }
 
+function recurringBreakdownCard() {
+  return `<table role="presentation" class="total-card" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border:1px solid #c8c8c8;">
+    <tr><td class="muted-text" style="padding:14px 18px 5px;color:#333333;font-size:12px;">Valet Parking</td><td class="item-text" align="right" style="padding:14px 18px 5px;color:#111111;font-size:12px;">${money(25000)}/month</td></tr>
+    <tr><td class="muted-text" style="padding:5px 18px 13px;color:#333333;font-size:12px;">Processing Fee</td><td class="item-text" align="right" style="padding:5px 18px 13px;color:#111111;font-size:12px;">${money(755)}/month</td></tr>
+    <tr><td class="heading-text" style="padding:15px 18px;border-top:1px solid #c8c8c8;color:#111111;font-family:Georgia,'Times New Roman',serif;font-size:18px;">Monthly Total</td><td class="heading-text" align="right" style="padding:15px 18px;border-top:1px solid #c8c8c8;color:#111111;font-size:18px;font-weight:600;">${money(25755)}/month</td></tr>
+  </table>`;
+}
+
+function recurringCallout(title, text) {
+  return `<table role="presentation" class="next-card" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border:1px solid #c8c8c8;border-left:4px solid #a68b54;"><tr><td class="body-text" style="padding:18px 20px;color:#222222;font-size:14px;line-height:23px;"><strong class="heading-text" style="display:block;margin-bottom:6px;color:#111111;">${escapeHtml(title)}</strong>${text}</td></tr></table>`;
+}
+
+function recurringDetailsCard(rows) {
+  return `<table role="presentation" class="info-card" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border:1px solid #c8c8c8;">
+    ${rows.map(([label,value]) => `<tr><td class="info-label" valign="top" style="padding:8px 16px;color:#333333;font-size:12px;line-height:18px;">${escapeHtml(label)}</td><td class="info-value" valign="top" align="right" style="padding:8px 16px;color:#111111;font-size:12px;line-height:18px;word-break:break-word;">${escapeHtml(value)}</td></tr>`).join("")}
+  </table>`;
+}
+
+function recurringHero({eyebrow, title, intro}) {
+  return `<tr><td class="mobile-pad content-surface" bgcolor="#ffffff" style="padding:38px 34px 30px;background-color:#ffffff;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
+      <td width="58" valign="top" style="width:58px;padding-right:17px;"><div style="width:48px;height:48px;border-radius:24px;background-color:#3f5b43;color:#ffffff;font-size:25px;line-height:48px;text-align:center;font-family:Arial,sans-serif;">&#10003;</div></td>
+      <td valign="top">
+        <div class="muted-text" style="margin:0 0 8px;color:#76571d;font-size:11px;line-height:16px;text-transform:uppercase;letter-spacing:1.1px;font-weight:600;">${escapeHtml(eyebrow)}</div>
+        <h1 class="hero-title heading-text" style="margin:0 0 11px;font-family:Georgia,'Times New Roman',serif;font-size:34px;line-height:40px;font-weight:400;color:#111111;">${escapeHtml(title)}</h1>
+        <p class="body-text" style="margin:0;color:#222222;font-size:15px;line-height:24px;">${escapeHtml(intro)}</p>
+      </td>
+    </tr></table>
+  </td></tr>`;
+}
+
+function cancellationCard() {
+  return recurringCallout(
+    "Cancellation instructions",
+    `Cancellation requests must be emailed to <a class="contact-link" href="mailto:${CONTACTS.managementEmail}" style="color:#314f38;text-decoration:underline;">${CONTACTS.managementEmail}</a> at least five (5) business days before your next scheduled billing date. Recurring charges continue until Management processes your cancellation.`
+  );
+}
+
+function buildValetRecurringResidentEmail(rawOrder) {
+  const order = normalizeOrder(rawOrder);
+  const content = [
+    recurringHero({
+      eyebrow:"Recurring Monthly Subscription",
+      title:"Recurring Monthly Subscription Activated",
+      intro:"Your recurring monthly Valet Parking subscription has been successfully activated. This is not a one-time payment."
+    }),
+    contentSection("Monthly Charges", recurringBreakdownCard()),
+    contentSection("Subscription Details", recurringDetailsCard([
+      ["Service","Valet Parking"],
+      ["Billing frequency","Monthly"],
+      ["Status","Active"],
+      ["Enrollment date",dateTime(order.createdAt)],
+      ["Resident",order.residentName],
+      ["Unit",order.unit]
+    ])),
+    contentSection("Automatic Monthly Payments", recurringCallout(
+      "Recurring Monthly Subscription — NOT a one-time payment",
+      "Your selected payment method will automatically be charged $257.55 each month until your subscription is canceled."
+    )),
+    contentSection("Contact BrickellHouse", cancellationCard(), true)
+  ].join("");
+
+  return {
+    from:SENDER,
+    to:order.email,
+    subject:"Valet Parking Recurring Monthly Subscription Activated",
+    html:emailShell({
+      preheader:"Your recurring monthly Valet Parking subscription is active.",
+      serviceLabel:"Resident Services",
+      title:"Recurring Monthly Valet Subscription Activated",
+      content,
+      footerNote:"This email confirms your recurring monthly Valet Parking enrollment. Please do not reply; contact Management directly with questions."
+    }),
+    text:`Recurring Monthly Subscription Activated\n\nThis is a Recurring Monthly Subscription. This is NOT a one-time payment.\n\nService: Valet Parking\nValet: ${money(25000)}/month\nProcessing Fee: ${money(755)}/month\nMonthly Total: ${money(25755)}\nBilling Frequency: Monthly\nStatus: Active\nEnrollment Date: ${dateTime(order.createdAt)}\nResident: ${safeText(order.residentName)}\nUnit: ${safeText(order.unit)}\n\nYour selected payment method will automatically be charged each month until your subscription is canceled.\n\nTo cancel your recurring subscription, please email ${CONTACTS.managementEmail} at least five (5) business days before your next scheduled billing date. Recurring charges continue until Management processes your cancellation.\n\nBrickellHouse Condominium\nportal.brickellhouse.org`
+  };
+}
+
+function buildValetRecurringManagementEmail(rawOrder) {
+  const order = normalizeOrder(rawOrder);
+  const content = [
+    recurringHero({
+      eyebrow:"RECURRING MONTHLY SUBSCRIPTION ENROLLMENT",
+      title:"New Valet Enrollment",
+      intro:"This resident has enrolled in Automatic Monthly Valet Parking Payments. This is a recurring monthly subscription."
+    }),
+    contentSection("Resident and Enrollment", recurringDetailsCard([
+      ["Resident",order.residentName],
+      ["Email",order.email],
+      ["Unit",order.unit],
+      ["Enrollment date",dateTime(order.createdAt)],
+      ["Billing frequency","Monthly"]
+    ])),
+    contentSection("Monthly Charges", recurringBreakdownCard()),
+    contentSection("Next Action", recurringCallout(
+      "Review this recurring enrollment in the Management workflow.",
+      "Process cancellation requests received at least five business days before the resident’s next scheduled billing date."
+    ), true)
+  ].join("");
+
+  return {
+    from:SENDER,
+    to:MANAGEMENT_RECIPIENT,
+    subject:"New BrickellHouse Store Order",
+    html:emailShell({
+      preheader:`Recurring monthly Valet enrollment for Unit ${order.unit}.`,
+      serviceLabel:"Management",
+      title:"Recurring Monthly Subscription Enrollment",
+      content,
+      footerNote:"This email was sent automatically to notify Management of a recurring Valet enrollment."
+    }),
+    text:`RECURRING MONTHLY SUBSCRIPTION ENROLLMENT\n\nThis resident has enrolled in Automatic Monthly Valet Parking Payments.\nThis is a recurring monthly subscription.\n\nResident: ${safeText(order.residentName)}\nEmail: ${safeText(order.email)}\nUnit: ${safeText(order.unit)}\nValet: ${money(25000)}\nProcessing Fee: ${money(755)}\nMonthly Total: ${money(25755)}\nEnrollment Date: ${dateTime(order.createdAt)}\nBilling Frequency: Monthly`
+  };
+}
+
+function buildValetRecurringRenewalEmail(renewal) {
+  const residentName = safeText(renewal?.residentName, "Resident");
+  const unit = safeText(renewal?.unit, "Not provided");
+  const nextRenewal = renewal?.nextRenewalDate ? dateTime(renewal.nextRenewalDate) : "";
+  const details = [
+    ["Resident",residentName],
+    ["Unit",unit],
+    ["Service","Valet Parking"],
+    ["Valet amount",money(renewal?.valetCents ?? 25000)],
+    ["Processing Fee",money(renewal?.processingFeeCents ?? 755)],
+    ["Total paid",money(renewal?.monthlyTotalCents ?? 25755)],
+    ["Payment date",dateTime(renewal?.renewalDate)],
+    ["Transaction reference",safeText(renewal?.transactionReference, "Not provided")]
+  ];
+  if (nextRenewal) details.push(["Next renewal date",nextRenewal]);
+  const content = [
+    recurringHero({
+      eyebrow:"Management",
+      title:"Valet Subscription Renewed",
+      intro:"A recurring monthly Valet Parking payment was successfully completed."
+    }),
+    contentSection("Renewal Details", recurringDetailsCard(details), true)
+  ].join("");
+  const nextRenewalText = nextRenewal ? `\nNext Renewal Date: ${nextRenewal}` : "";
+
+  return {
+    from:SENDER,
+    to:MANAGEMENT_RECIPIENT,
+    subject:`Valet Recurring Subscription Renewed \u2013 Unit ${unit}`,
+    html:emailShell({
+      preheader:`Valet recurring subscription renewed for Unit ${unit}.`,
+      serviceLabel:"Management",
+      title:"Valet Recurring Subscription Renewed",
+      content,
+      footerNote:"This email was sent automatically after Stripe confirmed a successful recurring Valet payment."
+    }),
+    text:`Valet Recurring Subscription Renewed\n\nResident Name: ${residentName}\nUnit: ${unit}\nService: Valet Parking\nValet Amount: ${money(renewal?.valetCents ?? 25000)}\nProcessing Fee: ${money(renewal?.processingFeeCents ?? 755)}\nTotal Paid: ${money(renewal?.monthlyTotalCents ?? 25755)}\nPayment Date: ${dateTime(renewal?.renewalDate)}\nTransaction Reference: ${safeText(renewal?.transactionReference, "Not provided")}${nextRenewalText}`
+  };
+}
+
 async function deliver(resend, email, label, idempotencyKey) {
   try {
     const result = await resend.emails.send(email, {idempotencyKey});
@@ -409,4 +563,46 @@ async function sendOrderEmails(order, options = {}) {
   return {resident,management,skipped:false};
 }
 
-module.exports = {sendOrderEmails,buildResidentEmail,buildManagementEmail,SENDER,MANAGEMENT_RECIPIENT};
+async function sendValetRecurringEnrollmentEmails(order, options = {}) {
+  const apiKey = options.apiKey ?? process.env.RESEND_API_KEY;
+  const resend = options.resend || (apiKey ? new Resend(apiKey) : null);
+  if (!resend) {
+    console.warn("Recurring Valet enrollment emails skipped: RESEND_API_KEY is not configured.");
+    return {resident:false,management:false,skipped:true};
+  }
+
+  const keyBase = String(order.paymentId || order.orderNumber).replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 160);
+  const sendResident = options.sendResident !== false;
+  const sendManagement = options.sendManagement !== false;
+  const resident = sendResident
+    ? await deliver(resend, buildValetRecurringResidentEmail(order), "recurring Valet resident enrollment", `brickellhouse-valet-recurring-resident-${keyBase}`)
+    : true;
+  const management = sendManagement
+    ? await deliver(resend, buildValetRecurringManagementEmail(order), "recurring Valet management enrollment", `brickellhouse-valet-recurring-management-${keyBase}`)
+    : true;
+  return {resident,management,skipped:false};
+}
+
+async function sendValetRecurringRenewalEmail(renewal, options = {}) {
+  const apiKey = options.apiKey ?? process.env.RESEND_API_KEY;
+  const resend = options.resend || (apiKey ? new Resend(apiKey) : null);
+  if (!resend) {
+    console.warn("Recurring Valet renewal email skipped: RESEND_API_KEY is not configured.");
+    return false;
+  }
+  const keyBase = String(renewal?.invoiceId || "renewal").replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 180);
+  return deliver(resend, buildValetRecurringRenewalEmail(renewal), "recurring Valet management renewal", `brickellhouse-valet-recurring-renewal-${keyBase}`);
+}
+
+module.exports = {
+  sendOrderEmails,
+  sendValetRecurringEnrollmentEmails,
+  sendValetRecurringRenewalEmail,
+  buildResidentEmail,
+  buildManagementEmail,
+  buildValetRecurringResidentEmail,
+  buildValetRecurringManagementEmail,
+  buildValetRecurringRenewalEmail,
+  SENDER,
+  MANAGEMENT_RECIPIENT
+};
