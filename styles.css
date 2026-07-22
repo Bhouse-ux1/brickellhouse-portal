@@ -455,7 +455,8 @@ body.management-page{background:#eef0ec}
 .valet-payment-choice{display:grid;grid-template-columns:18px 1fr;gap:12px;align-items:flex-start;margin:0;padding:15px;border:1px solid #ddd8cc;border-radius:5px;background:#fff;cursor:pointer}
 .valet-payment-choice:has(input:checked){border-color:#788373;background:#f4f6f0;box-shadow:inset 3px 0 0 #788373}
 .valet-payment-choice input,.valet-recurring-authorization input{width:16px;height:16px;margin:2px 0 0;accent-color:#53604f}
-.valet-payment-choice strong,.valet-recurring-authorization strong{display:block;color:#222824;font-family:var(--serif);font-size:18px;font-weight:600;line-height:1.25}
+.valet-payment-choice>span,.valet-recurring-authorization>span{font-family:var(--sans);letter-spacing:normal;text-transform:none}
+.valet-payment-choice strong,.valet-recurring-authorization strong{display:block;color:#222824;font-family:inherit;font-size:12px;font-weight:500;line-height:1.5;letter-spacing:normal;text-transform:none}
 .valet-payment-choice small,.valet-recurring-authorization small{display:block;margin-top:5px;color:#606761;font-size:10px;line-height:1.6}
 .valet-recurring-details{display:grid;gap:16px;margin-top:6px;padding:18px;border:1px solid #cfd5c9;border-radius:5px;background:#f5f7f1}
 .valet-recurring-breakdown{display:grid;gap:9px;padding:15px;background:#fff;border:1px solid #d8dcd3}
