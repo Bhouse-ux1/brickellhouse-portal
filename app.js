@@ -2,6 +2,7 @@ const CATALOG_VERSION = "resident-services-2026-06-12-v2";
 const LEGAL_NOTICE_VERSION = window.BH_LEGAL_NOTICE.version;
 const CATEGORIES = ["Keys & Access", "Maintenance Services", "HVAC Services", "Subscriptions & Plans"];
 const PRODUCT_IMAGE_VERSION = "20260624-product-images1";
+const VALET_MONTHLY_PARKING_PRODUCT_ID = "svc13";
 
 const seedProducts = [
   {id:"svc1",name:"Mailbox Key Copy",category:"Keys & Access",description:"Replacement key for your assigned mailbox.",price:1,inventory:99,image:"offer-mailbox-key.webp",active:true},
@@ -105,6 +106,8 @@ let cart = Array.isArray(storedCart) ? storedCart : [];
 let feeSettings = publicFeeSettings(storedFeeSettings || {});
 let activeCategory = "All";
 let lastProductRenderKey = "";
+let valetCartConflictType = "";
+let valetCartConflictReturnFocus = null;
 const residentAppIsCheckoutPage = document.body.classList.contains("checkout-page");
 let storeCatalogReady = residentAppIsCheckoutPage;
 let residentCatalogUnavailable = false;
@@ -214,7 +217,7 @@ function renderProducts() {
       <div class="product-info">
         <span class="product-category">${display.category}</span>
         <h3>${display.name}</h3><p>${display.description}</p>
-        <div class="product-bottom"><strong>${product.price === 0 ? t("common.free") : money(product.price)}</strong><button class="add-button" data-add="${product.id}" ${product.inventory === 0 ? "disabled" : ""} aria-label="${t("store.add", {name:display.name})}">+</button></div>
+        <div class="product-bottom"><strong>${product.price === 0 ? t("common.free") : money(product.price)}</strong><button class="add-button" data-add="${product.id}" ${product.inventory === 0 ? "disabled" : ""} aria-label="${t("store.add", {name:display.name})}">${t("store.addToCart")}</button></div>
       </div>
     </article>`
     );
@@ -225,7 +228,7 @@ function renderProducts() {
     $("#emptyState").textContent = residentCatalogUnavailable ? t("checkout.catalogUnavailable") : t("store.noResults");
   }
   $("#emptyState")?.classList.toggle("hidden", filtered.length > 0);
-  $$('[data-add]').forEach(button => button.onclick = () => addToCart(button.dataset.add));
+  $$('[data-add]').forEach(button => button.onclick = () => addToCart(button.dataset.add, button));
 }
 
 async function loadPublicProductCatalog() {
@@ -268,10 +271,56 @@ async function loadPublicProductCatalog() {
   }
 }
 
-function addToCart(id) {
+function cartContainsValetMonthlyParking() {
+  return cart.some(item => item.id === VALET_MONTHLY_PARKING_PRODUCT_ID && item.quantity > 0);
+}
+
+function cartContainsOtherStoreItems() {
+  return cart.some(item => item.id !== VALET_MONTHLY_PARKING_PRODUCT_ID && item.quantity > 0);
+}
+
+function renderValetCartConflict() {
+  if (!valetCartConflictType) return;
+  const addingValet = valetCartConflictType === "adding_valet";
+  const title = $("#valetCartModalTitle");
+  const primary = $("#valetCartModalPrimary");
+  const secondary = $("#valetCartModalSecondary");
+  const continueButton = $("#valetCartContinue");
+  const actionButton = $("#valetCartAction");
+  if (title) title.textContent = t(addingValet ? "store.valetSeparateTitle" : "store.separateCheckoutTitle");
+  if (primary) primary.textContent = t(addingValet ? "store.valetSeparatePrimary" : "store.otherItemSeparatePrimary");
+  if (secondary) secondary.textContent = t(addingValet ? "store.valetSeparateSecondary" : "store.otherItemSeparateSecondary");
+  if (continueButton) continueButton.textContent = t("store.continueShopping");
+  if (actionButton) actionButton.textContent = t(addingValet ? "store.viewCart" : "store.checkoutNow");
+}
+
+function showValetCartConflict(type, trigger) {
+  valetCartConflictType = type;
+  valetCartConflictReturnFocus = trigger || null;
+  renderValetCartConflict();
+  openModal("#valetCartModal");
+  requestAnimationFrame(() => $("#valetCartContinue")?.focus());
+}
+
+function closeValetCartConflict({restoreFocus = true} = {}) {
+  closeModal("#valetCartModal");
+  if (restoreFocus) valetCartConflictReturnFocus?.focus();
+  valetCartConflictReturnFocus = null;
+  valetCartConflictType = "";
+}
+
+function addToCart(id, trigger) {
   const item = cart.find(candidate => candidate.id === id);
   const product = products.find(candidate => candidate.id === id);
   if (!product || !product.active || Number(product.inventory || 0) < 1) return;
+  if (id === VALET_MONTHLY_PARKING_PRODUCT_ID && cartContainsOtherStoreItems()) {
+    showValetCartConflict("adding_valet", trigger);
+    return;
+  }
+  if (id !== VALET_MONTHLY_PARKING_PRODUCT_ID && cartContainsValetMonthlyParking()) {
+    showValetCartConflict("adding_other_item", trigger);
+    return;
+  }
   if (item) {
     if (item.quantity < product.inventory) item.quantity++;
   } else {
@@ -285,7 +334,9 @@ function addToCart(id) {
 
 function updateCartSummary(items = cart.map(item => ({...item, product:products.find(product => product.id === item.id)})).filter(item => item.product), {toggleEmptyState = true, totals = null} = {}) {
   if (!$("#cartCount")) return;
-  $("#cartCount").textContent = items.reduce((sum, item) => sum + item.quantity, 0);
+  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  $("#cartCount").textContent = itemCount;
+  if ($("#cartCount").closest("#cartOpen")) $("#cartCount").classList.toggle("hidden", itemCount === 0);
   const subtotal = totals ? totals.subtotal : cartSubtotal();
   const fee = totals ? totals.processingFee : processingFee(subtotal);
   $("#cartTotal").textContent = money(subtotal);
@@ -381,6 +432,22 @@ if ($("#checkoutOpen")) $("#checkoutOpen").onclick = () => {
   setDrawer(false);
   window.location.href = "checkout.html";
 };
+if ($("#valetCartContinue")) $("#valetCartContinue").onclick = () => closeValetCartConflict();
+if ($("#valetCartAction")) $("#valetCartAction").onclick = () => {
+  const action = valetCartConflictType;
+  closeValetCartConflict({restoreFocus:false});
+  if (action === "adding_other_item") {
+    window.location.href = "checkout.html";
+    return;
+  }
+  setDrawer(true);
+};
+if ($("#valetCartModal")) $("#valetCartModal").addEventListener("click", event => {
+  if (event.target === event.currentTarget) closeValetCartConflict();
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && $("#valetCartModal")?.classList.contains("open")) closeValetCartConflict();
+});
 if ($("#searchInput")) $("#searchInput").oninput = renderProducts;
 if ($("#legalNoticeOpen")) $("#legalNoticeOpen").onclick = () => openModal("#legalModal");
 if ($("#legalAcceptance")) $("#legalAcceptance").onchange = event => {
@@ -428,6 +495,7 @@ document.addEventListener("bh:language-changed", () => {
   renderProducts();
   renderCart();
   renderLegalNotice();
+  renderValetCartConflict();
 });
 
 if (residentAppIsCheckoutPage) {

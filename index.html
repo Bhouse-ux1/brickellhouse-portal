@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="BrickellHouse resident services and essentials portal." data-i18n-content="portal.metaDescription">
   <title>BrickellHouse | Resident Services</title>
-  <script src="i18n.js?v=20260720-feedback-cooldown1"></script>
+  <script src="i18n.js?v=20260724-valet-cart-ui1"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260717-product-image-fill1">
+  <link rel="stylesheet" href="styles.css?v=20260724-valet-cart-ui1">
 </head>
 <body data-i18n-title="portal.pageTitle">
   <div class="ambient" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -31,7 +31,13 @@
       <button type="button" data-language="es" aria-pressed="false" aria-label="Spanish" data-i18n-aria-label="language.spanish">ES</button>
     </div>
     <button class="cart-button" id="cartOpen" aria-label="Open cart" data-i18n-aria-label="nav.openCart">
-      <span data-i18n="nav.bag">Bag</span><b id="cartCount">0</b>
+      <span class="cart-button-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="M6.75 8.25h10.5l.75 12H6l.75-12Z"></path>
+          <path d="M9 8.25V6a3 3 0 0 1 6 0v2.25"></path>
+        </svg>
+      </span>
+      <b class="hidden" id="cartCount">0</b>
     </button>
     <div class="mobile-menu" id="mobileMenu">
       <a href="index.html" data-i18n="common.home">Home</a>
@@ -182,6 +188,20 @@
     </div>
   </div>
 
+  <div class="modal valet-cart-modal" id="valetCartModal" role="dialog" aria-modal="true" aria-labelledby="valetCartModalTitle" aria-describedby="valetCartModalMessage">
+    <div class="modal-card valet-cart-modal-card">
+      <h2 id="valetCartModalTitle">Valet Monthly Parking</h2>
+      <div class="valet-cart-modal-message" id="valetCartModalMessage">
+        <p id="valetCartModalPrimary">To keep monthly parking separate from other Store purchases, Valet Monthly Parking must be purchased in its own checkout.</p>
+        <p id="valetCartModalSecondary">Please complete your current purchase first, then return to purchase Valet Monthly Parking.</p>
+      </div>
+      <div class="valet-cart-modal-actions">
+        <button class="outline-button" id="valetCartContinue" type="button">Continue Shopping</button>
+        <button class="primary-button" id="valetCartAction" type="button">View Cart</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
   <section class="resident-chat" id="residentChat" aria-label="AI assistant chat" data-i18n-aria-label="luna.widgetLabel">
     <button class="chat-launcher" id="chatLauncher" type="button" aria-expanded="false" aria-controls="chatPanel" aria-label="Open AI assistant" data-i18n-aria-label="luna.open">
@@ -214,7 +234,7 @@
   <script src="legal.js?v=20260615-legal1"></script>
   <script src="public-nav.js?v=20260713-resident-i18n1"></script>
   <script src="processing-fee.js?v=20260716-fee1"></script>
-  <script src="app.js?v=20260717-resident-performance1"></script>
+  <script src="app.js?v=20260724-valet-cart-ui1"></script>
   <script src="roadmap.js?v=20260720-feedback-cooldown1"></script>
   <script src="chat.js?v=20260720-luna-performance1"></script>
 </body>
